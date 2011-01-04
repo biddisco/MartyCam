@@ -20,15 +20,16 @@ public:
 	ProcessingThread* getProcessingThread() { return processingThread; }
 	CaptureThread*    getCaptureThread() { return captureThread; }
 	double getFPS();
+
 public slots:
 	void startTracking();
 	void stopTracking();
 private:
 	int frameRate;
 	CaptureThread::FrameSize frameSize;
-	CaptureThread     *captureThread;
-	ProcessingThread  *processingThread;
-	ImageBuffer* imageBuffer;
+	CaptureThread           *captureThread;
+	ProcessingThread        *processingThread;
+	ImageBuffer             *imageBuffer;
 };
 
 #endif

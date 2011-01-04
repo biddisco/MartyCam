@@ -25,6 +25,7 @@ public:
 	void setThreshold(int val) { threshold = val; }
 	void setAveraging(double val) { average = val; }
 	void setErodeBlockSize(int val) { erodeBlockSize = val; }
+	void setDisplayImage(int image) { displayImage = image; }
 	void run();
 
 private:
@@ -36,15 +37,16 @@ private:
   double       average;
 	int          erodeBlockSize;
   double       motionPercent;
+  int          displayImage;
 
   //Images to use in the program.
   CvSize    imageSize;
-  IplImage* greyImage;
-  IplImage* colourImage;
+  IplImage* currentImage;
+  IplImage* thresholdImage;
   IplImage* blendImage;
   IplImage* movingAverage;
   IplImage* difference;
-  IplImage* temp;
+  IplImage* tempImage;
 
 };
 

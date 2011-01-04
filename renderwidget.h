@@ -21,6 +21,7 @@ private:
 	void updatePixmap(const IplImage* frame);
   QImage *bufferImage;
   QImage *lastImage;
+  bool UpdatingImage;
 };
 
 #endif

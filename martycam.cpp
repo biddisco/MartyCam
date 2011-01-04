@@ -26,7 +26,7 @@ MartyCam::MartyCam() : QMainWindow(0)
 	// create the settings dock widget
   settingsDock = new QDockWidget("Settings", this);
 	settingsDock->setAllowedAreas(Qt::RightDockWidgetArea | Qt::LeftDockWidgetArea);
-	settingsWidget = new SettingsWidget(this, this->trackController->getCaptureThread());
+	settingsWidget = new SettingsWidget(this, this->trackController->getCaptureThread(), this->trackController->getProcessingThread());
 	settingsDock->setWidget(settingsWidget);
   settingsDock->setMinimumWidth(300);
 //  this->centralWidget()->layout()->addWidget(settingsDock);

@@ -3,13 +3,15 @@
 
 #include "ui_settings.h"
 #include "capturethread.h"
+#include "processingthread.h"
 #include <QDateTime>
 #include <QTimer>
+#include <QButtonGroup>
 
 class SettingsWidget : public QWidget {
 Q_OBJECT;
 public:
-  SettingsWidget(QWidget* parent, CaptureThread *capthread);
+  SettingsWidget(QWidget* parent, CaptureThread *capthread, ProcessingThread *procthread);
   CaptureThread::FrameSize getSelectedResolution();
   void RecordAVI(bool state);
 
@@ -23,6 +25,7 @@ public slots:
   void onBrowseClicked();
   void onWriteAVIToggled(bool state);
   void onTimer();
+  void onImageSelection(int btn);
 
 signals:
 	void resolutionSelected(CaptureThread::FrameSize);
@@ -33,10 +36,12 @@ signals:
 
 private:
 	Ui::SettingsWidget ui;
-	CaptureThread *capturethread;
+	CaptureThread    *capturethread;
+  ProcessingThread *processingthread;
   QTime   AVI_StartTime;
   QTime   AVI_EndTime;
   QTimer  clock;
+  QButtonGroup ImageButtonGroup;
 };
 
 #endif

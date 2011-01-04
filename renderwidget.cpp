@@ -15,15 +15,19 @@ IplImage* QImage2IplImage(QImage *qimg)
   return imgHeader;
 }
 //----------------------------------------------------------------------------
-QImage*  IplImage2QImage(const IplImage *iplImg)
+// this->movingAverage  = cvCreateImage( imageSize, IPL_DEPTH_32F, 3);
+// this->thresholdImage = cvCreateImage( imageSize, IPL_DEPTH_8U, 1);
+//----------------------------------------------------------------------------
+template <typename T> 
+QImage *IplImage2QImage(const IplImage *iplImg)
 {
   int h = iplImg->height;
   int w = iplImg->width;
   int channels = iplImg->nChannels;
   QImage *qimg = new QImage(w, h, QImage::Format_ARGB32);
-  char *data = iplImg->imageData;
+  const T *data = reinterpret_cast<const T *>(iplImg->imageData);
   //
-  for (int y = 0; y < h; y++, data += iplImg->widthStep) {
+  for (int y = 0; y < h; y++, data += iplImg->widthStep/sizeof(T)) {
     for (int x = 0; x < w; x++) {
       char r, g, b, a = 0;
       if (channels == 1) {
@@ -56,6 +60,7 @@ RenderWidget::RenderWidget(QWidget* parent) : QWidget(parent), Filter()
 	connect(this, SIGNAL(frameSizeChanged(int, int)), this, SLOT(onFrameSizeChanged(int, int)), Qt::QueuedConnection);
   this->bufferImage = NULL;
   this->lastImage = NULL;
+  this->UpdatingImage = false;
 }
 //----------------------------------------------------------------------------
 void RenderWidget::onFrameSizeChanged(int width, int height) {
@@ -64,9 +69,15 @@ void RenderWidget::onFrameSizeChanged(int width, int height) {
 //----------------------------------------------------------------------------
 void RenderWidget::updatePixmap(const IplImage* frame) 
 {
-  QImage *temp = this->lastImage;
-  this->lastImage = this->bufferImage;
-  this->bufferImage = IplImage2QImage(frame);
+  QImage *temp = this->bufferImage;
+  this->UpdatingImage = true;
+  if (frame->depth == IPL_DEPTH_32F) {
+    this->bufferImage = IplImage2QImage<float>(frame);
+  } 
+  else {
+    this->bufferImage = IplImage2QImage<char>(frame);
+  }
+  this->UpdatingImage = false;
   delete temp;
 }
 //----------------------------------------------------------------------------
@@ -79,10 +90,10 @@ void RenderWidget::processPoint(const IplImage* image) {
 //----------------------------------------------------------------------------
 void RenderWidget::paintEvent(QPaintEvent*) {
 	QPainter painter(this);
-	if (this->lastImage) {
-		painter.drawImage(QPoint(0,0), *this->lastImage);
+	if (this->bufferImage && !this->UpdatingImage) {
+		painter.drawImage(QPoint(0,0), *this->bufferImage);
 	}
-	else {
+	else if (!this->UpdatingImage) {
 		painter.setBrush(Qt::black);
 		painter.drawRect(rect());
 	}

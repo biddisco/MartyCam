@@ -126,8 +126,8 @@ void CaptureThread::saveAVI(IplImage *image)
     this->AVI_Writer = cvCreateVideoWriter(
       path.c_str(),
       0,  
-      // 15.0,  
-      this->getFPS(),
+       15.0,  
+      // this->getFPS(),
       imageSize
     );
     emit(RecordingState(true));

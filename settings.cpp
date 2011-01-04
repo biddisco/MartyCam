@@ -3,10 +3,13 @@
 #include <QFileDialog>
 
 //----------------------------------------------------------------------------
-SettingsWidget::SettingsWidget(QWidget* parent, CaptureThread *capthread) : QWidget(parent) {
+SettingsWidget::SettingsWidget(QWidget* parent, 
+  CaptureThread *capthread, ProcessingThread *procthread) : QWidget(parent) 
+{
 	ui.setupUi(this);
 	setMinimumWidth(150);
   this->capturethread = capthread;
+  this->processingthread = procthread;
   //	
 	connect(ui.res640Radio, SIGNAL(toggled(bool)), this, SLOT(on640ResToggled(bool)));
 	connect(ui.res320Radio, SIGNAL(toggled(bool)), this, SLOT(on320ResToggled(bool)));
@@ -17,6 +20,13 @@ SettingsWidget::SettingsWidget(QWidget* parent, CaptureThread *capthread) : QWid
 	connect(ui.browse, SIGNAL(clicked()), this, SLOT(onBrowseClicked()));
 	connect(ui.WriteAVI, SIGNAL(toggled(bool)), this, SLOT(onWriteAVIToggled(bool)));
   connect(&this->clock, SIGNAL(timeout()), this, SLOT(onTimer()));
+  
+  ImageButtonGroup.addButton(ui.cameraImage,0);
+  ImageButtonGroup.addButton(ui.movingAverage,1);
+  ImageButtonGroup.addButton(ui.differenceImage,2);
+  ImageButtonGroup.addButton(ui.combinedImage,3);
+  connect(&ImageButtonGroup, SIGNAL(buttonClicked(int)), this, SLOT(onImageSelection(int)));
+
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::onVerticalFlipStateChanged(int state) {
@@ -99,7 +109,7 @@ void SettingsWidget::onTimer()
 //----------------------------------------------------------------------------
 CaptureThread::FrameSize SettingsWidget::getSelectedResolution() 
 {
-	if(ui.res640Radio->isChecked()) {
+	if (ui.res640Radio->isChecked()) {
 		return CaptureThread::Size640;
 	}
 	return CaptureThread::Size320;
@@ -137,5 +147,10 @@ void SettingsWidget::RecordAVI(bool state)
     this->clock.start();
     this->onTimer();
   }
+}
+//----------------------------------------------------------------------------
+void SettingsWidget::onImageSelection(int btn)
+{
+  this->processingthread->setDisplayImage(btn);
 }
 //----------------------------------------------------------------------------
