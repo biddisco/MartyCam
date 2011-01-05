@@ -52,50 +52,50 @@ QImage *IplImage2QImage(const IplImage *iplImg)
   return qimg;
 }
 //----------------------------------------------------------------------------
-RenderWidget::RenderWidget(QWidget* parent) : QWidget(parent), Filter() 
+RenderWidget::RenderWidget(QWidget* parent) : QWidget(parent), Filter(), imageValid(1) 
 {
-	setAttribute(Qt::WA_OpaquePaintEvent, true); // don't clear the area before the paintEvent
-	setAttribute(Qt::WA_PaintOnScreen, true); // disable double buffering
-	setFixedSize(640, 480);
-	connect(this, SIGNAL(frameSizeChanged(int, int)), this, SLOT(onFrameSizeChanged(int, int)), Qt::QueuedConnection);
+  setAttribute(Qt::WA_OpaquePaintEvent, true); // don't clear the area before the paintEvent
+  setAttribute(Qt::WA_PaintOnScreen, true); // disable double buffering
+  setFixedSize(640, 480);
+  connect(this, SIGNAL(frameSizeChanged(int, int)), this, SLOT(onFrameSizeChanged(int, int)), Qt::QueuedConnection);
   this->bufferImage = NULL;
-  this->lastImage = NULL;
-  this->UpdatingImage = false;
 }
 //----------------------------------------------------------------------------
 void RenderWidget::onFrameSizeChanged(int width, int height) {
-	setFixedSize(width, height);
+  setFixedSize(width, height);
 } 
 //----------------------------------------------------------------------------
 void RenderWidget::updatePixmap(const IplImage* frame) 
 {
   QImage *temp = this->bufferImage;
-  this->UpdatingImage = true;
+  imageValid.acquire();
   if (frame->depth == IPL_DEPTH_32F) {
     this->bufferImage = IplImage2QImage<float>(frame);
   } 
   else {
     this->bufferImage = IplImage2QImage<char>(frame);
   }
-  this->UpdatingImage = false;
+  imageValid.release();
   delete temp;
 }
 //----------------------------------------------------------------------------
 void RenderWidget::processPoint(const IplImage* image) {
-	// copy the image to the local pixmap and update the display
-	updatePixmap(image);
-	update();
-//	notifyListener(frame);
+  // copy the image to the local pixmap and update the display
+  updatePixmap(image);
+  update();
+  //  notifyListener(frame);
 }
 //----------------------------------------------------------------------------
 void RenderWidget::paintEvent(QPaintEvent*) {
-	QPainter painter(this);
-	if (this->bufferImage && !this->UpdatingImage) {
-		painter.drawImage(QPoint(0,0), *this->bufferImage);
-	}
-	else if (!this->UpdatingImage) {
-		painter.setBrush(Qt::black);
-		painter.drawRect(rect());
-	}
+  QPainter painter(this);
+  if (this->bufferImage) {
+    imageValid.acquire();
+    painter.drawImage(QPoint(0,0), *this->bufferImage);
+    imageValid.release();
+  }
+  else {
+    painter.setBrush(Qt::black);
+    painter.drawRect(rect());
+  }
 }
 //----------------------------------------------------------------------------

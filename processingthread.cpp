@@ -10,11 +10,14 @@ ProcessingThread::ProcessingThread(ImageBuffer* buffer) :
   this->difference = NULL;
   this->tempImage = NULL;
   this->currentImage = NULL;
-  this->threshold = 10;
-  this->average = 0.6;
-	this->erodeBlockSize = 4;
+  this->threshold = 7;
+  this->average = 0.4;
+  this->erodeIterations = 2;
+  this->dilateIterations = 4;
+
   this->motionPercent = 0.0;
   this->displayImage = 3;
+  this->blendRatio   = 0.75;
 
   this->imageSize.width = 640;
   this->imageSize.height = 480;
@@ -33,64 +36,68 @@ ProcessingThread::~ProcessingThread()
 }
 //----------------------------------------------------------------------------
 void ProcessingThread::run() {
-	while (true) {
-		this->currentImage = imageBuffer->getFrame();
+  while (true) {
+    this->currentImage = imageBuffer->getFrame();
     if (!this->difference) {
       this->difference = cvCloneImage( this->currentImage );
       this->tempImage = cvCloneImage(this->currentImage );
       cvConvertScale(this->currentImage, movingAverage, 1.0, 0.0);
     }
-		if (this->currentImage) {
-			if (flipVertical) {
-				cvFlip(this->currentImage, 0, 0);
-			}
+    if (this->currentImage) {
+      if (flipVertical) {
+        cvFlip(this->currentImage, 0, 0);
+      }
       if (this->MotionDetecting) {
-        cvRunningAvg(currentImage, movingAverage, this->average, NULL);
+        cvRunningAvg(this->currentImage, this->movingAverage, this->average, NULL);
 
-        //Convert the scale of the moving average.
-        cvConvertScale(movingAverage,tempImage, 1.0, 0.0);
+        // Convert the type of the moving average from float to char
+        cvConvertScale(this->movingAverage, this->tempImage, 1.0, 0.0);
 
-        //Minus the current frame from the moving average.
-        cvAbsDiff(currentImage, tempImage, difference);
+        // Subtract the current frame from the moving average.
+        cvAbsDiff(this->currentImage, this->tempImage, this->difference);
 
-        //Convert the image to grayscale.
-        cvCvtColor(difference,thresholdImage,CV_RGB2GRAY);
+        // Convert the image to grayscale.
+        cvCvtColor(this->difference, this->thresholdImage, CV_RGB2GRAY);
 
-        //Convert the image to black and white.
-        cvThreshold(thresholdImage, thresholdImage, threshold, 255, CV_THRESH_BINARY);
+        // Threshold the image to black/white off/on.
+        cvThreshold(this->thresholdImage, this->thresholdImage, threshold, 255, CV_THRESH_BINARY);
 
-        //Dilate and erode to get people blobs
-        cvDilate(thresholdImage, thresholdImage, 0, this->erodeBlockSize);
-        cvErode(thresholdImage, thresholdImage, 0, this->erodeBlockSize);
+        // Erode and Dilate to denoise and produce blobs
+        if (this->erodeIterations>0) {
+          cvErode(this->thresholdImage, this->thresholdImage, 0, this->erodeIterations);
+        }
+        if (this->dilateIterations>0) {
+          cvDilate(this->thresholdImage, this->thresholdImage, 0, this->dilateIterations);
+        }
 
-        //Convert the image to grayscale.
-        cvCvtColor(thresholdImage, this->blendImage, CV_GRAY2RGB);
-        this->countPixels(thresholdImage);
+        // Convert the image to grayscale.
+        cvCvtColor(this->thresholdImage, this->blendImage, CV_GRAY2RGB);
+        this->countPixels(this->thresholdImage);
 
         /* dst = src1 * alpha + src2 * beta + gamma */
-	      cvAddWeighted(currentImage, 0.75, this->blendImage, 0.25, 0.0, this->blendImage);
+        cvAddWeighted(currentImage, this->blendRatio, this->blendImage, 1.0-this->blendRatio, 0.0, this->blendImage);
       }
-			
-			if (rootFilter) {
+      
+      if (rootFilter) {
         switch (this->displayImage) {
           case 0:
-				    rootFilter->processPoint(this->currentImage);
+            rootFilter->processPoint(this->currentImage);
             break;
           case 1:
-				    rootFilter->processPoint(this->movingAverage);
+            rootFilter->processPoint(this->movingAverage);
             break;
           case 2:
-				    rootFilter->processPoint(this->thresholdImage);
+            rootFilter->processPoint(this->thresholdImage);
             break;
           default:
           case 3:
-				    rootFilter->processPoint(this->blendImage);
+            rootFilter->processPoint(this->blendImage);
             break;
         }
-			}
+      }
       cvReleaseImage(&this->currentImage);
-		}
-	}
+    }
+  }
 }
 //----------------------------------------------------------------------------
 void ProcessingThread::countPixels(IplImage *image) 

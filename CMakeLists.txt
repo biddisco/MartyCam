@@ -13,19 +13,19 @@ INCLUDE_DIRECTORIES(include)
 
 
 SET(QtOpenCV_UIS
-	settings.ui
-	martycam.ui
+  settings.ui
+  martycam.ui
 )
 
 QT4_WRAP_UI(QtOpenCV_UIS_H ${QtOpenCV_UIS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 SET(QtOpenCV_OBJECTS
-	martycam.h
-	settings.h
-	renderwidget.h
-	trackcontroller.h
-	capturethread.h
+  martycam.h
+  settings.h
+  renderwidget.h
+  trackcontroller.h
+  capturethread.h
 )
 
 QT_WRAP_CPP(MartyCam MOC_FILES ${QtOpenCV_OBJECTS})
@@ -33,18 +33,18 @@ QT_WRAP_CPP(MartyCam MOC_FILES ${QtOpenCV_OBJECTS})
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src ${QT_INCLUDE_DIR} ${QT_QTNETWORK_INCLUDE_DIR} ${QT_QTXML_INCLUDE_DIR})
 
 LINK_LIBRARIES(${SSL_LIBRARY} ${QT_LIBRARIES} ${QT_QTNETWORK_LIBRARIES}
-	       ${QT_QTXML_LIBRARIES})
+         ${QT_QTXML_LIBRARIES})
 
 SET(QtOpenCV_SRCS
-	capturethread.cpp
-	filter.cpp
-	martycam.cpp
-	imagebuffer.cpp
-	main.cpp
-	processingthread.cpp
-	renderwidget.cpp
-	settings.cpp
-	trackcontroller.cpp
+  capturethread.cpp
+  filter.cpp
+  martycam.cpp
+  imagebuffer.cpp
+  main.cpp
+  processingthread.cpp
+  renderwidget.cpp
+  settings.cpp
+  trackcontroller.cpp
 )
 
 ADD_EXECUTABLE(MartyCam WIN32 ${QtOpenCV_SRCS} ${QtOpenCV_UIS_H} ${MOC_FILES})

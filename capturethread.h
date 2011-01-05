@@ -13,16 +13,16 @@ class CvVideoWriter;
 class CaptureThread : public QThread {
 Q_OBJECT;
 public: 
-	enum FrameSize { Size640, Size320 };
+  enum FrameSize { Size640, Size320 };
   //
-	 CaptureThread(ImageBuffer* buffer);
+   CaptureThread(ImageBuffer* buffer);
   ~CaptureThread() ;
 
-	void run();
-	bool startCapture(int framerate, FrameSize size);
-	void stopCapture();
-	double getFPS() { return fps; }
-	bool isCapturing() { return captureActive; }
+  void run();
+  bool startCapture(int framerate, FrameSize size);
+  void stopCapture();
+  double getFPS() { return fps; }
+  bool isCapturing() { return captureActive; }
 
   void setWriteAVI(bool write) { this->AVI_Writing = write; }
   bool getWriteAVI() { return this->AVI_Writing; }
@@ -32,18 +32,18 @@ public:
   void closeAVI();
 
 signals:
-	void RecordingState(bool);
+  void RecordingState(bool);
 
 private:
-	void updateFPS(int time);
-	QMutex          captureLock;
-	QWaitCondition  captureWait;
-	ImageBuffer    *imageBuffer;
-	bool            captureActive;
+  void updateFPS(int time);
+  QMutex          captureLock;
+  QWaitCondition  captureWait;
+  ImageBuffer    *imageBuffer;
+  bool            captureActive;
   CvSize          imageSize;
-	CvCapture      *capture;
-	double          fps;
-	QQueue<int>     frameTimes;
+  CvCapture      *capture;
+  double          fps;
+  QQueue<int>     frameTimes;
   //
   CvVideoWriter  *AVI_Writer;
   bool            AVI_Writing;

@@ -8,12 +8,12 @@
  */
 class Filter {
 public:
-	Filter();
-	void setListener(Filter* list);
-	virtual void processPoint(const IplImage* image) = 0;
+  Filter();
+  void setListener(Filter* list);
+  virtual void processPoint(const IplImage* image) = 0;
 protected:
-	Filter* listener;
-	void notifyListener(const IplImage* image);
+  Filter* listener;
+  void notifyListener(const IplImage* image);
 };
 
 #endif

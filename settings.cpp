@@ -6,51 +6,50 @@
 SettingsWidget::SettingsWidget(QWidget* parent, 
   CaptureThread *capthread, ProcessingThread *procthread) : QWidget(parent) 
 {
-	ui.setupUi(this);
-	setMinimumWidth(150);
+  ui.setupUi(this);
+  setMinimumWidth(150);
   this->capturethread = capthread;
   this->processingthread = procthread;
-  //	
-	connect(ui.res640Radio, SIGNAL(toggled(bool)), this, SLOT(on640ResToggled(bool)));
-	connect(ui.res320Radio, SIGNAL(toggled(bool)), this, SLOT(on320ResToggled(bool)));
-	connect(ui.flipVertical, SIGNAL(stateChanged(int)), this, SLOT(onVerticalFlipStateChanged(int)));
-	connect(ui.threshold, SIGNAL(valueChanged(int)), this, SLOT(onThresholdChanged(int)));
-	connect(ui.average, SIGNAL(valueChanged(int)), this, SLOT(onAverageChanged(int)));
-	connect(ui.erode, SIGNAL(valueChanged(int)), this, SLOT(onErodeBlockChanged(int)));
-	connect(ui.browse, SIGNAL(clicked()), this, SLOT(onBrowseClicked()));
-	connect(ui.WriteAVI, SIGNAL(toggled(bool)), this, SLOT(onWriteAVIToggled(bool)));
+  //  
+  connect(ui.res640Radio, SIGNAL(toggled(bool)), this, SLOT(on640ResToggled(bool)));
+  connect(ui.res320Radio, SIGNAL(toggled(bool)), this, SLOT(on320ResToggled(bool)));
+  connect(ui.flipVertical, SIGNAL(stateChanged(int)), this, SLOT(onVerticalFlipStateChanged(int)));
+  connect(ui.threshold, SIGNAL(valueChanged(int)), this, SLOT(onThresholdChanged(int)));
+  connect(ui.average, SIGNAL(valueChanged(int)), this, SLOT(onAverageChanged(int)));
+  connect(ui.erode, SIGNAL(valueChanged(int)), this, SLOT(onErodeChanged(int)));
+  connect(ui.dilate, SIGNAL(valueChanged(int)), this, SLOT(onDilateChanged(int)));
+  connect(ui.browse, SIGNAL(clicked()), this, SLOT(onBrowseClicked()));
+  connect(ui.WriteAVI, SIGNAL(toggled(bool)), this, SLOT(onWriteAVIToggled(bool)));
   connect(&this->clock, SIGNAL(timeout()), this, SLOT(onTimer()));
+  connect(ui.blendRatio, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));  
   
   ImageButtonGroup.addButton(ui.cameraImage,0);
   ImageButtonGroup.addButton(ui.movingAverage,1);
   ImageButtonGroup.addButton(ui.differenceImage,2);
-  ImageButtonGroup.addButton(ui.combinedImage,3);
+  ImageButtonGroup.addButton(ui.blendedImage,3);
   connect(&ImageButtonGroup, SIGNAL(buttonClicked(int)), this, SLOT(onImageSelection(int)));
-
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::onVerticalFlipStateChanged(int state) {
-	emit(flipVerticalChanged(state == Qt::Checked));
+  this->processingthread->setFlipVertical(state);
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::on640ResToggled(bool on) {
-	// qDebug() << "640 is" << on;
-	if(on) {
-		emit(resolutionSelected(CaptureThread::Size640));
-	}
+  if(on) {
+    emit(resolutionSelected(CaptureThread::Size640));
+  }
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::on320ResToggled(bool on) {
-	// qDebug() << "320 is" << on;
-	if(on) {
-		emit(resolutionSelected(CaptureThread::Size320));
-	}
+  if(on) {
+    emit(resolutionSelected(CaptureThread::Size320));
+  }
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::onThresholdChanged(int value)
 {
   this->ui.t_label->setText(QString("%1").arg(value, 2));
-	emit(thresholdChanged(value));
+  this->processingthread->setThreshold(value);
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::onAverageChanged(int value)
@@ -58,13 +57,19 @@ void SettingsWidget::onAverageChanged(int value)
   double newval = value/100.0;
   QString label = QString("%1").arg(newval,4 , 'f', 2);
   this->ui.a_label->setText(label);
-	emit(averageChanged(value/100.0));
+  this->processingthread->setAveraging(value/100.0);
 }
 //----------------------------------------------------------------------------
-void SettingsWidget::onErodeBlockChanged(int value)
+void SettingsWidget::onErodeChanged(int value)
 {
   this->ui.e_label->setText(QString("%1").arg(value, 2));
-	emit(erodeBlockChanged(value));
+  this->processingthread->setErodeIterations(value);
+}
+//----------------------------------------------------------------------------
+void SettingsWidget::onDilateChanged(int value)
+{
+  this->ui.d_label->setText(QString("%1").arg(value, 2));
+  this->processingthread->setDilateIterations(value);
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::onBrowseClicked()
@@ -109,10 +114,10 @@ void SettingsWidget::onTimer()
 //----------------------------------------------------------------------------
 CaptureThread::FrameSize SettingsWidget::getSelectedResolution() 
 {
-	if (ui.res640Radio->isChecked()) {
-		return CaptureThread::Size640;
-	}
-	return CaptureThread::Size320;
+  if (ui.res640Radio->isChecked()) {
+    return CaptureThread::Size640;
+  }
+  return CaptureThread::Size320;
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::RecordAVI(bool state) 
@@ -154,3 +159,7 @@ void SettingsWidget::onImageSelection(int btn)
   this->processingthread->setDisplayImage(btn);
 }
 //----------------------------------------------------------------------------
+void SettingsWidget::onBlendChanged(int value)
+{
+  this->processingthread->setBlendRatio(value/100.0);
+}

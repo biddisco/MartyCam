@@ -12,32 +12,37 @@ class CvVideoWriter;
 
 class ProcessingThread : public QThread {
 public: 
-	 ProcessingThread(ImageBuffer* buffer);
+   ProcessingThread(ImageBuffer* buffer);
   ~ProcessingThread();
 
   void countPixels(IplImage *image);
 
   double getMotionPercent() { return this->motionPercent; }
   //
-	void setRootFilter(Filter* filter) { rootFilter = filter; }
-	void setFlipVertical(bool fv) { flipVertical = fv; }
-	void setMotionDetecting(bool md) { this->MotionDetecting = md; }
-	void setThreshold(int val) { threshold = val; }
-	void setAveraging(double val) { average = val; }
-	void setErodeBlockSize(int val) { erodeBlockSize = val; }
-	void setDisplayImage(int image) { displayImage = image; }
-	void run();
+  void setRootFilter(Filter* filter) { rootFilter = filter; }
+  void setFlipVertical(bool fv) { flipVertical = fv; }
+  void setMotionDetecting(bool md) { this->MotionDetecting = md; }
+  void setThreshold(int val) { threshold = val; }
+  void setAveraging(double val) { average = val; }
+  void setErodeIterations(int val) { erodeIterations = val; }
+  void setDilateIterations(int val) { dilateIterations = val; }
+  void setDisplayImage(int image) { displayImage = image; }
+  void setBlendRatio(double ratio) { this->blendRatio = ratio; }
+  
+  void run();
 
 private:
-	ImageBuffer *imageBuffer;
-	Filter      *rootFilter;
-	bool         flipVertical;
+  ImageBuffer *imageBuffer;
+  Filter      *rootFilter;
+  bool         flipVertical;
   bool         MotionDetecting;
   int          threshold;
   double       average;
-	int          erodeBlockSize;
+  int          erodeIterations;
+  int          dilateIterations;
   double       motionPercent;
   int          displayImage;
+  double       blendRatio;
 
   //Images to use in the program.
   CvSize    imageSize;

@@ -13,18 +13,18 @@
 
 class ImageBuffer {
 public:
-	ImageBuffer(int size);
-	void addFrame(const IplImage* image);
-	IplImage* getFrame();
-	void clear();
+  ImageBuffer(int size);
+  void addFrame(const IplImage* image);
+  IplImage* getFrame();
+  void clear();
   bool isFull();
 private:
-	QWaitCondition bufferNotEmpty;
-	QWaitCondition bufferNotFull;
-	QMutex mutex;
-	int bufferSize;
-	/** Queue of IplImage objects to store the data. **/
-	QQueue<IplImage*> imageQueue;
+  QWaitCondition bufferNotEmpty;
+  QWaitCondition bufferNotFull;
+  QMutex mutex;
+  int bufferSize;
+  /** Queue of IplImage objects to store the data. **/
+  QQueue<IplImage*> imageQueue;
 };
 
 #endif

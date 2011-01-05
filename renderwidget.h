@@ -2,26 +2,27 @@
 #define RENDER_WIDGET_H
 
 #include <QWidget>
+#include <QSemaphore>
 #include "filter.h"
-
-class HeadState;
 
 class RenderWidget : public QWidget, public Filter {
 Q_OBJECT;
 public:
-	RenderWidget(QWidget* parent);
-	void processPoint(const IplImage* image);
+  RenderWidget(QWidget* parent);
+  void processPoint(const IplImage* image);
+
 public slots:
-	void onFrameSizeChanged(int width, int height);
+  void onFrameSizeChanged(int width, int height);
 signals:
-	void frameSizeChanged(int width, int height);
+  void frameSizeChanged(int width, int height);
+
 protected:
-	void paintEvent(QPaintEvent*);
+  void paintEvent(QPaintEvent*);
+  void updatePixmap(const IplImage* frame);
+
 private:
-	void updatePixmap(const IplImage* frame);
-  QImage *bufferImage;
-  QImage *lastImage;
-  bool UpdatingImage;
+  QImage         *bufferImage;
+  QSemaphore      imageValid;
 };
 
 #endif

@@ -10,26 +10,26 @@ class ImageBuffer;
 class TrackController : public QObject {
 Q_OBJECT;
 public:
-	TrackController();
-	bool isTracking();
-	void setFrameSize(CaptureThread::FrameSize size) { frameSize = size; }
-	CaptureThread::FrameSize getFrameSize() { return frameSize; }
-	void setFrameRate(int rate) { frameRate = rate; }
-	int getFrameRate() { return frameSize; }
-	void setRootFilter(Filter* filter);
-	ProcessingThread* getProcessingThread() { return processingThread; }
-	CaptureThread*    getCaptureThread() { return captureThread; }
-	double getFPS();
+  TrackController();
+  bool isTracking();
+  void setFrameSize(CaptureThread::FrameSize size) { frameSize = size; }
+  CaptureThread::FrameSize getFrameSize() { return frameSize; }
+  void setFrameRate(int rate) { frameRate = rate; }
+  int getFrameRate() { return frameSize; }
+  void setRootFilter(Filter* filter);
+  ProcessingThread* getProcessingThread() { return processingThread; }
+  CaptureThread*    getCaptureThread() { return captureThread; }
+  double getFPS();
 
 public slots:
-	void startTracking();
-	void stopTracking();
+  void startTracking();
+  void stopTracking();
 private:
-	int frameRate;
-	CaptureThread::FrameSize frameSize;
-	CaptureThread           *captureThread;
-	ProcessingThread        *processingThread;
-	ImageBuffer             *imageBuffer;
+  int frameRate;
+  CaptureThread::FrameSize frameSize;
+  CaptureThread           *captureThread;
+  ProcessingThread        *processingThread;
+  ImageBuffer             *imageBuffer;
 };
 
 #endif

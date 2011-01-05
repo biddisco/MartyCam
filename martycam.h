@@ -16,29 +16,25 @@ Q_OBJECT
 public:
     MartyCam();
 public slots:
-	void onFlipVerticalChanged(bool flip);
-	void onResolutionSelected(CaptureThread::FrameSize newSize);
-  void onThresholdChanged(int value);
-  void onAverageChanged(double value);
-  void onErodeBlockChanged(int value);
+  void onResolutionSelected(CaptureThread::FrameSize newSize);
   void onUserTrackChanged(int value);
-	void startTracking();
-	void stopTracking();
-	void startRecording();
-	void updateStats();
+  void startTracking();
+  void stopTracking();
+  void updateStats();
   void onRecordingStateChanged(bool state);
   //
 protected:
-	void closeEvent(QCloseEvent*);
+  void closeEvent(QCloseEvent*);
 private:
   Ui::MartyCam ui;
-	TrackController *trackController;
-	RenderWidget    *renderWidget;
-	QTimer          *updateTimer;
+  TrackController *trackController;
+  RenderWidget    *renderWidget;
+  QTimer          *updateTimer;
   QDockWidget     *progressToolbar;
-	QDockWidget     *settingsDock;
-	SettingsWidget  *settingsWidget;
+  QDockWidget     *settingsDock;
+  SettingsWidget  *settingsWidget;
   double           UserDetectionThreshold;
+  int              RecordingEvents;
 };
 
 #endif

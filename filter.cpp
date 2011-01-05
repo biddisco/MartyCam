@@ -7,7 +7,7 @@ Filter::Filter() : listener(0) {}
  * @param filter Listener that should be notified of updated events.
  */
 void Filter::setListener(Filter *filter) {
-	listener = filter;
+  listener = filter;
 }
 
 /**
@@ -15,7 +15,7 @@ void Filter::setListener(Filter *filter) {
  * @param state The current state
  */
 void Filter::notifyListener(const IplImage* image) {
-	if(listener) {
-		listener->processPoint(image);
-	}
+  if(listener) {
+    listener->processPoint(image);
+  }
 }

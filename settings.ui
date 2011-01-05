@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>295</width>
-    <height>538</height>
+    <height>565</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -26,7 +26,7 @@
          <number>255</number>
         </property>
         <property name="value">
-         <number>10</number>
+         <number>7</number>
         </property>
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
@@ -42,7 +42,7 @@
          </size>
         </property>
         <property name="text">
-         <string>10</string>
+         <string>7</string>
         </property>
         <property name="alignment">
          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -67,10 +67,10 @@
          <number>99</number>
         </property>
         <property name="value">
-         <number>60</number>
+         <number>40</number>
         </property>
         <property name="sliderPosition">
-         <number>60</number>
+         <number>40</number>
         </property>
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
@@ -86,7 +86,7 @@
          </size>
         </property>
         <property name="text">
-         <string>0.60</string>
+         <string>0.40</string>
         </property>
         <property name="alignment">
          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -99,19 +99,22 @@
    <item>
     <widget class="QGroupBox" name="groupBox_4">
      <property name="title">
-      <string>Dilate/Erode Block Size</string>
+      <string>Erode - Dilate Iterations</string>
      </property>
      <layout class="QHBoxLayout" name="horizontalLayout_3">
       <item>
        <widget class="QSlider" name="erode">
         <property name="minimum">
-         <number>1</number>
+         <number>0</number>
         </property>
         <property name="maximum">
-         <number>64</number>
+         <number>16</number>
+        </property>
+        <property name="pageStep">
+         <number>4</number>
         </property>
         <property name="value">
-         <number>4</number>
+         <number>2</number>
         </property>
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
@@ -122,7 +125,42 @@
        <widget class="QLabel" name="e_label">
         <property name="minimumSize">
          <size>
-          <width>32</width>
+          <width>24</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>2</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QSlider" name="dilate">
+        <property name="minimum">
+         <number>0</number>
+        </property>
+        <property name="maximum">
+         <number>16</number>
+        </property>
+        <property name="pageStep">
+         <number>4</number>
+        </property>
+        <property name="value">
+         <number>4</number>
+        </property>
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="d_label">
+        <property name="minimumSize">
+         <size>
+          <width>24</width>
           <height>0</height>
          </size>
         </property>
@@ -130,7 +168,7 @@
          <string>4</string>
         </property>
         <property name="alignment">
-         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+         <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
         </property>
        </widget>
       </item>
@@ -275,35 +313,51 @@
      <property name="title">
       <string>Display</string>
      </property>
-     <layout class="QVBoxLayout" name="verticalLayout">
-      <item>
+     <layout class="QGridLayout" name="gridLayout">
+      <item row="0" column="0">
        <widget class="QRadioButton" name="cameraImage">
         <property name="text">
          <string>Camera Image</string>
         </property>
        </widget>
       </item>
-      <item>
+      <item row="1" column="0">
        <widget class="QRadioButton" name="movingAverage">
         <property name="text">
          <string>Moving Average Image</string>
         </property>
        </widget>
       </item>
-      <item>
+      <item row="2" column="0">
        <widget class="QRadioButton" name="differenceImage">
         <property name="text">
          <string>Thresholded Difference Image</string>
         </property>
        </widget>
       </item>
-      <item>
-       <widget class="QRadioButton" name="combinedImage">
+      <item row="3" column="0">
+       <widget class="QRadioButton" name="blendedImage">
         <property name="text">
-         <string>Combined Image</string>
+         <string>Blended  Image</string>
         </property>
         <property name="checked">
          <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="1">
+       <widget class="QSlider" name="blendRatio">
+        <property name="minimum">
+         <number>0</number>
+        </property>
+        <property name="maximum">
+         <number>100</number>
+        </property>
+        <property name="value">
+         <number>70</number>
+        </property>
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
         </property>
        </widget>
       </item>

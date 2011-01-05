@@ -20,94 +20,67 @@ MartyCam::MartyCam() : QMainWindow(0)
   
   this->setCentralWidget(splitter);
 
-	trackController = new TrackController();
-	trackController->setRootFilter(renderWidget);
-	
-	// create the settings dock widget
+  trackController = new TrackController();
+  trackController->setRootFilter(renderWidget);
+  
+  // create the settings dock widget
   settingsDock = new QDockWidget("Settings", this);
-	settingsDock->setAllowedAreas(Qt::RightDockWidgetArea | Qt::LeftDockWidgetArea);
-	settingsWidget = new SettingsWidget(this, this->trackController->getCaptureThread(), this->trackController->getProcessingThread());
-	settingsDock->setWidget(settingsWidget);
+  settingsDock->setAllowedAreas(Qt::RightDockWidgetArea | Qt::LeftDockWidgetArea);
+  settingsWidget = new SettingsWidget(this, this->trackController->getCaptureThread(), this->trackController->getProcessingThread());
+  settingsDock->setWidget(settingsWidget);
   settingsDock->setMinimumWidth(300);
 //  this->centralWidget()->layout()->addWidget(settingsDock);
-	addDockWidget(Qt::RightDockWidgetArea, settingsDock);
-	connect(settingsWidget, SIGNAL(resolutionSelected(CaptureThread::FrameSize)), this, SLOT(onResolutionSelected(CaptureThread::FrameSize)));
-	connect(settingsWidget, SIGNAL(flipVerticalChanged(bool)), this, SLOT(onFlipVerticalChanged(bool)));
-	connect(settingsWidget, SIGNAL(thresholdChanged(int)), this, SLOT(onThresholdChanged(int)));
-	connect(settingsWidget, SIGNAL(averageChanged(double)), this, SLOT(onAverageChanged(double)));
-	connect(settingsWidget, SIGNAL(erodeBlockChanged(int)), this, SLOT(onErodeBlockChanged(int)));
-	
-	updateTimer = new QTimer(this);
-	connect(updateTimer, SIGNAL(timeout()), this, SLOT(updateStats()));
-	updateTimer->start(1000);
-	
-	connect(ui.actionQuit, SIGNAL(triggered()), this, SLOT(close()));
-	connect(ui.actionStart, SIGNAL(triggered()), this, SLOT(startTracking()));
-	connect(ui.actionStop, SIGNAL(triggered()), this, SLOT(stopTracking()));
-	connect(ui.actionRecord, SIGNAL(triggered()), this, SLOT(startRecording()));
+  addDockWidget(Qt::RightDockWidgetArea, settingsDock);
+  connect(settingsWidget, SIGNAL(resolutionSelected(CaptureThread::FrameSize)), this, SLOT(onResolutionSelected(CaptureThread::FrameSize)));
+  
+  updateTimer = new QTimer(this);
+  connect(updateTimer, SIGNAL(timeout()), this, SLOT(updateStats()));
+  updateTimer->start(1000);
+  
+  connect(ui.actionQuit, SIGNAL(triggered()), this, SLOT(close()));
+  connect(ui.actionStart, SIGNAL(triggered()), this, SLOT(startTracking()));
+  connect(ui.actionStop, SIGNAL(triggered()), this, SLOT(stopTracking()));
+  connect(ui.actionRecord, SIGNAL(triggered()), this, SLOT(startRecording()));
   connect(ui.user_trackval, SIGNAL(valueChanged(int)), this, SLOT(onUserTrackChanged(int))); 
   //
   this->UserDetectionThreshold = 0.25;
+  this->RecordingEvents = 0;
   connect(trackController->getCaptureThread(), SIGNAL(RecordingState(bool)), this, SLOT(onRecordingStateChanged(bool))); 
 }
 //----------------------------------------------------------------------------
 void MartyCam::closeEvent(QCloseEvent*) {
-	if(trackController->isTracking()) {
-		trackController->stopTracking();
-	}
-}
-//----------------------------------------------------------------------------
-// flip the image vertically
-void MartyCam::onFlipVerticalChanged(bool flip) {
-	trackController->getProcessingThread()->setFlipVertical(flip);
-}
-//----------------------------------------------------------------------------
-// set Threshold
-void MartyCam::onThresholdChanged(int value) {
-	trackController->getProcessingThread()->setThreshold(value);
-}
-//----------------------------------------------------------------------------
-// set averaging
-void MartyCam::onAverageChanged(double value) {
-	trackController->getProcessingThread()->setAveraging(value);
-}
-//----------------------------------------------------------------------------
-// set erosion block size
-void MartyCam::onErodeBlockChanged(int value) {
-	trackController->getProcessingThread()->setErodeBlockSize(value);
+  if(trackController->isTracking()) {
+    trackController->stopTracking();
+  }
 }
 //----------------------------------------------------------------------------
 // resolution has been changed from the settings
 void MartyCam::onResolutionSelected(CaptureThread::FrameSize newSize) {
-	if(trackController->isTracking()) {
-		trackController->stopTracking();
-		trackController->setFrameSize(newSize);
-		trackController->startTracking();
-	}
-	else {
-		trackController->setFrameSize(newSize);
-	}
-}
-//----------------------------------------------------------------------------
-void MartyCam::startRecording() {
-	
+  if(trackController->isTracking()) {
+    trackController->stopTracking();
+    trackController->setFrameSize(newSize);
+    trackController->startTracking();
+  }
+  else {
+    trackController->setFrameSize(newSize);
+  }
 }
 //----------------------------------------------------------------------------
 void MartyCam::startTracking() {
-	trackController->setFrameSize(settingsWidget->getSelectedResolution());
-	trackController->startTracking();
-	ui.actionStart->setEnabled(false);
-	ui.actionStop->setEnabled(true);
+  trackController->setFrameSize(settingsWidget->getSelectedResolution());
+  trackController->startTracking();
+  ui.actionStart->setEnabled(false);
+  ui.actionStop->setEnabled(true);
 }
 //----------------------------------------------------------------------------
 void MartyCam::stopTracking() {
-	trackController->stopTracking();
-	ui.actionStart->setEnabled(true);
-	ui.actionStop->setEnabled(false);
+  trackController->stopTracking();
+  ui.actionStart->setEnabled(true);
+  ui.actionStop->setEnabled(false);
 }
 //----------------------------------------------------------------------------
 void MartyCam::updateStats() {
-	statusBar()->showMessage(QString("FPS: ")+QString::number(trackController->getFPS(), 'f', 1));
+  statusBar()->showMessage(QString("FPS: ")+QString::number(trackController->getFPS(), 'f', 1));
   // scale up to 100*100 = 1E4 for log display
   double percent = 100.0*trackController->getProcessingThread()->getMotionPercent();
   double logval = percent>1 ? (100.0/4.0)*log10(percent) : 0;
@@ -136,6 +109,9 @@ void MartyCam::onRecordingStateChanged(bool state)
 {
   if (state) {
     this->ui.RecordingEnabled->setStyleSheet("QCheckBox { background-color: green; }");
+    this->RecordingEvents++;
+    QString evc = QString("Events : %1").arg(this->RecordingEvents, 3);
+    this->ui.eventCounter->setText(evc);
   }
   else {
     this->ui.RecordingEnabled->setStyleSheet("QCheckBox { background-color: window; }");
