@@ -10,7 +10,9 @@ class ImageBuffer;
 class TrackController : public QObject {
 Q_OBJECT;
 public:
-  TrackController();
+   TrackController();
+  ~TrackController() ;
+
   bool isTracking();
   void setFrameSize(CaptureThread::FrameSize size) { frameSize = size; }
   CaptureThread::FrameSize getFrameSize() { return frameSize; }

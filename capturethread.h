@@ -8,7 +8,6 @@
 #include "opencv/highgui.h"
 
 class ImageBuffer;
-class CvVideoWriter;
 
 class CaptureThread : public QThread {
 Q_OBJECT;
@@ -30,12 +29,14 @@ public:
   void setWriteAVIName(const char *name);
   void saveAVI(IplImage *image);
   void closeAVI();
+  void setAbort(bool a) { this->abort = a; }
 
 signals:
   void RecordingState(bool);
 
 private:
   void updateFPS(int time);
+  bool            abort; 
   QMutex          captureLock;
   QWaitCondition  captureWait;
   ImageBuffer    *imageBuffer;

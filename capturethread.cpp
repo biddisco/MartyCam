@@ -1,16 +1,33 @@
 #include <iostream>
 #include "capturethread.h"
 #include "imagebuffer.h"
+//#include "../3rdparty/include/videoInput.h"
 #include <QDebug>
 #include <QTime>
 //----------------------------------------------------------------------------
 CaptureThread::CaptureThread(ImageBuffer* buffer) : 
 QThread(), imageBuffer(buffer), captureActive(false), fps(0.0) 
 {
-  int i=-1000;
+  this->abort = false;
+
+	//create a videoInput object
+//	videoInput VI;
+	
+	//Prints out a list of available devices and returns num of devices found
+//	int numDevices = VI.listDevices();	
+
+
+  int devs=0, i=0;
   capture = NULL;
-  while (!capture && i<65536) {
-    capture = cvCaptureFromCAM(i); // + CV_CAP_VFW);
+  while (!capture /*& i<numDevices*/) {
+    capture = cvCaptureFromCAM(CV_CAP_DSHOW + /*numDevices-*/1 ); // CV_CAP_VFW + i);
+    if (capture) {
+      devs++;
+      if (devs<1) {
+        cvReleaseCapture(&capture);
+        capture = NULL;
+      }
+    }
     i++;
   }
   this->imageSize.width = 640;
@@ -20,18 +37,17 @@ QThread(), imageBuffer(buffer), captureActive(false), fps(0.0)
 }
 //----------------------------------------------------------------------------
 CaptureThread::~CaptureThread() 
-{
+{  
   this->closeAVI();
+  // Release our stream capture object
+  cvReleaseCapture(&capture);
 }
 //----------------------------------------------------------------------------
-/* 
- * Start the thread
- */
 void CaptureThread::run() {  
   QTime time;
   time.start();
   int numFrames = 0;
-  while (true) {
+  while (!this->abort) {
     if (!captureActive) {
       captureLock.lock();
       fps = 0;
@@ -68,15 +84,8 @@ void CaptureThread::updateFPS(int time) {
   }
 }
 //----------------------------------------------------------------------------
-/* 
- * Start the capture process
- */
 bool CaptureThread::startCapture(int framerate, FrameSize size) {
   if (!captureActive) {
-    if (!capture || !imageBuffer){
-      // qDebug() << "E: Capture not initialized or invalid buffer";
-      return false;
-    }
     if (size == Size640) {
       // qDebug() << "Setting 640x480" << cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 640);
       cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, 480);
@@ -105,11 +114,7 @@ bool CaptureThread::startCapture(int framerate, FrameSize size) {
   return false;
 }
 //----------------------------------------------------------------------------
-/* 
- * Stop the capture process
- */
 void CaptureThread::stopCapture() {
-  // qDebug() << "Stop capture requested.";
   captureActive = false;
 }
 //----------------------------------------------------------------------------

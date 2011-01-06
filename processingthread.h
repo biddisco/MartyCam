@@ -30,6 +30,7 @@ public:
   void setBlendRatio(double ratio) { this->blendRatio = ratio; }
   
   void run();
+  void setAbort(bool a) { this->abort = a; }
 
 private:
   ImageBuffer *imageBuffer;
@@ -43,6 +44,7 @@ private:
   double       motionPercent;
   int          displayImage;
   double       blendRatio;
+  bool         abort;
 
   //Images to use in the program.
   CvSize    imageSize;

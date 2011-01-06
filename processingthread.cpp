@@ -6,6 +6,7 @@
 ProcessingThread::ProcessingThread(ImageBuffer* buffer) : 
   QThread(), imageBuffer(buffer), rootFilter(0), flipVertical(false)
 {
+  this->abort = false;
   this->MotionDetecting  = true;
   this->difference = NULL;
   this->tempImage = NULL;
@@ -36,7 +37,7 @@ ProcessingThread::~ProcessingThread()
 }
 //----------------------------------------------------------------------------
 void ProcessingThread::run() {
-  while (true) {
+  while (!this->abort) {
     this->currentImage = imageBuffer->getFrame();
     if (!this->difference) {
       this->difference = cvCloneImage( this->currentImage );

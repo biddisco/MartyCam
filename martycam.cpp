@@ -49,9 +49,11 @@ MartyCam::MartyCam() : QMainWindow(0)
 }
 //----------------------------------------------------------------------------
 void MartyCam::closeEvent(QCloseEvent*) {
-  if(trackController->isTracking()) {
+  updateTimer->stop();
+  if (trackController->isTracking()) {
     trackController->stopTracking();
   }
+  delete trackController;
 }
 //----------------------------------------------------------------------------
 // resolution has been changed from the settings

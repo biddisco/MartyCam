@@ -12,6 +12,17 @@ TrackController::TrackController() : frameRate(15), frameSize(CaptureThread::Siz
   startTracking();
 }
 //----------------------------------------------------------------------------
+TrackController::~TrackController() 
+{
+  captureThread->stopCapture();
+  processingThread->setAbort(true);
+  captureThread->setAbort(true);
+  captureThread->wait();
+  processingThread->wait();
+  delete captureThread;
+  delete processingThread;
+}
+//----------------------------------------------------------------------------
 void TrackController::startTracking() {
   captureThread->startCapture(frameRate, frameSize);
   // qDebug() << "About to start the capture thread";
