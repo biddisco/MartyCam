@@ -1,6 +1,7 @@
 #include "settings.h"
 #include <QDebug>
 #include <QFileDialog>
+#include "../3rdparty/include/videoInput.h"
 
 //----------------------------------------------------------------------------
 SettingsWidget::SettingsWidget(QWidget* parent, 
@@ -28,6 +29,17 @@ SettingsWidget::SettingsWidget(QWidget* parent,
   ImageButtonGroup.addButton(ui.differenceImage,2);
   ImageButtonGroup.addButton(ui.blendedImage,3);
   connect(&ImageButtonGroup, SIGNAL(buttonClicked(int)), this, SLOT(onImageSelection(int)));
+  //
+  //
+  //
+	//create a videoInput object
+	videoInput VI;
+	//Prints out a list of available devices and returns num of devices found
+	int numDevices = VI.listDevices();	
+  for (int i=0; i<numDevices; i++) {
+    this->ui.cameraSelect->addItem(VI.getDeviceName(i));
+  }
+  connect(this->ui.cameraSelect, SIGNAL(currentIndexChanged(int)), this, SLOT(onCameraSelection(int)));
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::onVerticalFlipStateChanged(int state) {
@@ -163,3 +175,9 @@ void SettingsWidget::onBlendChanged(int value)
 {
   this->processingthread->setBlendRatio(value/100.0);
 }
+//----------------------------------------------------------------------------
+void SettingsWidget::onCameraSelection(int index)
+{
+  emit(CameraIndexChanged(index));
+}
+//----------------------------------------------------------------------------

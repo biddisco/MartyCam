@@ -11,6 +11,9 @@ FIND_PACKAGE(OpenCV REQUIRED)
 INCLUDE(${QT_USE_FILE})
 INCLUDE_DIRECTORIES(include)
 
+SET(VIDEOLIB_LIBRARY 
+  "C:\\Code\\OpenCV-2.2.0\\3rdparty\\lib\\videoInput64.lib" 
+  CACHE FILEPATH "Path to videlib")
 
 SET(QtOpenCV_UIS
   settings.ui
@@ -24,7 +27,6 @@ SET(QtOpenCV_OBJECTS
   martycam.h
   settings.h
   renderwidget.h
-  trackcontroller.h
   capturethread.h
 )
 
@@ -44,7 +46,7 @@ SET(QtOpenCV_SRCS
   processingthread.cpp
   renderwidget.cpp
   settings.cpp
-  trackcontroller.cpp
+#  trackcontroller.cpp
 )
 
 ADD_EXECUTABLE(MartyCam WIN32 ${QtOpenCV_SRCS} ${QtOpenCV_UIS_H} ${MOC_FILES})
@@ -52,25 +54,13 @@ ADD_EXECUTABLE(MartyCam WIN32 ${QtOpenCV_SRCS} ${QtOpenCV_UIS_H} ${MOC_FILES})
 #SET_TARGET_PROPERTIES (MartyCam
 # #   PROPERTIES
 #        LINK_FLAGS "/SUBSYSTEM:WINDOWS"
-#) 
-target_link_libraries(MartyCam ${QT_LIBRARIES} ${OpenCV_LIBS})
+#) videoInput64
 
-#install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/MartyCam DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
-#install(FILES pics/smile.png DESTINATION ${DATADIR}/emoticons)
-#install(FILES 
-#  pics/decrypted.png
-#  pics/encrypted.png
-#  pics/offline.png
-#  pics/online.png
-#  pics/online-none.png
-#  pics/online-to.png
-#  pics/online-from.png
-#  pics/chat.png
-#  pics/xa.png
-#  pics/dnd.png
-#  pics/away.png
-#  pics/16x16.png
-#  pics/32x32.png
-#  pics/64x64.png
-#  pics/128x128.png
-#  DESTINATION ${DATADIR}/icons)
+#LINK_DIRECTORIES("C:\\Code\\OpenCV-2.2.0\\3rdparty\\lib")
+target_link_libraries(MartyCam 
+  ${QT_LIBRARIES} 
+  ${OpenCV_LIBS} 
+  strmiids
+  ${VIDEOLIB_LIBRARY}
+)
+

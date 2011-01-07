@@ -3,28 +3,29 @@
 #include "imagebuffer.h"
 #include "processingthread.h"
 //----------------------------------------------------------------------------
-ProcessingThread::ProcessingThread(ImageBuffer* buffer) : 
-  QThread(), imageBuffer(buffer), rootFilter(0), flipVertical(false)
+ProcessingThread::ProcessingThread(ImageBuffer* buffer) : QThread()
 {
-  this->abort = false;
-  this->MotionDetecting  = true;
-  this->difference = NULL;
-  this->tempImage = NULL;
-  this->currentImage = NULL;
-  this->threshold = 7;
-  this->average = 0.4;
-  this->erodeIterations = 2;
-  this->dilateIterations = 4;
+  this->imageBuffer       = buffer;
+  this->rootFilter        = NULL; 
+  this->abort             = false;
+  this->MotionDetecting   = true;
+  this->motionPercent     = 0.0;
+  this->threshold         = 7;
+  this->average           = 0.4;
+  this->erodeIterations   = 2;
+  this->dilateIterations  = 4;
+  this->displayImage      = 3;
+  this->blendRatio        = 0.75;
+  this->flipVertical      = false;
 
-  this->motionPercent = 0.0;
-  this->displayImage = 3;
-  this->blendRatio   = 0.75;
-
-  this->imageSize.width = 640;
-  this->imageSize.height = 480;
-  this->movingAverage  = cvCreateImage( imageSize, IPL_DEPTH_32F, 3);
-  this->thresholdImage = cvCreateImage( imageSize, IPL_DEPTH_8U, 1);
-  this->blendImage     = cvCreateImage( imageSize, IPL_DEPTH_8U, 3);
+  this->imageSize.width   = 320;
+  this->imageSize.height  = 240;
+  this->difference        = NULL;
+  this->tempImage         = NULL;
+  this->currentImage      = NULL;
+  this->movingAverage     = cvCreateImage( imageSize, IPL_DEPTH_32F, 3);
+  this->thresholdImage    = cvCreateImage( imageSize, IPL_DEPTH_8U, 1);
+  this->blendImage        = cvCreateImage( imageSize, IPL_DEPTH_8U, 3);
 }
 //----------------------------------------------------------------------------
 ProcessingThread::~ProcessingThread()

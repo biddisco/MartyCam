@@ -1,39 +1,22 @@
 #include <iostream>
 #include "capturethread.h"
 #include "imagebuffer.h"
-//#include "../3rdparty/include/videoInput.h"
 #include <QDebug>
 #include <QTime>
 //----------------------------------------------------------------------------
-CaptureThread::CaptureThread(ImageBuffer* buffer) : 
-QThread(), imageBuffer(buffer), captureActive(false), fps(0.0) 
+CaptureThread::CaptureThread(ImageBuffer* buffer, int device) : QThread()
 {
-  this->abort = false;
-
-	//create a videoInput object
-//	videoInput VI;
-	
-	//Prints out a list of available devices and returns num of devices found
-//	int numDevices = VI.listDevices();	
-
-
-  int devs=0, i=0;
-  capture = NULL;
-  while (!capture /*& i<numDevices*/) {
-    capture = cvCaptureFromCAM(CV_CAP_DSHOW + /*numDevices-*/1 ); // CV_CAP_VFW + i);
-    if (capture) {
-      devs++;
-      if (devs<1) {
-        cvReleaseCapture(&capture);
-        capture = NULL;
-      }
-    }
-    i++;
-  }
-  this->imageSize.width = 640;
-  this->imageSize.height = 480;
-  this->AVI_Writing = false;
-  this->AVI_Writer = NULL; 
+  this->abort             = false;
+  this->captureActive     = false;
+  this->fps               = 0.0 ;
+  this->deviceIndex       = -1;
+  this->imageSize.width   = 640;
+  this->imageSize.height  = 480;
+  this->AVI_Writing       = false;
+  this->AVI_Writer        = NULL; 
+  this->capture           = NULL;
+  this->imageBuffer       = buffer;
+  this->setDeviceIndex(device);
 }
 //----------------------------------------------------------------------------
 CaptureThread::~CaptureThread() 
@@ -43,10 +26,28 @@ CaptureThread::~CaptureThread()
   cvReleaseCapture(&capture);
 }
 //----------------------------------------------------------------------------
+void CaptureThread::setDeviceIndex(int index)
+{
+  if (this->deviceIndex!=index) {
+    bool active = this->captureActive;
+    this->stopCapture();
+    if (this->capture) {
+      cvReleaseCapture(&capture);
+    }
+    this->deviceIndex = index;
+    capture = cvCaptureFromCAM(CV_CAP_DSHOW + this->deviceIndex );
+    if (!capture) {
+      throw std::exception("Camera capture failed");
+    }
+    if (active) {
+      this->startCapture(30, Size640);
+    }
+  }
+}
+//----------------------------------------------------------------------------
 void CaptureThread::run() {  
   QTime time;
   time.start();
-  int numFrames = 0;
   while (!this->abort) {
     if (!captureActive) {
       captureLock.lock();
@@ -56,27 +57,28 @@ void CaptureThread::run() {
       time.restart();
       updateFPS(time.elapsed());
       captureLock.unlock();
-    }                     
+    }
     // get latest frame from webcam
     IplImage *frame = cvQueryFrame(capture);
     updateFPS(time.elapsed());
-    // add to queue if space is available
-    if (!imageBuffer->isFull()) {
-      imageBuffer->addFrame(frame);
-    }
-    // always write so we don't drop frames
+    // always write the frame out if saving movie
     if (this->AVI_Writing) {
       this->saveAVI(frame);
+    }
+    // add to queue if space is available, 
+    // otherwise drop the frame from further processing
+    if (!imageBuffer->isFull()) {
+      imageBuffer->addFrame(frame);
     }
   }
 }
 //----------------------------------------------------------------------------
 void CaptureThread::updateFPS(int time) {
   frameTimes.enqueue(time);
-  if(frameTimes.size() > 15) {
+  if (frameTimes.size() > 15) {
     frameTimes.dequeue();
   }
-  if(frameTimes.size() > 1) {
+  if (frameTimes.size() > 1) {
     fps = frameTimes.size()/((double)time-frameTimes.head())*1000.0;
   }
   else {
@@ -86,14 +88,16 @@ void CaptureThread::updateFPS(int time) {
 //----------------------------------------------------------------------------
 bool CaptureThread::startCapture(int framerate, FrameSize size) {
   if (!captureActive) {
+/*
     if (size == Size640) {
-      // qDebug() << "Setting 640x480" << cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 640);
+      cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 640);
       cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, 480);
     }
     else if (size == Size320) {
-      // qDebug() << "Settings 320x240:" << cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 320);
-      // qDebug() << "Settings 320x240:" << cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, 240);
-    }
+*/
+    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 320);
+      cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, 240);
+//    }
     // qDebug() << "Listing capture properties...";
     // qDebug() << "CV_CAP_PROP_FRAME_WIDTH" << cvGetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH);
     // qDebug() << "CV_CAP_PROP_FRAME_HEIGHT" << cvGetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT);

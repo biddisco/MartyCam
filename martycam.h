@@ -3,6 +3,7 @@
 
 #include "ui_martycam.h"
 #include "capturethread.h"
+#include "processingthread.h"
 #include <QMainWindow>
 
 class TrackController;
@@ -17,6 +18,7 @@ public:
     MartyCam();
 public slots:
   void onResolutionSelected(CaptureThread::FrameSize newSize);
+  void onCameraIndexChanged(int index);
   void onUserTrackChanged(int value);
   void startTracking();
   void stopTracking();
@@ -27,14 +29,16 @@ protected:
   void closeEvent(QCloseEvent*);
 private:
   Ui::MartyCam ui;
-  TrackController *trackController;
-  RenderWidget    *renderWidget;
-  QTimer          *updateTimer;
-  QDockWidget     *progressToolbar;
-  QDockWidget     *settingsDock;
-  SettingsWidget  *settingsWidget;
-  double           UserDetectionThreshold;
-  int              RecordingEvents;
+  RenderWidget            *renderWidget;
+  QTimer                  *updateTimer;
+  QDockWidget             *progressToolbar;
+  QDockWidget             *settingsDock;
+  SettingsWidget          *settingsWidget;
+  CaptureThread           *captureThread;
+  ProcessingThread        *processingThread;
+  ImageBuffer             *imageBuffer;
+  double                   UserDetectionThreshold;
+  int                      RecordingEvents;
 };
 
 #endif

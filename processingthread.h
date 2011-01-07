@@ -8,7 +8,6 @@
 
 class ImageBuffer;
 class Filter;
-class CvVideoWriter;
 
 class ProcessingThread : public QThread {
 public: 

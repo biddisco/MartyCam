@@ -28,9 +28,11 @@ public slots:
   void onTimer();
   void onImageSelection(int btn);
   void onBlendChanged(int value);
+  void onCameraSelection(int index);
 
 signals:
   void resolutionSelected(CaptureThread::FrameSize);
+  void CameraIndexChanged(int);
 
 private:
   Ui::SettingsWidget  ui;

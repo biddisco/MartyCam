@@ -1,8 +1,7 @@
 #include "martycam.h"
-#include "trackcontroller.h"
 #include "renderwidget.h"
 #include "settings.h"
-#include "processingthread.h"
+#include "imagebuffer.h"
 #include <QTimer>
 #include <QToolBar>
 #include <QDockWidget>
@@ -20,18 +19,20 @@ MartyCam::MartyCam() : QMainWindow(0)
   
   this->setCentralWidget(splitter);
 
-  trackController = new TrackController();
-  trackController->setRootFilter(renderWidget);
+  imageBuffer = new ImageBuffer(1);
+  captureThread = new CaptureThread(imageBuffer, 0);
+  processingThread = new ProcessingThread(imageBuffer);
+  processingThread->setRootFilter(renderWidget);
   
   // create the settings dock widget
   settingsDock = new QDockWidget("Settings", this);
   settingsDock->setAllowedAreas(Qt::RightDockWidgetArea | Qt::LeftDockWidgetArea);
-  settingsWidget = new SettingsWidget(this, this->trackController->getCaptureThread(), this->trackController->getProcessingThread());
+  settingsWidget = new SettingsWidget(this, this->captureThread, processingThread);
   settingsDock->setWidget(settingsWidget);
   settingsDock->setMinimumWidth(300);
-//  this->centralWidget()->layout()->addWidget(settingsDock);
   addDockWidget(Qt::RightDockWidgetArea, settingsDock);
   connect(settingsWidget, SIGNAL(resolutionSelected(CaptureThread::FrameSize)), this, SLOT(onResolutionSelected(CaptureThread::FrameSize)));
+  connect(settingsWidget, SIGNAL(CameraIndexChanged(int)), this, SLOT(onCameraIndexChanged(int)));
   
   updateTimer = new QTimer(this);
   connect(updateTimer, SIGNAL(timeout()), this, SLOT(updateStats()));
@@ -45,19 +46,40 @@ MartyCam::MartyCam() : QMainWindow(0)
   //
   this->UserDetectionThreshold = 0.25;
   this->RecordingEvents = 0;
-  connect(trackController->getCaptureThread(), SIGNAL(RecordingState(bool)), this, SLOT(onRecordingStateChanged(bool))); 
+  connect(this->captureThread, SIGNAL(RecordingState(bool)), this, SLOT(onRecordingStateChanged(bool))); 
+  //
+  processingThread->start();
+  captureThread->startCapture(15, CaptureThread::Size640);
+  captureThread->start(QThread::IdlePriority);
 }
 //----------------------------------------------------------------------------
 void MartyCam::closeEvent(QCloseEvent*) {
   updateTimer->stop();
-  if (trackController->isTracking()) {
-    trackController->stopTracking();
-  }
-  delete trackController;
+  captureThread->stopCapture();
+  processingThread->setAbort(true);
+  captureThread->setAbort(true);
+  captureThread->wait();
+  processingThread->wait();
+  delete captureThread;
+  delete processingThread;
+}
+//----------------------------------------------------------------------------
+void MartyCam::onCameraIndexChanged(int index)
+{
+  updateTimer->stop();
+  captureThread->stopCapture();
+  captureThread->setAbort(true);
+  captureThread->wait();
+  delete captureThread;
+  captureThread = new CaptureThread(imageBuffer, index);
+  captureThread->startCapture(15, CaptureThread::Size640);
+  captureThread->start(QThread::IdlePriority);
+  updateTimer->start();
 }
 //----------------------------------------------------------------------------
 // resolution has been changed from the settings
 void MartyCam::onResolutionSelected(CaptureThread::FrameSize newSize) {
+/*
   if(trackController->isTracking()) {
     trackController->stopTracking();
     trackController->setFrameSize(newSize);
@@ -66,32 +88,31 @@ void MartyCam::onResolutionSelected(CaptureThread::FrameSize newSize) {
   else {
     trackController->setFrameSize(newSize);
   }
+*/
 }
 //----------------------------------------------------------------------------
 void MartyCam::startTracking() {
-  trackController->setFrameSize(settingsWidget->getSelectedResolution());
-  trackController->startTracking();
-  ui.actionStart->setEnabled(false);
-  ui.actionStop->setEnabled(true);
+//  trackController->setFrameSize(settingsWidget->getSelectedResolution());
+//  trackController->startTracking();
 }
 //----------------------------------------------------------------------------
 void MartyCam::stopTracking() {
-  trackController->stopTracking();
+//  trackController->stopTracking();
   ui.actionStart->setEnabled(true);
   ui.actionStop->setEnabled(false);
 }
 //----------------------------------------------------------------------------
 void MartyCam::updateStats() {
-  statusBar()->showMessage(QString("FPS: ")+QString::number(trackController->getFPS(), 'f', 1));
+  statusBar()->showMessage(QString("FPS: ")+QString::number(this->captureThread->getFPS(), 'f', 1));
   // scale up to 100*100 = 1E4 for log display
-  double percent = 100.0*trackController->getProcessingThread()->getMotionPercent();
+  double percent = 100.0*this->processingThread->getMotionPercent();
   double logval = percent>1 ? (100.0/4.0)*log10(percent) : 0;
   this->ui.progressBar->setValue(logval);
-  this->ui.detect_value->setText(QString("%1").arg(trackController->getProcessingThread()->getMotionPercent(),4 , 'f', 2));
+  this->ui.detect_value->setText(QString("%1").arg(this->processingThread->getMotionPercent(),4 , 'f', 2));
   //
 
   if (this->ui.RecordingEnabled->isChecked()) {
-    if (trackController->getProcessingThread()->getMotionPercent()>this->UserDetectionThreshold) {
+    if (this->processingThread->getMotionPercent()>this->UserDetectionThreshold) {
       settingsWidget->RecordAVI(true);
     }
   }

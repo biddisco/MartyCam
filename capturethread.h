@@ -14,7 +14,7 @@ Q_OBJECT;
 public: 
   enum FrameSize { Size640, Size320 };
   //
-   CaptureThread(ImageBuffer* buffer);
+   CaptureThread(ImageBuffer* buffer, int device);
   ~CaptureThread() ;
 
   void run();
@@ -30,6 +30,7 @@ public:
   void saveAVI(IplImage *image);
   void closeAVI();
   void setAbort(bool a) { this->abort = a; }
+  void setDeviceIndex(int index);
 
 signals:
   void RecordingState(bool);
@@ -45,6 +46,7 @@ private:
   CvCapture      *capture;
   double          fps;
   QQueue<int>     frameTimes;
+  int             deviceIndex;
   //
   CvVideoWriter  *AVI_Writer;
   bool            AVI_Writing;
