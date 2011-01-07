@@ -11,7 +11,7 @@ class Filter;
 
 class ProcessingThread : public QThread {
 public: 
-   ProcessingThread(ImageBuffer* buffer);
+   ProcessingThread(ImageBuffer* buffer, CvSize &size);
   ~ProcessingThread();
 
   void countPixels(IplImage *image);

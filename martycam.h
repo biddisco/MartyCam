@@ -5,6 +5,7 @@
 #include "capturethread.h"
 #include "processingthread.h"
 #include <QMainWindow>
+#include <QTimer>
 
 class TrackController;
 class RenderWidget;
@@ -16,24 +17,30 @@ class MartyCam : public QMainWindow {
 Q_OBJECT
 public:
     MartyCam();
+
 public slots:
-  void onResolutionSelected(CaptureThread::FrameSize newSize);
+  void updateStats();
+  void onResolutionSelected(CvSize newSize);
   void onCameraIndexChanged(int index);
   void onUserTrackChanged(int value);
-  void startTracking();
-  void stopTracking();
-  void updateStats();
   void onRecordingStateChanged(bool state);
   //
 protected:
   void closeEvent(QCloseEvent*);
+  void deleteCaptureThread();
+  void createCaptureThread(int FPS, CvSize &size, int camera);
+  void deleteProcessingThread();
+  void createProcessingThread(CvSize &size);
+
 private:
   Ui::MartyCam ui;
   RenderWidget            *renderWidget;
-  QTimer                  *updateTimer;
+  QTimer                   updateTimer;
   QDockWidget             *progressToolbar;
   QDockWidget             *settingsDock;
   SettingsWidget          *settingsWidget;
+  CvSize                   imageSize;
+  int                      cameraIndex;
   CaptureThread           *captureThread;
   ProcessingThread        *processingThread;
   ImageBuffer             *imageBuffer;

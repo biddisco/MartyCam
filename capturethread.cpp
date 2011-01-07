@@ -4,14 +4,13 @@
 #include <QDebug>
 #include <QTime>
 //----------------------------------------------------------------------------
-CaptureThread::CaptureThread(ImageBuffer* buffer, int device) : QThread()
+CaptureThread::CaptureThread(ImageBuffer* buffer, CvSize &size, int device) : QThread()
 {
   this->abort             = false;
   this->captureActive     = false;
   this->fps               = 0.0 ;
   this->deviceIndex       = -1;
-  this->imageSize.width   = 640;
-  this->imageSize.height  = 480;
+  this->imageSize         = size;
   this->AVI_Writing       = false;
   this->AVI_Writer        = NULL; 
   this->capture           = NULL;
@@ -40,7 +39,7 @@ void CaptureThread::setDeviceIndex(int index)
       throw std::exception("Camera capture failed");
     }
     if (active) {
-      this->startCapture(30, Size640);
+      this->startCapture(15);
     }
   }
 }
@@ -86,18 +85,11 @@ void CaptureThread::updateFPS(int time) {
   }
 }
 //----------------------------------------------------------------------------
-bool CaptureThread::startCapture(int framerate, FrameSize size) {
+bool CaptureThread::startCapture(int framerate) {
   if (!captureActive) {
-/*
-    if (size == Size640) {
-      cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 640);
-      cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, 480);
-    }
-    else if (size == Size320) {
-*/
-    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 320);
-      cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, 240);
-//    }
+    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, this->imageSize.width);
+    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, this->imageSize.height);
+    cvSetCaptureProperty(capture, CV_CAP_PROP_FPS, framerate);
     // qDebug() << "Listing capture properties...";
     // qDebug() << "CV_CAP_PROP_FRAME_WIDTH" << cvGetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH);
     // qDebug() << "CV_CAP_PROP_FRAME_HEIGHT" << cvGetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT);
@@ -135,7 +127,7 @@ void CaptureThread::saveAVI(IplImage *image)
       0,  
       // 15.0,  
       this->getFPS(),
-      imageSize
+      this->imageSize
     );
     emit(RecordingState(true));
   }

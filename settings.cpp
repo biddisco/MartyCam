@@ -4,13 +4,10 @@
 #include "../3rdparty/include/videoInput.h"
 
 //----------------------------------------------------------------------------
-SettingsWidget::SettingsWidget(QWidget* parent, 
-  CaptureThread *capthread, ProcessingThread *procthread) : QWidget(parent) 
+SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent) 
 {
   ui.setupUi(this);
   setMinimumWidth(150);
-  this->capturethread = capthread;
-  this->processingthread = procthread;
   //  
   connect(ui.res640Radio, SIGNAL(toggled(bool)), this, SLOT(on640ResToggled(bool)));
   connect(ui.res320Radio, SIGNAL(toggled(bool)), this, SLOT(on320ResToggled(bool)));
@@ -42,20 +39,26 @@ SettingsWidget::SettingsWidget(QWidget* parent,
   connect(this->ui.cameraSelect, SIGNAL(currentIndexChanged(int)), this, SLOT(onCameraSelection(int)));
 }
 //----------------------------------------------------------------------------
-void SettingsWidget::onVerticalFlipStateChanged(int state) {
-  this->processingthread->setFlipVertical(state);
+void SettingsWidget::setThreads(CaptureThread *capthread, ProcessingThread *procthread)
+{
+  this->capturethread = capthread;
+  this->processingthread = procthread;
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::on640ResToggled(bool on) {
   if(on) {
-    emit(resolutionSelected(CaptureThread::Size640));
+    emit(resolutionSelected(cvSize(640,480)));
   }
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::on320ResToggled(bool on) {
   if(on) {
-    emit(resolutionSelected(CaptureThread::Size320));
+    emit(resolutionSelected(cvSize(320,240)));
   }
+}
+//----------------------------------------------------------------------------
+void SettingsWidget::onVerticalFlipStateChanged(int state) {
+  this->processingthread->setFlipVertical(state);
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::onThresholdChanged(int value)
@@ -124,12 +127,12 @@ void SettingsWidget::onTimer()
   }
 }
 //----------------------------------------------------------------------------
-CaptureThread::FrameSize SettingsWidget::getSelectedResolution() 
+CvSize SettingsWidget::getSelectedResolution() 
 {
   if (ui.res640Radio->isChecked()) {
-    return CaptureThread::Size640;
+    return cvSize(640,480);
   }
-  return CaptureThread::Size320;
+  return cvSize(320,240);
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::RecordAVI(bool state) 

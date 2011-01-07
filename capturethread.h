@@ -12,14 +12,16 @@ class ImageBuffer;
 class CaptureThread : public QThread {
 Q_OBJECT;
 public: 
-  enum FrameSize { Size640, Size320 };
-  //
-   CaptureThread(ImageBuffer* buffer, int device);
+   CaptureThread(ImageBuffer* buffer, CvSize &size, int device);
   ~CaptureThread() ;
 
   void run();
-  bool startCapture(int framerate, FrameSize size);
+  void setAbort(bool a) { this->abort = a; }
+  //
+  bool startCapture(int framerate);
   void stopCapture();
+  void setDeviceIndex(int index);
+  //
   double getFPS() { return fps; }
   bool isCapturing() { return captureActive; }
 
@@ -29,14 +31,13 @@ public:
   void setWriteAVIName(const char *name);
   void saveAVI(IplImage *image);
   void closeAVI();
-  void setAbort(bool a) { this->abort = a; }
-  void setDeviceIndex(int index);
 
 signals:
   void RecordingState(bool);
 
 private:
   void updateFPS(int time);
+  //
   bool            abort; 
   QMutex          captureLock;
   QWaitCondition  captureWait;

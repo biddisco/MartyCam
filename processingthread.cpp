@@ -3,7 +3,7 @@
 #include "imagebuffer.h"
 #include "processingthread.h"
 //----------------------------------------------------------------------------
-ProcessingThread::ProcessingThread(ImageBuffer* buffer) : QThread()
+ProcessingThread::ProcessingThread(ImageBuffer* buffer, CvSize &size) : QThread()
 {
   this->imageBuffer       = buffer;
   this->rootFilter        = NULL; 
@@ -17,9 +17,8 @@ ProcessingThread::ProcessingThread(ImageBuffer* buffer) : QThread()
   this->displayImage      = 3;
   this->blendRatio        = 0.75;
   this->flipVertical      = false;
-
-  this->imageSize.width   = 320;
-  this->imageSize.height  = 240;
+  //
+  this->imageSize         = size;
   this->difference        = NULL;
   this->tempImage         = NULL;
   this->currentImage      = NULL;

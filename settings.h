@@ -11,9 +11,11 @@
 class SettingsWidget : public QWidget {
 Q_OBJECT;
 public:
-  SettingsWidget(QWidget* parent, CaptureThread *capthread, ProcessingThread *procthread);
-  CaptureThread::FrameSize getSelectedResolution();
+  SettingsWidget(QWidget* parent);
+  CvSize getSelectedResolution();
   void RecordAVI(bool state);
+
+  void setThreads(CaptureThread *capthread, ProcessingThread *procthread);
 
 public slots:
   void on640ResToggled(bool on);
@@ -31,7 +33,7 @@ public slots:
   void onCameraSelection(int index);
 
 signals:
-  void resolutionSelected(CaptureThread::FrameSize);
+  void resolutionSelected(CvSize);
   void CameraIndexChanged(int);
 
 private:
