@@ -31,6 +31,7 @@ public:
   void setWriteAVIName(const char *name);
   void saveAVI(IplImage *image);
   void closeAVI();
+  std::string GetCaptureStatusString() { return this->CaptureStatus; }
 
 signals:
   void RecordingState(bool);
@@ -53,6 +54,7 @@ private:
   bool            AVI_Writing;
   std::string     AVI_Directory;
   std::string     AVI_Name;
+  std::string     CaptureStatus;
 };
 
 #endif

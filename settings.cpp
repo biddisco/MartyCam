@@ -27,11 +27,9 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   ImageButtonGroup.addButton(ui.blendedImage,3);
   connect(&ImageButtonGroup, SIGNAL(buttonClicked(int)), this, SLOT(onImageSelection(int)));
   //
+	// create a videoInput object to enumerate devices
   //
-  //
-	//create a videoInput object
 	videoInput VI;
-	//Prints out a list of available devices and returns num of devices found
 	int numDevices = VI.listDevices();	
   for (int i=0; i<numDevices; i++) {
     this->ui.cameraSelect->addItem(VI.getDeviceName(i));

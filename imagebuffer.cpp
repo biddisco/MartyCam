@@ -16,13 +16,10 @@ bool ImageBuffer::isFull()
  * @param image The image to add
  */
 void ImageBuffer::addFrame(const IplImage* image) {
-  //QTime time;
-  //time.start();
-  if(!image) {
-    // qDebug() << "E: Imagebuffer received a null image";
+  if (!image) {
     return;
   }
-  //// qDebug() << "Adding a frame";
+  //output << "Adding a frame";
   mutex.lock();
   if(imageQueue.size() == bufferSize) {
     return;
@@ -33,7 +30,7 @@ void ImageBuffer::addFrame(const IplImage* image) {
   // copy the image
   IplImage* temp = cvCloneImage(image);
   imageQueue.enqueue(temp);
-  //// qDebug() << "AF" << time.elapsed();
+  //output << "AF" << time.elapsed();
   mutex.lock();
   bufferNotEmpty.wakeAll();
   mutex.unlock();
@@ -46,9 +43,9 @@ void ImageBuffer::addFrame(const IplImage* image) {
 IplImage* ImageBuffer::getFrame() {
   mutex.lock();
   if(imageQueue.isEmpty()) {
-  //  // qDebug() << "Get frame waiting on frame";
+  //  output << "Get frame waiting on frame";
     bufferNotEmpty.wait(&mutex);
-  //  // qDebug() << "Get frame has been received";
+  //  output << "Get frame has been received";
   }
   mutex.unlock();
 
