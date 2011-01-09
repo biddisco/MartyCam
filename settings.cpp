@@ -2,6 +2,7 @@
 #include <QDebug>
 #include <QFileDialog>
 #include "../3rdparty/include/videoInput.h"
+#include "renderwidget.h"
 
 //----------------------------------------------------------------------------
 SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent) 
@@ -11,7 +12,6 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   //  
   connect(ui.res640Radio, SIGNAL(toggled(bool)), this, SLOT(on640ResToggled(bool)));
   connect(ui.res320Radio, SIGNAL(toggled(bool)), this, SLOT(on320ResToggled(bool)));
-  connect(ui.flipVertical, SIGNAL(stateChanged(int)), this, SLOT(onVerticalFlipStateChanged(int)));
   connect(ui.threshold, SIGNAL(valueChanged(int)), this, SLOT(onThresholdChanged(int)));
   connect(ui.average, SIGNAL(valueChanged(int)), this, SLOT(onAverageChanged(int)));
   connect(ui.erode, SIGNAL(valueChanged(int)), this, SLOT(onErodeChanged(int)));
@@ -26,6 +26,13 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   ImageButtonGroup.addButton(ui.differenceImage,2);
   ImageButtonGroup.addButton(ui.blendedImage,3);
   connect(&ImageButtonGroup, SIGNAL(buttonClicked(int)), this, SLOT(onImageSelection(int)));
+
+  RotateButtonGroup.addButton(ui.rotate0,0);
+  RotateButtonGroup.addButton(ui.rotate90,1);
+  RotateButtonGroup.addButton(ui.rotate90m,2);
+  RotateButtonGroup.addButton(ui.rotate180,3);
+  connect(&RotateButtonGroup, SIGNAL(buttonClicked(int)), this, SLOT(onRotateSelection(int)));
+
   //
 	// create a videoInput object to enumerate devices
   //
@@ -53,10 +60,6 @@ void SettingsWidget::on320ResToggled(bool on) {
   if(on) {
     emit(resolutionSelected(cvSize(320,240)));
   }
-}
-//----------------------------------------------------------------------------
-void SettingsWidget::onVerticalFlipStateChanged(int state) {
-  this->processingthread->setFlipVertical(state);
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::onThresholdChanged(int value)
@@ -170,6 +173,17 @@ void SettingsWidget::RecordAVI(bool state)
 void SettingsWidget::onImageSelection(int btn)
 {
   this->processingthread->setDisplayImage(btn);
+}
+//----------------------------------------------------------------------------
+void SettingsWidget::onRotateSelection(int btn)
+{
+  this->processingthread->setRotation(btn);
+  if (btn==0 || btn==3) {
+    this->renderWidget->setFixedSize(640, 480);
+  }
+  if (btn==1 || btn==2) {
+    this->renderWidget->setFixedSize(480, 640);
+  }
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::onBlendChanged(int value)

@@ -30,7 +30,7 @@ protected:
   void deleteCaptureThread();
   void createCaptureThread(int FPS, CvSize &size, int camera);
   void deleteProcessingThread();
-  void createProcessingThread(CvSize &size);
+  ProcessingThread *MartyCam::createProcessingThread(CvSize &size, ProcessingThread *oldThread);
 
 private:
   Ui::MartyCam ui;

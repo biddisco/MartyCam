@@ -16,88 +16,157 @@ ProcessingThread::ProcessingThread(ImageBuffer* buffer, CvSize &size) : QThread(
   this->dilateIterations  = 4;
   this->displayImage      = 3;
   this->blendRatio        = 0.75;
-  this->flipVertical      = false;
+  this->rotation          = 0;
+  this->storageInvalid    = false;
   //
   this->imageSize         = size;
-  this->difference        = NULL;
+  this->cameraImage       = NULL;
+  this->rotatedImage      = NULL;
   this->tempImage         = NULL;
-  this->currentImage      = NULL;
-  this->movingAverage     = cvCreateImage( imageSize, IPL_DEPTH_32F, 3);
-  this->thresholdImage    = cvCreateImage( imageSize, IPL_DEPTH_8U, 1);
-  this->blendImage        = cvCreateImage( imageSize, IPL_DEPTH_8U, 3);
+  this->difference        = NULL;
+  this->blendImage        = NULL;
+  this->thresholdImage    = NULL;
+  this->movingAverage     = NULL;
 }
 //----------------------------------------------------------------------------
 ProcessingThread::~ProcessingThread()
 {
+  this->DeleteTemporaryStorage();
+}
+//----------------------------------------------------------------------------
+void ProcessingThread::DeleteTemporaryStorage()
+{
+  cvReleaseImage(&this->rotatedImage);
   cvReleaseImage(&this->movingAverage);
   cvReleaseImage(&this->thresholdImage);
   cvReleaseImage(&this->blendImage);
   cvReleaseImage(&this->difference);
   cvReleaseImage(&this->tempImage);
+  this->rotatedImage      = NULL;
+  this->tempImage         = NULL;
+  this->difference        = NULL;
+  this->blendImage        = NULL;
+  this->thresholdImage    = NULL;
+  this->movingAverage     = NULL;
+}
+//----------------------------------------------------------------------------
+void ProcessingThread::CopySettings(ProcessingThread *thread)
+{
+  this->motionPercent     = thread->motionPercent;
+  this->threshold         = thread->threshold;
+  this->average           = thread->average;
+  this->erodeIterations   = thread->erodeIterations;
+  this->dilateIterations  = thread->dilateIterations;
+  this->displayImage      = thread->displayImage;
+  this->blendRatio        = thread->blendRatio;
+  this->rotation          = thread->rotation;
+}
+//----------------------------------------------------------------------------
+void ProcessingThread::setRotation(int value) { 
+  this->storageInvalid = true;
+  this->rotation = value; 
 }
 //----------------------------------------------------------------------------
 void ProcessingThread::run() {
   while (!this->abort) {
-    this->currentImage = imageBuffer->getFrame();
+    this->cameraImage = imageBuffer->getFrame();
+    // if camera not working or disconnected, abort
+    if (!this->cameraImage) {
+      msleep(100);
+      continue;
+    }
+    if (this->storageInvalid) {
+      this->DeleteTemporaryStorage();
+      this->storageInvalid = false;
+    }
+    IplImage *workingImage = this->cameraImage;
+    CvSize     workingSize = this->imageSize;
+    //
+    // only executed on first pass 
+    //
     if (!this->difference) {
-      this->difference = cvCloneImage( this->currentImage );
-      this->tempImage = cvCloneImage(this->currentImage );
-      cvConvertScale(this->currentImage, movingAverage, 1.0, 0.0);
+      if (this->rotation==1 || this->rotation==2) {
+        workingSize = cvSize(this->imageSize.height,this->imageSize.width);
+        this->rotatedImage = cvCreateImage( workingSize, IPL_DEPTH_8U, 3);
+        workingImage = this->rotatedImage;
+      }
+      this->movingAverage   = cvCreateImage( workingSize, IPL_DEPTH_32F, 3);
+      this->thresholdImage  = cvCreateImage( workingSize, IPL_DEPTH_8U, 1);
+      this->blendImage      = cvCreateImage( workingSize, IPL_DEPTH_8U, 3);
+      this->difference      = cvCloneImage(workingImage);
+      this->tempImage       = cvCloneImage(workingImage);
+      cvConvertScale(workingImage, this->movingAverage, 1.0, 0.0);
     }
-    if (this->currentImage) {
-      if (flipVertical) {
-        cvFlip(this->currentImage, 0, 0);
-      }
-      if (this->MotionDetecting) {
-        cvRunningAvg(this->currentImage, this->movingAverage, this->average, NULL);
-
-        // Convert the type of the moving average from float to char
-        cvConvertScale(this->movingAverage, this->tempImage, 1.0, 0.0);
-
-        // Subtract the current frame from the moving average.
-        cvAbsDiff(this->currentImage, this->tempImage, this->difference);
-
-        // Convert the image to grayscale.
-        cvCvtColor(this->difference, this->thresholdImage, CV_RGB2GRAY);
-
-        // Threshold the image to black/white off/on.
-        cvThreshold(this->thresholdImage, this->thresholdImage, threshold, 255, CV_THRESH_BINARY);
-
-        // Erode and Dilate to denoise and produce blobs
-        if (this->erodeIterations>0) {
-          cvErode(this->thresholdImage, this->thresholdImage, 0, this->erodeIterations);
-        }
-        if (this->dilateIterations>0) {
-          cvDilate(this->thresholdImage, this->thresholdImage, 0, this->dilateIterations);
-        }
-
-        // Convert the image to grayscale.
-        cvCvtColor(this->thresholdImage, this->blendImage, CV_GRAY2RGB);
-        this->countPixels(this->thresholdImage);
-
-        /* dst = src1 * alpha + src2 * beta + gamma */
-        cvAddWeighted(currentImage, this->blendRatio, this->blendImage, 1.0-this->blendRatio, 0.0, this->blendImage);
-      }
-      
-      if (rootFilter) {
-        switch (this->displayImage) {
-          case 0:
-            rootFilter->processPoint(this->currentImage);
-            break;
-          case 1:
-            rootFilter->processPoint(this->movingAverage);
-            break;
-          case 2:
-            rootFilter->processPoint(this->thresholdImage);
-            break;
-          default:
-          case 3:
-            rootFilter->processPoint(this->blendImage);
-            break;
-        }
-      }
-      cvReleaseImage(&this->currentImage);
+    //
+    // executed every pass 
+    //
+    switch (this->rotation) {
+      case 0:
+        workingImage = this->cameraImage;
+        break;
+      case 1:
+        cvFlip(this->cameraImage, 0, 1);
+        cvTranspose(this->cameraImage, this->rotatedImage );
+        workingImage = this->rotatedImage;
+        break;
+      case 2:
+        cvTranspose(this->cameraImage, this->rotatedImage );
+        cvFlip(this->rotatedImage, 0, 1);
+        workingImage = this->rotatedImage;
+        break;
+      case 3:
+        cvFlip(this->cameraImage, 0, -1);
+        break;
     }
+    if (this->MotionDetecting) {
+      cvRunningAvg(workingImage, this->movingAverage, this->average, NULL);
+
+      // Convert the type of the moving average from float to char
+      cvConvertScale(this->movingAverage, this->tempImage, 1.0, 0.0);
+
+      // Subtract the current frame from the moving average.
+      cvAbsDiff(workingImage, this->tempImage, this->difference);
+
+      // Convert the image to grayscale.
+      cvCvtColor(this->difference, this->thresholdImage, CV_RGB2GRAY);
+
+      // Threshold the image to black/white off/on.
+      cvThreshold(this->thresholdImage, this->thresholdImage, threshold, 255, CV_THRESH_BINARY);
+
+      // Erode and Dilate to denoise and produce blobs
+      if (this->erodeIterations>0) {
+        cvErode(this->thresholdImage, this->thresholdImage, 0, this->erodeIterations);
+      }
+      if (this->dilateIterations>0) {
+        cvDilate(this->thresholdImage, this->thresholdImage, 0, this->dilateIterations);
+      }
+
+      // Convert the image to grayscale.
+      cvCvtColor(this->thresholdImage, this->blendImage, CV_GRAY2RGB);
+      this->countPixels(this->thresholdImage);
+
+      /* dst = src1 * alpha + src2 * beta + gamma */
+      cvAddWeighted(workingImage, this->blendRatio, this->blendImage, 1.0-this->blendRatio, 0.0, this->blendImage);
+    }
+    
+    if (rootFilter) {
+      switch (this->displayImage) {
+        case 0:
+          rootFilter->processPoint(workingImage);
+          break;
+        case 1:
+          rootFilter->processPoint(this->movingAverage);
+          break;
+        case 2:
+          rootFilter->processPoint(this->thresholdImage);
+          break;
+        default:
+        case 3:
+          rootFilter->processPoint(this->blendImage);
+          break;
+      }
+    }
+    cvReleaseImage(&this->cameraImage);
   }
 }
 //----------------------------------------------------------------------------

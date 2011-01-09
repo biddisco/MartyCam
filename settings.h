@@ -8,6 +8,8 @@
 #include <QTimer>
 #include <QButtonGroup>
 
+class RenderWidget;
+
 class SettingsWidget : public QWidget {
 Q_OBJECT;
 public:
@@ -16,11 +18,11 @@ public:
   void RecordAVI(bool state);
 
   void setThreads(CaptureThread *capthread, ProcessingThread *procthread);
+  void setRenderWidget(RenderWidget *rw) { this->renderWidget = rw; }
 
 public slots:
   void on640ResToggled(bool on);
   void on320ResToggled(bool on);
-  void onVerticalFlipStateChanged(int state);
   void onThresholdChanged(int value);
   void onAverageChanged(int value);
   void onErodeChanged(int value);
@@ -29,11 +31,14 @@ public slots:
   void onWriteAVIToggled(bool state);
   void onTimer();
   void onImageSelection(int btn);
+  void onRotateSelection(int btn);
   void onBlendChanged(int value);
   void onCameraSelection(int index);
 
 signals:
   void resolutionSelected(CvSize);
+  void rotationChanged(int);
+
   void CameraIndexChanged(int);
 
 private:
@@ -44,6 +49,8 @@ private:
   QTime               AVI_EndTime;
   QTimer              clock;
   QButtonGroup        ImageButtonGroup;
+  QButtonGroup        RotateButtonGroup;
+  RenderWidget       *renderWidget;
 };
 
 #endif

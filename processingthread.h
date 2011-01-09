@@ -13,13 +13,14 @@ class ProcessingThread : public QThread {
 public: 
    ProcessingThread(ImageBuffer* buffer, CvSize &size);
   ~ProcessingThread();
-
-  void countPixels(IplImage *image);
-
+  //
+  void CopySettings(ProcessingThread *thread);
+  void DeleteTemporaryStorage();
+  // 
+  void   countPixels(IplImage *image);
   double getMotionPercent() { return this->motionPercent; }
   //
   void setRootFilter(Filter* filter) { rootFilter = filter; }
-  void setFlipVertical(bool fv) { flipVertical = fv; }
   void setMotionDetecting(bool md) { this->MotionDetecting = md; }
   void setThreshold(int val) { threshold = val; }
   void setAveraging(double val) { average = val; }
@@ -27,14 +28,14 @@ public:
   void setDilateIterations(int val) { dilateIterations = val; }
   void setDisplayImage(int image) { displayImage = image; }
   void setBlendRatio(double ratio) { this->blendRatio = ratio; }
-  
+  void setRotation(int value);
+
   void run();
   void setAbort(bool a) { this->abort = a; }
 
 private:
   ImageBuffer *imageBuffer;
   Filter      *rootFilter;
-  bool         flipVertical;
   bool         MotionDetecting;
   int          threshold;
   double       average;
@@ -44,10 +45,13 @@ private:
   int          displayImage;
   double       blendRatio;
   bool         abort;
+  int          rotation;
+  bool         storageInvalid;
 
   //Images to use in the program.
   CvSize    imageSize;
-  IplImage* currentImage;
+  IplImage* cameraImage;
+  IplImage* rotatedImage;
   IplImage* thresholdImage;
   IplImage* blendImage;
   IplImage* movingAverage;

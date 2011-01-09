@@ -31,6 +31,7 @@ MartyCam::MartyCam() : QMainWindow(0)
   settingsDock = new QDockWidget("Settings", this);
   settingsDock->setAllowedAreas(Qt::RightDockWidgetArea | Qt::LeftDockWidgetArea);
   settingsWidget = new SettingsWidget(this);
+  settingsWidget->setRenderWidget(this->renderWidget);
   settingsDock->setWidget(settingsWidget);
   settingsDock->setMinimumWidth(300);
   addDockWidget(Qt::RightDockWidgetArea, settingsDock);
@@ -45,7 +46,8 @@ MartyCam::MartyCam() : QMainWindow(0)
   connect(&updateTimer, SIGNAL(timeout()), this, SLOT(updateStats()));
   //
   this->createCaptureThread(15, this->imageSize, this->cameraIndex);
-  this->createProcessingThread(this->imageSize);
+  this->processingThread = this->createProcessingThread(this->imageSize, NULL);
+  this->processingThread->start();
   //
   this->updateTimer.start(1000);
   connect(this->captureThread, SIGNAL(RecordingState(bool)), this, SLOT(onRecordingStateChanged(bool))); 
@@ -82,12 +84,13 @@ void MartyCam::deleteProcessingThread()
   delete processingThread;
 }
 //----------------------------------------------------------------------------
-void MartyCam::createProcessingThread(CvSize &size)
+ProcessingThread *MartyCam::createProcessingThread(CvSize &size, ProcessingThread *oldThread)
 {
-  this->processingThread = new ProcessingThread(imageBuffer, this->imageSize);
-  this->processingThread->setRootFilter(renderWidget);
-  this->processingThread->start(QThread::IdlePriority);
-  this->settingsWidget->setThreads(this->captureThread, this->processingThread);
+  ProcessingThread *temp = new ProcessingThread(imageBuffer, this->imageSize);
+  if (oldThread) temp->CopySettings(oldThread);
+  temp->setRootFilter(renderWidget);
+  this->settingsWidget->setThreads(this->captureThread, temp);
+  return temp;
 }
 //----------------------------------------------------------------------------
 void MartyCam::onCameraIndexChanged(int index)
@@ -99,11 +102,13 @@ void MartyCam::onCameraIndexChanged(int index)
 //----------------------------------------------------------------------------
 void MartyCam::onResolutionSelected(CvSize newSize) {
   this->imageSize = newSize;
+  ProcessingThread *temp = this->createProcessingThread(this->imageSize, this->processingThread);
   this->deleteProcessingThread();
   this->deleteCaptureThread();
   this->imageBuffer->clear();
   this->createCaptureThread(15, this->imageSize, this->cameraIndex);
-  this->createProcessingThread(this->imageSize);
+  this->processingThread = temp;
+  this->processingThread->start(QThread::IdlePriority);
 }
 //----------------------------------------------------------------------------
 void MartyCam::updateStats() {
