@@ -20,7 +20,6 @@ public:
   //
   bool startCapture(int framerate);
   void stopCapture();
-  void setDeviceIndex(int index);
   //
   double getFPS() { return fps; }
   bool isCapturing() { return captureActive; }

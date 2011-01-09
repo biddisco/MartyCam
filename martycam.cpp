@@ -24,6 +24,7 @@ MartyCam::MartyCam() : QMainWindow(0)
   this->RecordingEvents         = 0;
   this->imageSize               = cvSize(640,480);
   this->cameraIndex             = 0;
+  this->imageBuffer             = new ImageBuffer(1);
   //
   // create the settings dock widget
   //
@@ -43,13 +44,9 @@ MartyCam::MartyCam() : QMainWindow(0)
   connect(ui.user_trackval, SIGNAL(valueChanged(int)), this, SLOT(onUserTrackChanged(int))); 
   connect(&updateTimer, SIGNAL(timeout()), this, SLOT(updateStats()));
   //
-  this->imageBuffer = new ImageBuffer(1);
   this->createCaptureThread(15, this->imageSize, this->cameraIndex);
   this->createProcessingThread(this->imageSize);
   //
-  this->processingThread->start();
-  this->captureThread->startCapture(15);
-  this->captureThread->start(QThread::IdlePriority);
   this->updateTimer.start(1000);
   connect(this->captureThread, SIGNAL(RecordingState(bool)), this, SLOT(onRecordingStateChanged(bool))); 
 }

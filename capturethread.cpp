@@ -15,7 +15,8 @@ CaptureThread::CaptureThread(ImageBuffer* buffer, CvSize &size, int device) : QT
   this->AVI_Writer        = NULL; 
   this->capture           = NULL;
   this->imageBuffer       = buffer;
-  this->setDeviceIndex(device);
+  this->deviceIndex       = device;
+  capture = cvCaptureFromCAM(CV_CAP_DSHOW + this->deviceIndex );
 }
 //----------------------------------------------------------------------------
 CaptureThread::~CaptureThread() 
@@ -23,25 +24,6 @@ CaptureThread::~CaptureThread()
   this->closeAVI();
   // Release our stream capture object
   cvReleaseCapture(&capture);
-}
-//----------------------------------------------------------------------------
-void CaptureThread::setDeviceIndex(int index)
-{
-  if (this->deviceIndex!=index) {
-    bool active = this->captureActive;
-    this->stopCapture();
-    if (this->capture) {
-      cvReleaseCapture(&capture);
-    }
-    this->deviceIndex = index;
-    capture = cvCaptureFromCAM(CV_CAP_DSHOW + this->deviceIndex );
-    if (!capture) {
-      throw std::exception("Camera capture failed");
-    }
-    if (active) {
-      this->startCapture(15);
-    }
-  }
 }
 //----------------------------------------------------------------------------
 void CaptureThread::run() {  
@@ -74,7 +56,7 @@ void CaptureThread::run() {
 //----------------------------------------------------------------------------
 void CaptureThread::updateFPS(int time) {
   frameTimes.enqueue(time);
-  if (frameTimes.size() > 15) {
+  if (frameTimes.size() > 30) {
     frameTimes.dequeue();
   }
   if (frameTimes.size() > 1) {
@@ -123,7 +105,6 @@ void CaptureThread::saveAVI(IplImage *image)
     this->AVI_Writer = cvCreateVideoWriter(
       path.c_str(),
       0,  
-      // 15.0,  
       this->getFPS(),
       this->imageSize
     );
