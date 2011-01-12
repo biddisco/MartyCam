@@ -57,7 +57,8 @@ private:
   IplImage* movingAverage;
   IplImage* difference;
   IplImage* tempImage;
-
+  CvFont    font;
+  CvSize    text_size;
 };
 
 #endif

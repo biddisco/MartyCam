@@ -1,4 +1,5 @@
 #include <QDebug>
+#include <QTime>
 #include "filter.h"
 #include "imagebuffer.h"
 #include "processingthread.h"
@@ -90,12 +91,18 @@ void ProcessingThread::run() {
         this->rotatedImage = cvCreateImage( workingSize, IPL_DEPTH_8U, 3);
         workingImage = this->rotatedImage;
       }
+      //
       this->movingAverage   = cvCreateImage( workingSize, IPL_DEPTH_32F, 3);
       this->thresholdImage  = cvCreateImage( workingSize, IPL_DEPTH_8U, 1);
       this->blendImage      = cvCreateImage( workingSize, IPL_DEPTH_8U, 3);
       this->difference      = cvCloneImage(workingImage);
       this->tempImage       = cvCloneImage(workingImage);
       cvConvertScale(workingImage, this->movingAverage, 1.0, 0.0);
+
+      // initialize font and precompute text size
+      cvInitFont(&this->font, CV_FONT_HERSHEY_PLAIN, 1.0, 1.0, 0, 1, CV_AA);
+      QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
+      cvGetTextSize( timestring.toAscii(), &this->font, &this->text_size, NULL);
     }
     //
     // executed every pass 
@@ -150,21 +157,27 @@ void ProcessingThread::run() {
     }
     
     if (rootFilter) {
+      IplImage *shownImage;
       switch (this->displayImage) {
         case 0:
-          rootFilter->processPoint(workingImage);
+          shownImage = workingImage;
           break;
         case 1:
-          rootFilter->processPoint(this->movingAverage);
+          shownImage = this->movingAverage;
           break;
         case 2:
-          rootFilter->processPoint(this->thresholdImage);
+          shownImage = this->thresholdImage;
           break;
         default:
         case 3:
-          rootFilter->processPoint(this->blendImage);
+          shownImage = this->blendImage;
           break;
       }
+      QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
+      cvPutText(shownImage, timestring.toAscii(), 
+        cvPoint(shownImage->width-text_size.width-4, text_size.height+4), 
+        &this->font, cvScalar(255, 255, 255, 0));
+      rootFilter->processPoint(shownImage);
     }
     cvReleaseImage(&this->cameraImage);
   }

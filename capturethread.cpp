@@ -61,6 +61,7 @@ void CaptureThread::updateFPS(int time) {
   }
   if (frameTimes.size() > 1) {
     fps = frameTimes.size()/((double)time-frameTimes.head())*1000.0;
+    fps = (static_cast<int>(fps*10))/10.0;
   }
   else {
     fps = 0;
