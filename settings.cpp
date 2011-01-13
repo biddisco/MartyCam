@@ -177,7 +177,12 @@ void SettingsWidget::onImageSelection(int btn)
 //----------------------------------------------------------------------------
 void SettingsWidget::onRotateSelection(int btn)
 {
-  this->processingthread->setRotation(btn);
+  this->capturethread->setAbort(true);
+  this->capturethread->wait();
+  this->capturethread->setRotation(btn);
+  this->capturethread->setAbort(false);
+  this->capturethread->start();
+  //
   if (btn==0 || btn==3) {
     this->renderWidget->setFixedSize(640, 480);
   }

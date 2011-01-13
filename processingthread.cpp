@@ -22,7 +22,6 @@ ProcessingThread::ProcessingThread(ImageBuffer* buffer, CvSize &size) : QThread(
   //
   this->imageSize         = size;
   this->cameraImage       = NULL;
-  this->rotatedImage      = NULL;
   this->tempImage         = NULL;
   this->difference        = NULL;
   this->blendImage        = NULL;
@@ -37,13 +36,11 @@ ProcessingThread::~ProcessingThread()
 //----------------------------------------------------------------------------
 void ProcessingThread::DeleteTemporaryStorage()
 {
-  cvReleaseImage(&this->rotatedImage);
   cvReleaseImage(&this->movingAverage);
   cvReleaseImage(&this->thresholdImage);
   cvReleaseImage(&this->blendImage);
   cvReleaseImage(&this->difference);
   cvReleaseImage(&this->tempImage);
-  this->rotatedImage      = NULL;
   this->tempImage         = NULL;
   this->difference        = NULL;
   this->blendImage        = NULL;
@@ -76,21 +73,22 @@ void ProcessingThread::run() {
       msleep(100);
       continue;
     }
-    if (this->storageInvalid) {
-      this->DeleteTemporaryStorage();
-      this->storageInvalid = false;
-    }
+//    if (this->storageInvalid) {
+//      this->DeleteTemporaryStorage();
+//      this->storageInvalid = false;
+//    }
     IplImage *workingImage = this->cameraImage;
-    CvSize     workingSize = this->imageSize;
+    CvSize     workingSize = cvSize(this->cameraImage->width, this->cameraImage->height);
+    if (workingSize.width!=this->imageSize.width ||
+        workingSize.height!=this->imageSize.height) 
+    {
+      this->DeleteTemporaryStorage();
+      this->imageSize = workingSize;
+    }
     //
     // only executed on first pass 
     //
     if (!this->difference) {
-      if (this->rotation==1 || this->rotation==2) {
-        workingSize = cvSize(this->imageSize.height,this->imageSize.width);
-        this->rotatedImage = cvCreateImage( workingSize, IPL_DEPTH_8U, 3);
-        workingImage = this->rotatedImage;
-      }
       //
       this->movingAverage   = cvCreateImage( workingSize, IPL_DEPTH_32F, 3);
       this->thresholdImage  = cvCreateImage( workingSize, IPL_DEPTH_8U, 1);
@@ -103,27 +101,6 @@ void ProcessingThread::run() {
       cvInitFont(&this->font, CV_FONT_HERSHEY_PLAIN, 1.0, 1.0, 0, 1, CV_AA);
       QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
       cvGetTextSize( timestring.toAscii(), &this->font, &this->text_size, NULL);
-    }
-    //
-    // executed every pass 
-    //
-    switch (this->rotation) {
-      case 0:
-        workingImage = this->cameraImage;
-        break;
-      case 1:
-        cvFlip(this->cameraImage, 0, 1);
-        cvTranspose(this->cameraImage, this->rotatedImage );
-        workingImage = this->rotatedImage;
-        break;
-      case 2:
-        cvTranspose(this->cameraImage, this->rotatedImage );
-        cvFlip(this->rotatedImage, 0, 1);
-        workingImage = this->rotatedImage;
-        break;
-      case 3:
-        cvFlip(this->cameraImage, 0, -1);
-        break;
     }
     if (this->MotionDetecting) {
       cvRunningAvg(workingImage, this->movingAverage, this->average, NULL);

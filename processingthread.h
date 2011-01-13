@@ -51,7 +51,6 @@ private:
   //Images to use in the program.
   CvSize    imageSize;
   IplImage* cameraImage;
-  IplImage* rotatedImage;
   IplImage* thresholdImage;
   IplImage* blendImage;
   IplImage* movingAverage;

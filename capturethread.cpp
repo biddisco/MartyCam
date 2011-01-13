@@ -11,17 +11,29 @@ CaptureThread::CaptureThread(ImageBuffer* buffer, CvSize &size, int device) : QT
   this->fps               = 0.0 ;
   this->deviceIndex       = -1;
   this->imageSize         = size;
+  this->rotatedSize       = cvSize(size.height, size.width);
   this->AVI_Writing       = false;
   this->AVI_Writer        = NULL; 
   this->capture           = NULL;
   this->imageBuffer       = buffer;
   this->deviceIndex       = device;
+  this->rotation          = 0;
+  this->rotatedImage      = NULL;
+  // initialize font and precompute text size
+  cvInitFont(&this->font, CV_FONT_HERSHEY_PLAIN, 1.0, 1.0, 0, 1, CV_AA);
+  QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
+  cvGetTextSize( timestring.toAscii(), &this->font, &this->text_size, NULL);
+  // start capture device driver
   capture = cvCaptureFromCAM(CV_CAP_DSHOW + this->deviceIndex );
 }
 //----------------------------------------------------------------------------
 CaptureThread::~CaptureThread() 
 {  
   this->closeAVI();
+  // free memory
+  if (this->rotatedImage) {
+    cvReleaseData(this->rotatedImage);
+  }
   // Release our stream capture object
   cvReleaseCapture(&capture);
 }
@@ -42,14 +54,17 @@ void CaptureThread::run() {
     // get latest frame from webcam
     IplImage *frame = cvQueryFrame(capture);
     updateFPS(time.elapsed());
+    // rotate image if necessary
+    IplImage *workingImage = this->rotateImage(frame, this->rotatedImage);
+    // add to queue if space is available, 
+    if (!imageBuffer->isFull()) {
+      imageBuffer->addFrame(workingImage);
+    }
     // always write the frame out if saving movie
     if (this->AVI_Writing) {
-      this->saveAVI(frame);
-    }
-    // add to queue if space is available, 
-    // otherwise drop the frame from further processing
-    if (!imageBuffer->isFull()) {
-      imageBuffer->addFrame(frame);
+      // add date time stamp if enabled
+      this->captionImage(workingImage);
+      this->saveAVI(workingImage);
     }
   }
 }
@@ -106,7 +121,7 @@ void CaptureThread::saveAVI(IplImage *image)
       path.c_str(),
       0,  
       this->getFPS(),
-      this->imageSize
+      cvSize(image->width, image->height)
     );
     emit(RecordingState(true));
   }
@@ -131,5 +146,44 @@ void CaptureThread::setWriteAVIDir(const char *dir)
 void CaptureThread::setWriteAVIName(const char *name)
 {
   this->AVI_Name = name;
+}
+//----------------------------------------------------------------------------
+void CaptureThread::setRotation(int value) { 
+  this->rotation = value; 
+  if (this->rotatedImage) {
+    cvReleaseImage(&this->rotatedImage);
+  }
+  if (this->rotation==1 || this->rotation==2) {
+    CvSize workingSize = cvSize(this->imageSize.height, this->imageSize.width);
+    this->rotatedImage = cvCreateImage( workingSize, IPL_DEPTH_8U, 3);
+  }
+}
+//----------------------------------------------------------------------------
+IplImage *CaptureThread::rotateImage(IplImage *sourceImage, IplImage *rotatedImage)
+{
+  switch (this->rotation) {
+    case 0:
+      break;
+    case 1:
+      cvFlip(sourceImage, 0, 1);
+      cvTranspose(sourceImage, rotatedImage );
+      return rotatedImage;
+    case 2:
+      cvTranspose(sourceImage, rotatedImage );
+      cvFlip(rotatedImage, 0, 1);
+      return rotatedImage;
+    case 3:
+      cvFlip(sourceImage, 0, -1);
+      break;
+  }
+  return sourceImage;
+}
+//----------------------------------------------------------------------------
+void CaptureThread::captionImage(IplImage *sourceImage)
+{
+  QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
+  cvPutText(sourceImage, timestring.toAscii(), 
+    cvPoint(sourceImage->width-text_size.width-4, text_size.height+4), 
+    &this->font, cvScalar(255, 255, 255, 0));
 }
 //----------------------------------------------------------------------------

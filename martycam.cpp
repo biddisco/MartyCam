@@ -73,7 +73,7 @@ void MartyCam::createCaptureThread(int FPS, CvSize &size, int camera)
   captureThread->start(QThread::IdlePriority);
   this->settingsWidget->setThreads(this->captureThread, this->processingThread);
   updateTimer.start();
-  std::string capStatus = captureThread->GetCaptureStatusString();
+  std::string capStatus = captureThread->getCaptureStatusString();
   this->ui.outputWindow->setText(capStatus.c_str());
 }
 //----------------------------------------------------------------------------

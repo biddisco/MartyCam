@@ -30,7 +30,11 @@ public:
   void setWriteAVIName(const char *name);
   void saveAVI(IplImage *image);
   void closeAVI();
-  std::string GetCaptureStatusString() { return this->CaptureStatus; }
+  std::string getCaptureStatusString() { return this->CaptureStatus; }
+  void setRotation(int value);
+  //
+  IplImage *rotateImage(IplImage *sourceImage, IplImage *rotatedImage);
+  void      captionImage(IplImage *sourceImage);
 
 signals:
   void RecordingState(bool);
@@ -44,16 +48,22 @@ private:
   ImageBuffer    *imageBuffer;
   bool            captureActive;
   CvSize          imageSize;
+  CvSize          rotatedSize;
   CvCapture      *capture;
   double          fps;
   QQueue<int>     frameTimes;
   int             deviceIndex;
+  int             rotation;
   //
   CvVideoWriter  *AVI_Writer;
   bool            AVI_Writing;
   std::string     AVI_Directory;
   std::string     AVI_Name;
   std::string     CaptureStatus;
+  //
+  CvFont          font;
+  CvSize          text_size;
+  IplImage       *rotatedImage;
 };
 
 #endif
