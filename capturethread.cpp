@@ -10,8 +10,6 @@ CaptureThread::CaptureThread(ImageBuffer* buffer, CvSize &size, int device) : QT
   this->captureActive     = false;
   this->fps               = 0.0 ;
   this->deviceIndex       = -1;
-  this->imageSize         = size;
-  this->rotatedSize       = cvSize(size.height, size.width);
   this->AVI_Writing       = false;
   this->AVI_Writer        = NULL; 
   this->capture           = NULL;
@@ -25,6 +23,12 @@ CaptureThread::CaptureThread(ImageBuffer* buffer, CvSize &size, int device) : QT
   cvGetTextSize( timestring.toAscii(), &this->font, &this->text_size, NULL);
   // start capture device driver
   capture = cvCaptureFromCAM(CV_CAP_DSHOW + this->deviceIndex );
+  cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH,  size.width);
+  cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, size.height);
+  int w = cvGetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH);
+  int h = cvGetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT);
+  this->imageSize         = cvSize(w,h);
+  this->rotatedSize       = cvSize(h,w);
 }
 //----------------------------------------------------------------------------
 CaptureThread::~CaptureThread() 

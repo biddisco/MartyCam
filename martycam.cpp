@@ -46,6 +46,7 @@ MartyCam::MartyCam() : QMainWindow(0)
   connect(&updateTimer, SIGNAL(timeout()), this, SLOT(updateStats()));
   //
   this->createCaptureThread(15, this->imageSize, this->cameraIndex);
+  this->imageSize = this->captureThread->getImageSize();
   this->processingThread = this->createProcessingThread(this->imageSize, NULL);
   this->processingThread->start();
   //

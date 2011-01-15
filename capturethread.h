@@ -36,6 +36,8 @@ public:
   IplImage *rotateImage(IplImage *sourceImage, IplImage *rotatedImage);
   void      captionImage(IplImage *sourceImage);
 
+  CvSize    getImageSize() { return this->imageSize; }
+
 signals:
   void RecordingState(bool);
 
