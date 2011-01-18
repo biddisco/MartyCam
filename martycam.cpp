@@ -22,9 +22,9 @@ MartyCam::MartyCam() : QMainWindow(0)
   //
   this->UserDetectionThreshold  = 0.25;
   this->RecordingEvents         = 0;
-  this->imageSize               = cvSize(640,480);
+  this->imageSize               = cvSize(0,0);
   this->cameraIndex             = 0;
-  this->imageBuffer             = new ImageBuffer(1);
+  this->imageBuffer             = new ImageBuffer(2);
   //
   // create the settings dock widget
   //
@@ -47,6 +47,7 @@ MartyCam::MartyCam() : QMainWindow(0)
   //
   this->createCaptureThread(15, this->imageSize, this->cameraIndex);
   this->imageSize = this->captureThread->getImageSize();
+  this->renderWidget->setFixedSize(this->imageSize.width, this->imageSize.height);
   this->processingThread = this->createProcessingThread(this->imageSize, NULL);
   this->processingThread->start();
   //

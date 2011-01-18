@@ -25,6 +25,7 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   ImageButtonGroup.addButton(ui.movingAverage,1);
   ImageButtonGroup.addButton(ui.differenceImage,2);
   ImageButtonGroup.addButton(ui.blendedImage,3);
+  ImageButtonGroup.addButton(ui.noiseImage,4);
   connect(&ImageButtonGroup, SIGNAL(buttonClicked(int)), this, SLOT(onImageSelection(int)));
 
   RotateButtonGroup.addButton(ui.rotate0,0);

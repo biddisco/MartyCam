@@ -18,6 +18,7 @@ public:
   void DeleteTemporaryStorage();
   // 
   void   countPixels(IplImage *image);
+  void   updateNoiseMap(IplImage *image);
   double getMotionPercent() { return this->motionPercent; }
   //
   void setRootFilter(Filter* filter) { rootFilter = filter; }
@@ -49,15 +50,17 @@ private:
   bool         storageInvalid;
 
   //Images to use in the program.
-  CvSize    imageSize;
-  IplImage* cameraImage;
-  IplImage* thresholdImage;
-  IplImage* blendImage;
-  IplImage* movingAverage;
-  IplImage* difference;
-  IplImage* tempImage;
-  CvFont    font;
-  CvSize    text_size;
+  CvSize     imageSize;
+  IplImage  *cameraImage;
+  IplImage  *greyScaleImage;
+  IplImage  *thresholdImage;
+  IplImage  *blendImage;
+  IplImage  *movingAverage;
+  IplImage  *difference;
+  IplImage  *tempImage;
+  IplImage  *noiseImage;
+  CvFont     font;
+  CvSize     text_size;
 };
 
 #endif
