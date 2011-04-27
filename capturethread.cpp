@@ -3,6 +3,7 @@
 #include "imagebuffer.h"
 #include <QDebug>
 #include <QTime>
+#define IP_CAM
 //----------------------------------------------------------------------------
 CaptureThread::CaptureThread(ImageBuffer* buffer, CvSize &size, int device) : QThread()
 {
@@ -22,7 +23,20 @@ CaptureThread::CaptureThread(ImageBuffer* buffer, CvSize &size, int device) : QT
   QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
   cvGetTextSize( timestring.toAscii(), &this->font, &this->text_size, NULL);
   // start capture device driver
+
+  
+//  capture = cvCaptureFromFile("C:/2011-01-20_01-24-29-Martora.avi" );
+//  capture = cvCaptureFromFile("http://212.59.162.17:82/mjpg/video.mjpg");
+//  capture = cvCaptureFromFile("http://www.cowbridge.co.uk/webcam/cowbridge.jpg");
+//  capture = cvCaptureFromFile("http://admin:1234@http://192.168.1.21/videostream.cgi");
+//  capture = cvCaptureFromFile("http://192.168.1.21:8080/snapshot.cgi?user=admin&pwd=1234");
+//  capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/live.htm");
+
+#ifdef IP_CAM
+  capture = cvCaptureFromFile("http://192.168.1.21/videostream.asf?user=admin&pwd=1234");
+#else
   capture = cvCaptureFromCAM(CV_CAP_DSHOW + this->deviceIndex );
+#endif
   if (size.width>0 && size.height>0) {
     cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH,  size.width);
     cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, size.height);

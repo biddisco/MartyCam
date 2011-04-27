@@ -44,7 +44,7 @@ IplImage* ImageBuffer::getFrame() {
   mutex.lock();
   if(imageQueue.isEmpty()) {
   //  output << "Get frame waiting on frame";
-    bufferNotEmpty.wait(&mutex);
+    bufferNotEmpty.wait(&mutex, 1000);
   //  output << "Get frame has been received";
   }
   mutex.unlock();

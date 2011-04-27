@@ -110,6 +110,8 @@ void ProcessingThread::run() {
       QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
       cvGetTextSize( timestring.toAscii(), &this->font, &this->text_size, NULL);
     }
+
+    IplImage *shownImage;
     if (this->MotionDetecting) {
       cvRunningAvg(workingImage, this->movingAverage, this->average, NULL);
 
@@ -142,35 +144,38 @@ void ProcessingThread::run() {
 
       /* dst = src1 * alpha + src2 * beta + gamma */
       cvAddWeighted(workingImage, this->blendRatio, this->blendImage, 1.0-this->blendRatio, 0.0, this->blendImage);
-    }
-    
-    if (rootFilter) {
-      IplImage *shownImage;
-      switch (this->displayImage) {
-        case 0:
-          shownImage = workingImage;
-          break;
-        case 1:
-          shownImage = this->movingAverage;
-          break;
-        case 2:
-          shownImage = this->thresholdImage;
-          break;
-        default:
-        case 3:
-          shownImage = this->blendImage;
-          break;
-        case 4:
-          shownImage = this->noiseImage;
-          break;
+
+      if (rootFilter) {
+        switch (this->displayImage) {
+          case 0:
+            shownImage = workingImage;
+            break;
+          case 1:
+            shownImage = this->movingAverage;
+            break;
+          case 2:
+            shownImage = this->thresholdImage;
+            break;
+          default:
+          case 3:
+            shownImage = this->blendImage;
+            break;
+          case 4:
+            shownImage = this->noiseImage;
+            break;
+        }
       }
-      //
-      QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
-      cvPutText(shownImage, timestring.toAscii(), 
-        cvPoint(shownImage->width-text_size.width-4, text_size.height+4), 
-        &this->font, cvScalar(255, 255, 255, 0));
-      rootFilter->processPoint(shownImage);
     }
+    else {
+      shownImage = this->cameraImage;
+    }
+    //
+    QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
+    cvPutText(shownImage, timestring.toAscii(), 
+      cvPoint(shownImage->width-text_size.width-4, text_size.height+4), 
+      &this->font, cvScalar(255, 255, 255, 0));
+    rootFilter->processPoint(shownImage);
+
     cvReleaseImage(&this->cameraImage);
   }
 }

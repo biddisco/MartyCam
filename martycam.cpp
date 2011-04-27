@@ -151,3 +151,8 @@ void MartyCam::onRecordingStateChanged(bool state)
   }
 }
 //----------------------------------------------------------------------------
+void MartyCam::onMotionDetectionChanged(int state)
+{
+  this->processingThread->setMotionDetecting(state);
+}
+//----------------------------------------------------------------------------

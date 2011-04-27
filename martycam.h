@@ -24,6 +24,7 @@ public slots:
   void onCameraIndexChanged(int index);
   void onUserTrackChanged(int value);
   void onRecordingStateChanged(bool state);
+  void onMotionDetectionChanged(int state);
   //
 protected:
   void closeEvent(QCloseEvent*);

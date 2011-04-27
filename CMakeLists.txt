@@ -13,9 +13,14 @@ INCLUDE_DIRECTORIES(include)
 
 ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS)
 
+LINK_DIRECTORIES(
+  C:/bin/ffmpeg/lib
+  C:/Code/OpenCV-2.2.0/3rdparty/lib
+)
+  
 SET(VIDEOLIB_LIBRARY 
-  "C:\\Code\\OpenCV-2.2.0\\3rdparty\\lib\\videoInput64.lib" 
-  CACHE FILEPATH "Path to videlib")
+  "C:\\Code\\OpenCV-2.2.0\\3rdparty\\lib\\videoInput.lib" 
+  CACHE FILEPATH "Path to videolib")
 
 SET(QtOpenCV_UIS
   settings.ui
@@ -52,11 +57,6 @@ SET(QtOpenCV_SRCS
 )
 
 ADD_EXECUTABLE(MartyCam WIN32 ${QtOpenCV_SRCS} ${QtOpenCV_UIS_H} ${MOC_FILES})
-
-#SET_TARGET_PROPERTIES (MartyCam
-# #   PROPERTIES
-#        LINK_FLAGS "/SUBSYSTEM:WINDOWS"
-#) videoInput64
 
 #LINK_DIRECTORIES("C:\\Code\\OpenCV-2.2.0\\3rdparty\\lib")
 target_link_libraries(MartyCam 
