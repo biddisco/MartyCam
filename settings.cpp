@@ -143,8 +143,8 @@ void SettingsWidget::RecordAVI(bool state)
   //
   QString filePath = this->ui.avi_directory->text();
   QString fileName = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
-  this->capturethread->setWriteAVIName(fileName.toStdString().c_str());
-  this->capturethread->setWriteAVIDir(filePath.toStdString().c_str());
+  this->capturethread->setWriteAVIName(fileName.toAscii().constData());
+  this->capturethread->setWriteAVIDir(filePath.toAscii().constData());
   //
   // add duration to end time even if already running
   QTime duration = this->ui.AVI_Duration->time();
