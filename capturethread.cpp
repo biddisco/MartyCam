@@ -3,7 +3,7 @@
 #include "imagebuffer.h"
 #include <QDebug>
 #include <QTime>
-#define IP_CAM
+ #define IP_CAM
 //----------------------------------------------------------------------------
 CaptureThread::CaptureThread(ImageBuffer* buffer, CvSize &size, int device) : QThread()
 {
@@ -22,18 +22,18 @@ CaptureThread::CaptureThread(ImageBuffer* buffer, CvSize &size, int device) : QT
   cvInitFont(&this->font, CV_FONT_HERSHEY_PLAIN, 1.0, 1.0, 0, 1, CV_AA);
   QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
   cvGetTextSize( timestring.toAscii(), &this->font, &this->text_size, NULL);
-  // start capture device driver
 
-  
+  //
+  // start capture device driver
+  //
+#ifdef IP_CAM
+  capture = cvCaptureFromFile("http://192.168.1.21/videostream.asf?user=admin&pwd=1234");
 //  capture = cvCaptureFromFile("C:/2011-01-20_01-24-29-Martora.avi" );
 //  capture = cvCaptureFromFile("http://212.59.162.17:82/mjpg/video.mjpg");
 //  capture = cvCaptureFromFile("http://www.cowbridge.co.uk/webcam/cowbridge.jpg");
 //  capture = cvCaptureFromFile("http://admin:1234@http://192.168.1.21/videostream.cgi");
 //  capture = cvCaptureFromFile("http://192.168.1.21:8080/snapshot.cgi?user=admin&pwd=1234");
 //  capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/live.htm");
-
-#ifdef IP_CAM
-  capture = cvCaptureFromFile("http://192.168.1.21/videostream.asf?user=admin&pwd=1234");
 #else
   capture = cvCaptureFromCAM(CV_CAP_DSHOW + this->deviceIndex );
 #endif
@@ -51,9 +51,7 @@ CaptureThread::~CaptureThread()
 {  
   this->closeAVI();
   // free memory
-  if (this->rotatedImage) {
-    cvReleaseData(this->rotatedImage);
-  }
+  this->setRotation(0); 
   // Release our stream capture object
   cvReleaseCapture(&capture);
 }
@@ -169,9 +167,13 @@ void CaptureThread::setWriteAVIName(const char *name)
 }
 //----------------------------------------------------------------------------
 void CaptureThread::setRotation(int value) { 
+  if (this->rotation==value) {
+    return;
+  }
   this->rotation = value; 
   if (this->rotatedImage) {
     cvReleaseImage(&this->rotatedImage);
+    this->rotatedImage = NULL;
   }
   if (this->rotation==1 || this->rotation==2) {
     CvSize workingSize = cvSize(this->imageSize.height, this->imageSize.width);
@@ -179,24 +181,27 @@ void CaptureThread::setRotation(int value) {
   }
 }
 //----------------------------------------------------------------------------
-IplImage *CaptureThread::rotateImage(IplImage *sourceImage, IplImage *rotatedImage)
+IplImage *CaptureThread::rotateImage(IplImage *source, IplImage *rotated)
 {
+  IplImage *result = source;
   switch (this->rotation) {
     case 0:
       break;
     case 1:
-      cvFlip(sourceImage, 0, 1);
-      cvTranspose(sourceImage, rotatedImage );
-      return rotatedImage;
+      cvFlip(source, 0, 1);
+      cvTranspose(source, rotated );
+      result = rotated;
+      break;
     case 2:
-      cvTranspose(sourceImage, rotatedImage );
-      cvFlip(rotatedImage, 0, 1);
-      return rotatedImage;
+      cvTranspose(source, rotated );
+      cvFlip(rotated, 0, 1);
+      result = rotated;
+      break;
     case 3:
-      cvFlip(sourceImage, 0, -1);
+      cvFlip(source, 0, -1);
       break;
   }
-  return sourceImage;
+  return result;
 }
 //----------------------------------------------------------------------------
 void CaptureThread::captionImage(IplImage *sourceImage)

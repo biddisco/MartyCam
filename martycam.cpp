@@ -52,7 +52,8 @@ MartyCam::MartyCam() : QMainWindow(0)
   this->processingThread->start();
   //
   this->updateTimer.start(1000);
-  connect(this->captureThread, SIGNAL(RecordingState(bool)), this, SLOT(onRecordingStateChanged(bool))); 
+  connect(this->captureThread, SIGNAL(RecordingState(bool)), 
+    this, SLOT(onRecordingStateChanged(bool)),Qt::QueuedConnection); 
 }
 //----------------------------------------------------------------------------
 void MartyCam::closeEvent(QCloseEvent*) {

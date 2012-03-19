@@ -2,6 +2,7 @@
 #include <QPainter>
 #include <QDebug>
 #include <QTime>
+#include <iostream>
 //----------------------------------------------------------------------------
 IplImage* QImage2IplImage(QImage *qimg)
 {
@@ -57,7 +58,9 @@ RenderWidget::RenderWidget(QWidget* parent) : QWidget(parent), Filter(), imageVa
   setAttribute(Qt::WA_OpaquePaintEvent, true); // don't clear the area before the paintEvent
   setAttribute(Qt::WA_PaintOnScreen, true); // disable double buffering
   setFixedSize(640, 480);
-  connect(this, SIGNAL(frameSizeChanged(int, int)), this, SLOT(onFrameSizeChanged(int, int)), Qt::QueuedConnection);
+  connect(this, SIGNAL(frameSizeChanged(int, int)), this, SLOT(onFrameSizeChanged(int, int)));
+  connect(this, SIGNAL(update_signal(bool, int)), this, SLOT(UpdateTrigger(bool, int)), Qt::QueuedConnection);
+  //
   this->bufferImage = NULL;
 }
 //----------------------------------------------------------------------------
@@ -81,9 +84,8 @@ void RenderWidget::updatePixmap(const IplImage* frame)
 //----------------------------------------------------------------------------
 void RenderWidget::processPoint(const IplImage* image) {
   // copy the image to the local pixmap and update the display
-  updatePixmap(image);
-  update();
-  //  notifyListener(frame);
+  this->updatePixmap(image);
+  emit(update_signal(true, 12));
 }
 //----------------------------------------------------------------------------
 void RenderWidget::paintEvent(QPaintEvent*) {
@@ -99,3 +101,7 @@ void RenderWidget::paintEvent(QPaintEvent*) {
   }
 }
 //----------------------------------------------------------------------------
+void RenderWidget::UpdateTrigger(bool, int) {
+  this->repaint();
+//  std::cout << "Rendered frame " << std::endl;
+}

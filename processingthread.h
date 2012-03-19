@@ -47,7 +47,6 @@ private:
   double       blendRatio;
   bool         abort;
   int          rotation;
-  bool         storageInvalid;
 
   //Images to use in the program.
   CvSize     imageSize;

@@ -33,8 +33,8 @@ public:
   std::string getCaptureStatusString() { return this->CaptureStatus; }
   void setRotation(int value);
   //
-  IplImage *rotateImage(IplImage *sourceImage, IplImage *rotatedImage);
-  void      captionImage(IplImage *sourceImage);
+  IplImage *rotateImage(IplImage *source, IplImage *rotated);
+  void      captionImage(IplImage *source);
 
   CvSize    getImageSize() { return this->imageSize; }
 

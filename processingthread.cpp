@@ -3,6 +3,7 @@
 #include "filter.h"
 #include "imagebuffer.h"
 #include "processingthread.h"
+#include <iostream>
 //----------------------------------------------------------------------------
 ProcessingThread::ProcessingThread(ImageBuffer* buffer, CvSize &size) : QThread()
 {
@@ -18,7 +19,6 @@ ProcessingThread::ProcessingThread(ImageBuffer* buffer, CvSize &size) : QThread(
   this->displayImage      = 3;
   this->blendRatio        = 0.75;
   this->rotation          = 0;
-  this->storageInvalid    = false;
   //
   this->imageSize         = size;
   this->cameraImage       = NULL;
@@ -67,11 +67,14 @@ void ProcessingThread::CopySettings(ProcessingThread *thread)
 }
 //----------------------------------------------------------------------------
 void ProcessingThread::setRotation(int value) { 
-  this->storageInvalid = true;
+  if (this->rotation==value) {
+    return;
+  }
   this->rotation = value; 
 }
 //----------------------------------------------------------------------------
 void ProcessingThread::run() {
+  static int framenum = 0;
   while (!this->abort) {
     this->cameraImage = imageBuffer->getFrame();
     // if camera not working or disconnected, abort
@@ -79,10 +82,6 @@ void ProcessingThread::run() {
       msleep(100);
       continue;
     }
-//    if (this->storageInvalid) {
-//      this->DeleteTemporaryStorage();
-//      this->storageInvalid = false;
-//    }
     IplImage *workingImage = this->cameraImage;
     CvSize     workingSize = cvSize(this->cameraImage->width, this->cameraImage->height);
     if (workingSize.width!=this->imageSize.width ||
@@ -142,9 +141,6 @@ void ProcessingThread::run() {
       cvCvtColor(this->thresholdImage, this->blendImage, CV_GRAY2RGB);
       this->countPixels(this->thresholdImage);
 
-      /* dst = src1 * alpha + src2 * beta + gamma */
-      cvAddWeighted(workingImage, this->blendRatio, this->blendImage, 1.0-this->blendRatio, 0.0, this->blendImage);
-
       if (rootFilter) {
         switch (this->displayImage) {
           case 0:
@@ -158,9 +154,15 @@ void ProcessingThread::run() {
             break;
           default:
           case 3:
+            /* dst = src1 * alpha + src2 * beta + gamma */
+            cvAddWeighted(workingImage, this->blendRatio, this->blendImage, 1.0-this->blendRatio, 0.0, this->blendImage);
             shownImage = this->blendImage;
             break;
           case 4:
+            cvOr(workingImage, this->blendImage, this->blendImage, NULL);
+            shownImage = this->blendImage;
+            break;
+          case 5:
             shownImage = this->noiseImage;
             break;
         }
@@ -170,13 +172,21 @@ void ProcessingThread::run() {
       shownImage = this->cameraImage;
     }
     //
+    // Add time and data to image
+    //
     QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
     cvPutText(shownImage, timestring.toAscii(), 
       cvPoint(shownImage->width-text_size.width-4, text_size.height+4), 
       &this->font, cvScalar(255, 255, 255, 0));
+    //
+    // Pass final image to GUI
+    //
     rootFilter->processPoint(shownImage);
-
+    //
+    // Release our copy of original captured image
+    //
     cvReleaseImage(&this->cameraImage);
+//    std::cout << "Processed frame " << framenum++ << std::endl;
   }
 }
 //----------------------------------------------------------------------------
@@ -226,7 +236,7 @@ void ProcessingThread::updateNoiseMap(IplImage *image)
   cvConvertScale( image, image, -10.0, 255.0);
 
   // Add to running average of 'noisy' pixels
-  cvRunningAvg(image, this->noiseImage, 1.0/(2*60.0*fps), NULL);
+//  cvRunningAvg(image, this->noiseImage, 1.0/(2*60.0*fps), NULL);
 
   // invert pixels using : (255 - x)
 //  cvConvertScale( image, image, -1.0, 128.0);

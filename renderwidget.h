@@ -13,8 +13,11 @@ public:
 
 public slots:
   void onFrameSizeChanged(int width, int height);
+  void UpdateTrigger(bool, int);
+
 signals:
   void frameSizeChanged(int width, int height);
+  void update_signal(bool, int);
 
 protected:
   void paintEvent(QPaintEvent*);
