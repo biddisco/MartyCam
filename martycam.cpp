@@ -39,9 +39,6 @@ MartyCam::MartyCam() : QMainWindow(0)
   connect(settingsWidget, SIGNAL(CameraIndexChanged(int)), this, SLOT(onCameraIndexChanged(int)));
   //
   connect(ui.actionQuit, SIGNAL(triggered()), this, SLOT(close()));
-  connect(ui.actionStart, SIGNAL(triggered()), this, SLOT(startTracking()));
-  connect(ui.actionStop, SIGNAL(triggered()), this, SLOT(stopTracking()));
-  connect(ui.actionRecord, SIGNAL(triggered()), this, SLOT(startRecording()));
   connect(ui.user_trackval, SIGNAL(valueChanged(int)), this, SLOT(onUserTrackChanged(int))); 
   connect(&updateTimer, SIGNAL(timeout()), this, SLOT(updateStats()));
   //
