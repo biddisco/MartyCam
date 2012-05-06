@@ -157,7 +157,7 @@ void SettingsWidget::RecordAVI(bool state)
   if (!state) {    
     this->capturethread->setWriteAVI(state);
     this->ui.WriteAVI->setText("Write AVI");
-    this->capturethread->closeAVI() ;
+    this->capturethread->closeAVI();
     this->clock.stop();
   }
   else if (!this->capturethread->getWriteAVI()) {
@@ -200,6 +200,7 @@ void SettingsWidget::onBlendChanged(int value)
 //----------------------------------------------------------------------------
 void SettingsWidget::onCameraSelection(int index)
 {
-  emit(CameraIndexChanged(index));
+  QString val = this->ui.cameraSelect->currentText();
+  emit(CameraIndexChanged(index, val));
 }
 //----------------------------------------------------------------------------

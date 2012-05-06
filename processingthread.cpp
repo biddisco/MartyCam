@@ -12,10 +12,10 @@ ProcessingThread::ProcessingThread(ImageBuffer* buffer, CvSize &size) : QThread(
   this->abort             = false;
   this->MotionDetecting   = true;
   this->motionPercent     = 0.0;
-  this->threshold         = 7;
-  this->average           = 0.4;
-  this->erodeIterations   = 2;
-  this->dilateIterations  = 4;
+  this->threshold         = 3;
+  this->average           = 0.2;
+  this->erodeIterations   = 1;
+  this->dilateIterations  = 0;
   this->displayImage      = 3;
   this->blendRatio        = 0.75;
   this->rotation          = 0;

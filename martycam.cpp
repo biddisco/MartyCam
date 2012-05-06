@@ -6,6 +6,25 @@
 #include <QToolBar>
 #include <QDockWidget>
 #include <QSplitter>
+//
+#include "chart.h"
+#include "chart/datacontainers.h"
+
+
+typedef vector<int> vint;
+typedef list <int>  lint;
+typedef list <double> ldouble;
+typedef list< pair<double,double> > lpair;
+
+lpair position;
+vint  velocity;
+vint  times;
+vint  motionLevel;
+lint  press2;
+ldouble press3;
+
+static int current_time = 0;
+
 //----------------------------------------------------------------------------
 MartyCam::MartyCam() : QMainWindow(0) 
 {
@@ -25,6 +44,22 @@ MartyCam::MartyCam() : QMainWindow(0)
   this->imageSize               = cvSize(0,0);
   this->cameraIndex             = 0;
   this->imageBuffer             = new ImageBuffer(2);
+
+  // Layout of - chart
+  QWidget * widget = this->ui.motionGroup;
+  Chart *chart = this->ui.chart; // new Chart();
+/*
+QLayout * layout3 = new QVBoxLayout();
+  layout3->addWidget(chart);
+  QLayout * wert = new QHBoxLayout(); 
+  wert->addWidget(this->ui.chartPosition); 
+  wert->addWidget(this->ui.zoomBox); 
+  layout3->addItem(wert);
+  layout3->addWidget(this->ui.sizeSlider);
+//  layout3->addItem(this->ui.gridLayout);
+  widget->setLayout(layout3);
+*/
+
   //
   // create the settings dock widget
   //
@@ -36,21 +71,27 @@ MartyCam::MartyCam() : QMainWindow(0)
   settingsDock->setMinimumWidth(300);
   addDockWidget(Qt::RightDockWidgetArea, settingsDock);
   connect(settingsWidget, SIGNAL(resolutionSelected(CvSize)), this, SLOT(onResolutionSelected(CvSize)));
-  connect(settingsWidget, SIGNAL(CameraIndexChanged(int)), this, SLOT(onCameraIndexChanged(int)));
+  connect(settingsWidget, SIGNAL(CameraIndexChanged(int,QString)), this, SLOT(onCameraIndexChanged(int,QString)));
   //
   connect(ui.actionQuit, SIGNAL(triggered()), this, SLOT(close()));
   connect(ui.user_trackval, SIGNAL(valueChanged(int)), this, SLOT(onUserTrackChanged(int))); 
-  connect(&updateTimer, SIGNAL(timeout()), this, SLOT(updateStats()));
+//  connect(&updateTimer, SIGNAL(timeout()), this, SLOT(updateStats()));
   //
-  this->createCaptureThread(15, this->imageSize, this->cameraIndex);
+  this->createCaptureThread(15, this->imageSize, this->cameraIndex, QString());
   this->imageSize = this->captureThread->getImageSize();
   this->renderWidget->setFixedSize(this->imageSize.width, this->imageSize.height);
   this->processingThread = this->createProcessingThread(this->imageSize, NULL);
   this->processingThread->start();
   //
-  this->updateTimer.start(1000);
+  this->updateTimer.start(50);
   connect(this->captureThread, SIGNAL(RecordingState(bool)), 
     this, SLOT(onRecordingStateChanged(bool)),Qt::QueuedConnection); 
+
+  connect(this->captureThread, SIGNAL(NewImage()), 
+    this, SLOT(updateStats()),Qt::QueuedConnection); 
+
+  this->initChart();
+
 }
 //----------------------------------------------------------------------------
 void MartyCam::closeEvent(QCloseEvent*) {
@@ -66,15 +107,22 @@ void MartyCam::deleteCaptureThread()
   delete captureThread;
 }
 //----------------------------------------------------------------------------
-void MartyCam::createCaptureThread(int FPS, CvSize &size, int camera)
+void MartyCam::createCaptureThread(int FPS, CvSize &size, int camera, QString &cameraname)
 {
-  captureThread = new CaptureThread(imageBuffer, size, camera);
+  captureThread = new CaptureThread(imageBuffer, size, camera, cameraname);
   captureThread->startCapture(FPS);
   captureThread->start(QThread::IdlePriority);
   this->settingsWidget->setThreads(this->captureThread, this->processingThread);
   updateTimer.start();
-  std::string capStatus = captureThread->getCaptureStatusString();
-  this->ui.outputWindow->setText(capStatus.c_str());
+//  std::string capStatus = captureThread->getCaptureStatusString();
+//  this->ui.outputWindow->setText(capStatus.c_str());
+
+  connect(this->captureThread, SIGNAL(RecordingState(bool)), 
+    this, SLOT(onRecordingStateChanged(bool)),Qt::QueuedConnection); 
+
+  connect(this->captureThread, SIGNAL(NewImage()), 
+    this, SLOT(updateStats()),Qt::QueuedConnection); 
+
 }
 //----------------------------------------------------------------------------
 void MartyCam::deleteProcessingThread()
@@ -93,11 +141,11 @@ ProcessingThread *MartyCam::createProcessingThread(CvSize &size, ProcessingThrea
   return temp;
 }
 //----------------------------------------------------------------------------
-void MartyCam::onCameraIndexChanged(int index)
+void MartyCam::onCameraIndexChanged(int index, QString val)
 {
   this->deleteCaptureThread();
   this->cameraIndex = index;
-  this->createCaptureThread(15, this->imageSize, this->cameraIndex);
+  this->createCaptureThread(15, this->imageSize, this->cameraIndex, val);
 }
 //----------------------------------------------------------------------------
 void MartyCam::onResolutionSelected(CvSize newSize) {
@@ -106,7 +154,7 @@ void MartyCam::onResolutionSelected(CvSize newSize) {
   this->deleteProcessingThread();
   this->deleteCaptureThread();
   this->imageBuffer->clear();
-  this->createCaptureThread(15, this->imageSize, this->cameraIndex);
+  this->createCaptureThread(15, this->imageSize, this->cameraIndex, QString());
   this->processingThread = temp;
   this->processingThread->start(QThread::IdlePriority);
 }
@@ -124,6 +172,16 @@ void MartyCam::updateStats() {
       settingsWidget->RecordAVI(true);
     }
   }
+  times.push_back(current_time++);
+  motionLevel.push_back(logval);
+  if (times.size()>475) {
+    times.erase(times.begin(),times.begin()+50); 
+    motionLevel.erase(motionLevel.begin(),motionLevel.begin()+50); 
+  }
+  this->ui.chart->setPosition(times.front());
+  this->ui.chart->setSize(500);
+  this->ui.chart->update();
+
 }
 //----------------------------------------------------------------------------
 void MartyCam::onUserTrackChanged(int value)
@@ -154,3 +212,21 @@ void MartyCam::onMotionDetectionChanged(int state)
   this->processingThread->setMotionDetecting(state);
 }
 //----------------------------------------------------------------------------
+void MartyCam::initChart()
+{
+  QPen vPen;
+  vPen.setColor(Qt::red);
+  vPen.setWidthF(2.0);
+  vPen.setColor(Qt::green);
+  Channel motion(0,90,new DoubleDataContainer<vint,vint>(times,motionLevel), trUtf8("Motion Level"),vPen);
+
+  motion.setShowScale(true); 
+  motion.setShowLegend(true);
+  motion.setShowLegend(true);
+  motion.setMaximum(75.0);
+  //pozycja.showScale = predkosc.showScale = false ;
+  //chart->scaleGrid().showScale=false;
+  //chart->scaleGrid().showGrid=false;
+  ui.chart->addChannel(motion);
+  ui.chart->setSize(100);
+}

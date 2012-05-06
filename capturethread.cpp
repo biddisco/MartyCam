@@ -3,9 +3,12 @@
 #include "imagebuffer.h"
 #include <QDebug>
 #include <QTime>
- #define IP_CAM
+
+// May 2012.
+// FOSCAM FI8904W running firmware 11.25.2.44
+//
 //----------------------------------------------------------------------------
-CaptureThread::CaptureThread(ImageBuffer* buffer, CvSize &size, int device) : QThread()
+CaptureThread::CaptureThread(ImageBuffer* buffer, CvSize &size, int device, QString &name) : QThread()
 {
   this->abort             = false;
   this->captureActive     = false;
@@ -26,17 +29,15 @@ CaptureThread::CaptureThread(ImageBuffer* buffer, CvSize &size, int device) : QT
   //
   // start capture device driver
   //
-#ifdef IP_CAM
-  capture = cvCaptureFromFile("http://192.168.1.21/videostream.asf?user=admin&pwd=1234");
-//  capture = cvCaptureFromFile("C:/2011-01-20_01-24-29-Martora.avi" );
-//  capture = cvCaptureFromFile("http://212.59.162.17:82/mjpg/video.mjpg");
-//  capture = cvCaptureFromFile("http://www.cowbridge.co.uk/webcam/cowbridge.jpg");
-//  capture = cvCaptureFromFile("http://admin:1234@http://192.168.1.21/videostream.cgi");
-//  capture = cvCaptureFromFile("http://192.168.1.21:8080/snapshot.cgi?user=admin&pwd=1234");
-//  capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/live.htm");
-#else
-  capture = cvCaptureFromCAM(CV_CAP_DSHOW + this->deviceIndex );
-#endif
+  if (name.indexOf("IP") != -1) {
+    // using an IP camera, assume default string to access martycam
+    //capture = cvCaptureFromFile("http://192.168.1.21/videostream.asf?user=admin&pwd=1234");
+    capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/videostream.cgi?req_fps=30&.mjpg");
+  }
+  else {
+    capture = cvCaptureFromCAM(CV_CAP_DSHOW + this->deviceIndex );
+  }
+
   if (size.width>0 && size.height>0) {
     cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH,  size.width);
     cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, size.height);
@@ -78,12 +79,13 @@ void CaptureThread::run() {
     if (!imageBuffer->isFull()) {
       imageBuffer->addFrame(workingImage);
     }
-    // always write the frame out if saving movie
-    if (this->AVI_Writing) {
+    // always write the frame out if saving movie or in the process of closing AVI
+    if (this->AVI_Writing || this->AVI_Writer) {
       // add date time stamp if enabled
       this->captionImage(workingImage);
       this->saveAVI(workingImage);
     }
+    emit(NewImage());
   }
 }
 //----------------------------------------------------------------------------
@@ -143,17 +145,24 @@ void CaptureThread::saveAVI(IplImage *image)
     );
     emit(RecordingState(true));
   }
-  cvWriteFrame(this->AVI_Writer, image);
+  if (this->AVI_Writer) {
+    cvWriteFrame(this->AVI_Writer, image);
+    // if CloseAvi has been called, stop writing.
+    if (!this->AVI_Writing) {
+      cvReleaseVideoWriter(&this->AVI_Writer);
+      emit(RecordingState(false));
+      this->AVI_Writer = NULL;
+    }
+  }
+  else {
+    std::cout << "Failed to create AVI writer" << std::endl;
+    return;
+  }
 }
 //----------------------------------------------------------------------------
 void CaptureThread::closeAVI() 
 {
   this->AVI_Writing = false;
-  if (this->AVI_Writer) {
-    cvReleaseVideoWriter(&this->AVI_Writer);
-    emit(RecordingState(false));
-  }
-  this->AVI_Writer = NULL;
 }
 //----------------------------------------------------------------------------
 void CaptureThread::setWriteAVIDir(const char *dir)

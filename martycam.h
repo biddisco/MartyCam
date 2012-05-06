@@ -21,7 +21,7 @@ public:
 public slots:
   void updateStats();
   void onResolutionSelected(CvSize newSize);
-  void onCameraIndexChanged(int index);
+  void onCameraIndexChanged(int index, QString val);
   void onUserTrackChanged(int value);
   void onRecordingStateChanged(bool state);
   void onMotionDetectionChanged(int state);
@@ -29,9 +29,11 @@ public slots:
 protected:
   void closeEvent(QCloseEvent*);
   void deleteCaptureThread();
-  void createCaptureThread(int FPS, CvSize &size, int camera);
+  void createCaptureThread(int FPS, CvSize &size, int camera, QString &cameraname);
   void deleteProcessingThread();
   ProcessingThread *MartyCam::createProcessingThread(CvSize &size, ProcessingThread *oldThread);
+  
+  void initChart();
 
 private:
   Ui::MartyCam ui;

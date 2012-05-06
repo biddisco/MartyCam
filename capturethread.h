@@ -12,7 +12,7 @@ class ImageBuffer;
 class CaptureThread : public QThread {
 Q_OBJECT;
 public: 
-   CaptureThread(ImageBuffer* buffer, CvSize &size, int device);
+   CaptureThread(ImageBuffer* buffer, CvSize &size, int device, QString &name);
   ~CaptureThread() ;
 
   void run();
@@ -40,6 +40,7 @@ public:
 
 signals:
   void RecordingState(bool);
+  void NewImage();
 
 private:
   void updateFPS(int time);

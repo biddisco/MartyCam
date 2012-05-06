@@ -39,7 +39,7 @@ signals:
   void resolutionSelected(CvSize);
   void rotationChanged(int);
 
-  void CameraIndexChanged(int);
+  void CameraIndexChanged(int, QString);
 
 private:
   Ui::SettingsWidget  ui;
