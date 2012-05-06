@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/test" >
+        <file>resources/volume.svg</file>
+        <file>resources/digits.svg</file>
+    </qresource>
+</RCC>
