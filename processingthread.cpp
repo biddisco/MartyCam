@@ -12,8 +12,8 @@ ProcessingThread::ProcessingThread(ImageBuffer* buffer, CvSize &size) : QThread(
   this->abort             = false;
   this->MotionDetecting   = true;
   this->motionPercent     = 0.0;
-  this->threshold         = 3;
-  this->average           = 0.2;
+  this->threshold         = 2;
+  this->average           = 0.01;
   this->erodeIterations   = 1;
   this->dilateIterations  = 0;
   this->displayImage      = 3;

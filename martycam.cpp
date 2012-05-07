@@ -10,17 +10,31 @@
 #include "chart.h"
 #include "chart/datacontainers.h"
 
-
+#include <iostream>
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
+#include <boost/accumulators/statistics/rolling_mean.hpp>
+#include <boost/accumulators/statistics/median.hpp>
+#include <boost/accumulators/statistics/weighted_median.hpp>
+//
+using namespace boost::accumulators;    
+accumulator_set<int, stats<tag::rolling_mean> > acc(tag::rolling_window::window_size = 50);
+//
 typedef vector<int> vint;
+typedef vector<double> vdouble;
 typedef list <int>  lint;
 typedef list <double> ldouble;
 typedef list< pair<double,double> > lpair;
-
-lpair position;
-vint  velocity;
-vint  times;
-vint  motionLevel;
-lint  press2;
+//
+vint     frameNumber;
+vdouble  motionLevel;
+vdouble  movingAverage;
+vint     thresholdTime;
+vdouble  thresholdLevel;
+//
+lpair  position;
+vint   velocity;
+lint   press2;
 ldouble press3;
 
 static int current_time = 0;
@@ -164,7 +178,7 @@ void MartyCam::updateStats() {
   // scale up to 100*100 = 1E4 for log display
   double percent = 100.0*this->processingThread->getMotionPercent();
   double logval = percent>1 ? (100.0/4.0)*log10(percent) : 0;
-  this->ui.progressBar->setValue(logval);
+//  this->ui.progressBar->setValue(logval);
   this->ui.detect_value->setText(QString("%1").arg(this->processingThread->getMotionPercent(),4 , 'f', 2));
   //
   if (this->ui.RecordingEnabled->isChecked()) {
@@ -172,13 +186,23 @@ void MartyCam::updateStats() {
       settingsWidget->RecordAVI(true);
     }
   }
-  times.push_back(current_time++);
+  frameNumber.push_back(current_time++);
   motionLevel.push_back(logval);
-  if (times.size()>475) {
-    times.erase(times.begin(),times.begin()+50); 
-    motionLevel.erase(motionLevel.begin(),motionLevel.begin()+50); 
+  acc(logval);
+  movingAverage.push_back( rolling_mean(acc));
+
+  if (frameNumber.size()>475) {
+    frameNumber.erase(frameNumber.begin(),frameNumber.begin()+1); 
+    motionLevel.erase(motionLevel.begin(),motionLevel.begin()+1); 
+    movingAverage.erase(movingAverage.begin(),movingAverage.begin()+1); 
   }
-  this->ui.chart->setPosition(times.front());
+  thresholdTime[0] = frameNumber.front();
+  thresholdTime[1] = frameNumber.back();;
+  thresholdLevel[0] = this->UserDetectionThreshold;
+  thresholdLevel[1] = this->UserDetectionThreshold;
+
+
+  this->ui.chart->setPosition(frameNumber.front());
   this->ui.chart->setSize(500);
   this->ui.chart->update();
 
@@ -214,19 +238,45 @@ void MartyCam::onMotionDetectionChanged(int state)
 //----------------------------------------------------------------------------
 void MartyCam::initChart()
 {
+  const double gmax = 60.0;
+
   QPen vPen;
   vPen.setColor(Qt::red);
   vPen.setWidthF(2.0);
+
   vPen.setColor(Qt::green);
-  Channel motion(0,90,new DoubleDataContainer<vint,vint>(times,motionLevel), trUtf8("Motion Level"),vPen);
+  Channel motion(0,gmax,
+    new DoubleDataContainer<vint,vdouble>(frameNumber,motionLevel), trUtf8("Motion Level"),vPen);
+
+  vPen.setColor(Qt::blue);
+  Channel mean(0,gmax,
+    new DoubleDataContainer<vint,vdouble>(frameNumber,movingAverage), trUtf8("Moving Average"),vPen);
+
+  thresholdTime.push_back(0);
+  thresholdTime.push_back(500);
+  thresholdLevel.push_back(this->UserDetectionThreshold);
+  thresholdLevel.push_back(this->UserDetectionThreshold);
+  vPen.setColor(Qt::red);
+  Channel trigger(0,gmax,
+    new DoubleDataContainer<vint,vdouble>(thresholdTime,thresholdLevel), trUtf8("Trigger"),vPen);
 
   motion.setShowScale(true); 
   motion.setShowLegend(true);
-  motion.setShowLegend(true);
-  motion.setMaximum(75.0);
+  motion.setMaximum(gmax);
+
+  mean.setMaximum(gmax);
+  mean.setShowLegend(false);
+  mean.setShowScale(false);
+
+  trigger.setMaximum(gmax);
+  trigger.setShowLegend(false);
+  trigger.setShowScale(false);
+
   //pozycja.showScale = predkosc.showScale = false ;
   //chart->scaleGrid().showScale=false;
   //chart->scaleGrid().showGrid=false;
   ui.chart->addChannel(motion);
+  ui.chart->addChannel(mean);
+  ui.chart->addChannel(trigger);
   ui.chart->setSize(100);
 }

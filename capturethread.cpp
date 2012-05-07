@@ -4,8 +4,10 @@
 #include <QDebug>
 #include <QTime>
 
+//
 // May 2012.
 // FOSCAM FI8904W running firmware 11.25.2.44
+// capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/videostream.cgi?req_fps=30&.mjpg");
 //
 //----------------------------------------------------------------------------
 CaptureThread::CaptureThread(ImageBuffer* buffer, CvSize &size, int device, QString &name) : QThread()

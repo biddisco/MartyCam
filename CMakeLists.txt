@@ -7,6 +7,10 @@ cmake_minimum_required(VERSION 2.8)
 FIND_PACKAGE(Qt4 4.4 REQUIRED)
 FIND_PACKAGE(OpenCV REQUIRED)
 
+# Set up boost (interval) library
+find_package(Boost 1.40 REQUIRED) 
+INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
+  
 INCLUDE(${QT_USE_FILE})
 INCLUDE_DIRECTORIES(include)
 
