@@ -9,8 +9,7 @@
 //
 #include "chart.h"
 #include "chart/datacontainers.h"
-
-#include <iostream>
+//
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/rolling_mean.hpp>
@@ -31,13 +30,13 @@ vdouble  motionLevel;
 vdouble  movingAverage;
 vint     thresholdTime;
 vdouble  thresholdLevel;
+vint     frameNumberEvent;
+vdouble  eventLevel;
 //
 lpair  position;
 vint   velocity;
 lint   press2;
 ldouble press3;
-
-static int current_time = 0;
 
 //----------------------------------------------------------------------------
 MartyCam::MartyCam() : QMainWindow(0) 
@@ -54,7 +53,8 @@ MartyCam::MartyCam() : QMainWindow(0)
   // Main threads for capture and processing
   //
   this->UserDetectionThreshold  = 0.25;
-  this->RecordingEvents         = 0;
+  this->EventRecordCounter      = 0;
+  this->insideMotionEvent       = 0;
   this->imageSize               = cvSize(0,0);
   this->cameraIndex             = 0;
   this->imageBuffer             = new ImageBuffer(2);
@@ -89,7 +89,6 @@ QLayout * layout3 = new QVBoxLayout();
   //
   connect(ui.actionQuit, SIGNAL(triggered()), this, SLOT(close()));
   connect(ui.user_trackval, SIGNAL(valueChanged(int)), this, SLOT(onUserTrackChanged(int))); 
-//  connect(&updateTimer, SIGNAL(timeout()), this, SLOT(updateStats()));
   //
   this->createCaptureThread(15, this->imageSize, this->cameraIndex, QString());
   this->imageSize = this->captureThread->getImageSize();
@@ -97,13 +96,6 @@ QLayout * layout3 = new QVBoxLayout();
   this->processingThread = this->createProcessingThread(this->imageSize, NULL);
   this->processingThread->start();
   //
-  this->updateTimer.start(50);
-  connect(this->captureThread, SIGNAL(RecordingState(bool)), 
-    this, SLOT(onRecordingStateChanged(bool)),Qt::QueuedConnection); 
-
-  connect(this->captureThread, SIGNAL(NewImage()), 
-    this, SLOT(updateStats()),Qt::QueuedConnection); 
-
   this->initChart();
 
 }
@@ -115,7 +107,7 @@ void MartyCam::closeEvent(QCloseEvent*) {
 //----------------------------------------------------------------------------
 void MartyCam::deleteCaptureThread()
 {
-  updateTimer.stop();
+//  updateTimer.stop();
   captureThread->setAbort(true);
   captureThread->wait();
   delete captureThread;
@@ -127,16 +119,12 @@ void MartyCam::createCaptureThread(int FPS, CvSize &size, int camera, QString &c
   captureThread->startCapture(FPS);
   captureThread->start(QThread::IdlePriority);
   this->settingsWidget->setThreads(this->captureThread, this->processingThread);
-  updateTimer.start();
-//  std::string capStatus = captureThread->getCaptureStatusString();
-//  this->ui.outputWindow->setText(capStatus.c_str());
 
   connect(this->captureThread, SIGNAL(RecordingState(bool)), 
     this, SLOT(onRecordingStateChanged(bool)),Qt::QueuedConnection); 
 
   connect(this->captureThread, SIGNAL(NewImage()), 
     this, SLOT(updateStats()),Qt::QueuedConnection); 
-
 }
 //----------------------------------------------------------------------------
 void MartyCam::deleteProcessingThread()
@@ -174,38 +162,48 @@ void MartyCam::onResolutionSelected(CvSize newSize) {
 }
 //----------------------------------------------------------------------------
 void MartyCam::updateStats() {
+  //
   statusBar()->showMessage(QString("FPS: ")+QString::number(this->captureThread->getFPS(), 'f', 1));
   // scale up to 100*100 = 1E4 for log display
   double percent = 100.0*this->processingThread->getMotionPercent();
   double logval = percent>1 ? (100.0/4.0)*log10(percent) : 0;
-//  this->ui.progressBar->setValue(logval);
   this->ui.detect_value->setText(QString("%1").arg(this->processingThread->getMotionPercent(),4 , 'f', 2));
   //
-  if (this->ui.RecordingEnabled->isChecked()) {
-    if (this->processingThread->getMotionPercent()>this->UserDetectionThreshold) {
+  int counter = captureThread->GetFrameCounter();
+  frameNumber.push_back(counter);
+  frameNumberEvent.push_back(counter);
+  motionLevel.push_back(logval);
+  acc(logval);
+  movingAverage.push_back(rolling_mean(acc));
+  //
+  if (this->eventDecision()) {
+    eventLevel.push_back(100);
+    if (this->ui.RecordingEnabled->isChecked()) {
       settingsWidget->RecordAVI(true);
     }
   }
-  frameNumber.push_back(current_time++);
-  motionLevel.push_back(logval);
-  acc(logval);
-  movingAverage.push_back( rolling_mean(acc));
-
+  else {
+    eventLevel.push_back(0);
+  }
+  //
   if (frameNumber.size()>475) {
     frameNumber.erase(frameNumber.begin(),frameNumber.begin()+1); 
     motionLevel.erase(motionLevel.begin(),motionLevel.begin()+1); 
     movingAverage.erase(movingAverage.begin(),movingAverage.begin()+1); 
+    if (eventLevel.size()>475 && eventLevel.back()==0) {
+      frameNumberEvent.erase(frameNumberEvent.begin(),frameNumberEvent.end()-475); 
+      eventLevel.erase(eventLevel.begin(),eventLevel.end()-475); 
+    }
   }
   thresholdTime[0] = frameNumber.front();
-  thresholdTime[1] = frameNumber.back();;
+  thresholdTime[1] = frameNumber.back();
   thresholdLevel[0] = this->UserDetectionThreshold;
   thresholdLevel[1] = this->UserDetectionThreshold;
-
-
+  //
+  this->ui.chart->setUpdatesEnabled(0);
+  this->ui.chart->setSize(this->ui.chart->width()+50);
   this->ui.chart->setPosition(frameNumber.front());
-  this->ui.chart->setSize(500);
-  this->ui.chart->update();
-
+  this->ui.chart->setUpdatesEnabled(1);
 }
 //----------------------------------------------------------------------------
 void MartyCam::onUserTrackChanged(int value)
@@ -222,8 +220,8 @@ void MartyCam::onRecordingStateChanged(bool state)
 {
   if (state) {
     this->ui.RecordingEnabled->setStyleSheet("QCheckBox { background-color: green; }");
-    this->RecordingEvents++;
-    QString evc = QString("Events : %1").arg(this->RecordingEvents, 3);
+    this->EventRecordCounter++;
+    QString evc = QString("Events : %1").arg(this->EventRecordCounter, 3);
     this->ui.eventCounter->setText(evc);
   }
   else {
@@ -238,7 +236,7 @@ void MartyCam::onMotionDetectionChanged(int state)
 //----------------------------------------------------------------------------
 void MartyCam::initChart()
 {
-  const double gmax = 60.0;
+  const double gmax = 80;
 
   QPen vPen;
   vPen.setColor(Qt::red);
@@ -251,6 +249,10 @@ void MartyCam::initChart()
   vPen.setColor(Qt::blue);
   Channel mean(0,gmax,
     new DoubleDataContainer<vint,vdouble>(frameNumber,movingAverage), trUtf8("Moving Average"),vPen);
+
+  vPen.setColor(Qt::white);
+  Channel eventline(0,gmax,
+    new DoubleDataContainer<vint,vdouble>(frameNumberEvent,eventLevel), trUtf8("Event"),vPen);
 
   thresholdTime.push_back(0);
   thresholdTime.push_back(500);
@@ -272,11 +274,27 @@ void MartyCam::initChart()
   trigger.setShowLegend(false);
   trigger.setShowScale(false);
 
+  eventline.setMaximum(gmax);
+  eventline.setShowLegend(false);
+  eventline.setShowScale(false);
+
   //pozycja.showScale = predkosc.showScale = false ;
   //chart->scaleGrid().showScale=false;
   //chart->scaleGrid().showGrid=false;
   ui.chart->addChannel(motion);
   ui.chart->addChannel(mean);
   ui.chart->addChannel(trigger);
+  ui.chart->addChannel(eventline);
   ui.chart->setSize(100);
 }
+//----------------------------------------------------------------------------
+bool MartyCam::eventDecision() {
+  double percent = 100.0*this->processingThread->getMotionPercent();
+  double logval = percent>1 ? (100.0/4.0)*log10(percent) : 0;
+//  if (logval>this->UserDetectionThreshold) {
+ if (rolling_mean(acc)>this->UserDetectionThreshold) { 
+    return true; 
+  }
+  return false;
+}
+//----------------------------------------------------------------------------

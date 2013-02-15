@@ -35,14 +35,14 @@
        </property>
        <item>
         <layout class="QGridLayout" name="gridLayout">
-         <item row="0" column="0">
+         <item row="0" column="0" colspan="3">
           <widget class="QCheckBox" name="RecordingEnabled">
            <property name="text">
             <string>Recording Enabled</string>
            </property>
           </widget>
          </item>
-         <item row="1" column="0" rowspan="3" colspan="3">
+         <item row="1" column="0" rowspan="2" colspan="5">
           <widget class="Chart" name="chart" native="true">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
@@ -58,51 +58,111 @@
            </property>
           </widget>
          </item>
-         <item row="0" column="2">
-          <widget class="QLabel" name="detect_value">
-           <property name="text">
-            <string>0.00</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="3">
+         <item row="0" column="5">
           <widget class="QLabel" name="set_value">
+           <property name="minimumSize">
+            <size>
+             <width>32</width>
+             <height>0</height>
+            </size>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>64</width>
+             <height>16777215</height>
+            </size>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::Box</enum>
+           </property>
            <property name="text">
             <string>0.25</string>
            </property>
            <property name="alignment">
-            <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+            <set>Qt::AlignCenter</set>
            </property>
           </widget>
          </item>
-         <item row="0" column="1">
+         <item row="0" column="3">
           <widget class="QLabel" name="eventCounter">
+           <property name="maximumSize">
+            <size>
+             <width>96</width>
+             <height>16777215</height>
+            </size>
+           </property>
+           <property name="frameShape">
+            <enum>QFrame::Box</enum>
+           </property>
            <property name="text">
             <string>Events : 000</string>
            </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
           </widget>
          </item>
-         <item row="1" column="3" rowspan="3">
-          <widget class="QSlider" name="user_trackval">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
+         <item row="0" column="4">
+          <widget class="QLabel" name="detect_value">
+           <property name="maximumSize">
+            <size>
+             <width>64</width>
+             <height>16777215</height>
+            </size>
            </property>
-           <property name="maximum">
-            <number>100</number>
+           <property name="frameShape">
+            <enum>QFrame::Box</enum>
            </property>
-           <property name="singleStep">
-            <number>1</number>
+           <property name="text">
+            <string>0.00</string>
            </property>
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
            </property>
           </widget>
+         </item>
+         <item row="1" column="5">
+          <layout class="QVBoxLayout" name="verticalLayout_2">
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayout">
+             <item>
+              <widget class="QSlider" name="user_trackval">
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+                 <horstretch>0</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
+               </property>
+               <property name="maximum">
+                <number>100</number>
+               </property>
+               <property name="singleStep">
+                <number>1</number>
+               </property>
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <spacer name="verticalSpacer">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeType">
+              <enum>QSizePolicy::Fixed</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
          </item>
         </layout>
        </item>

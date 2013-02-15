@@ -34,11 +34,11 @@ protected:
   ProcessingThread *MartyCam::createProcessingThread(CvSize &size, ProcessingThread *oldThread);
   
   void initChart();
+  bool eventDecision();
 
 private:
   Ui::MartyCam ui;
   RenderWidget            *renderWidget;
-  QTimer                   updateTimer;
   QDockWidget             *progressToolbar;
   QDockWidget             *settingsDock;
   SettingsWidget          *settingsWidget;
@@ -48,7 +48,8 @@ private:
   ProcessingThread        *processingThread;
   ImageBuffer             *imageBuffer;
   double                   UserDetectionThreshold;
-  int                      RecordingEvents;
+  int                      EventRecordCounter;
+  int                      insideMotionEvent;
 };
 
 #endif

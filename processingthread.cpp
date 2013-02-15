@@ -141,35 +141,30 @@ void ProcessingThread::run() {
       cvCvtColor(this->thresholdImage, this->blendImage, CV_GRAY2RGB);
       this->countPixels(this->thresholdImage);
 
-      if (rootFilter) {
-        switch (this->displayImage) {
-          case 0:
-            shownImage = workingImage;
-            break;
-          case 1:
-            shownImage = this->movingAverage;
-            break;
-          case 2:
-            shownImage = this->thresholdImage;
-            break;
-          default:
-          case 3:
-            /* dst = src1 * alpha + src2 * beta + gamma */
-            cvAddWeighted(workingImage, this->blendRatio, this->blendImage, 1.0-this->blendRatio, 0.0, this->blendImage);
-            shownImage = this->blendImage;
-            break;
-          case 4:
-            cvOr(workingImage, this->blendImage, this->blendImage, NULL);
-            shownImage = this->blendImage;
-            break;
-          case 5:
-            shownImage = this->noiseImage;
-            break;
-        }
+      switch (this->displayImage) {
+        case 0:
+          shownImage = workingImage;
+          break;
+        case 1:
+          shownImage = this->movingAverage;
+          break;
+        case 2:
+          shownImage = this->thresholdImage;
+          break;
+        default:
+        case 3:
+          /* dst = src1 * alpha + src2 * beta + gamma */
+          cvAddWeighted(workingImage, this->blendRatio, this->blendImage, 1.0-this->blendRatio, 0.0, this->blendImage);
+          shownImage = this->blendImage;
+          break;
+        case 4:
+          cvOr(workingImage, this->blendImage, this->blendImage, NULL);
+          shownImage = this->blendImage;
+          break;
+        case 5:
+          shownImage = this->noiseImage;
+          break;
       }
-    }
-    else {
-      shownImage = this->cameraImage;
     }
     //
     // Add time and data to image
@@ -181,7 +176,9 @@ void ProcessingThread::run() {
     //
     // Pass final image to GUI
     //
-    rootFilter->processPoint(shownImage);
+    if (rootFilter) {
+      rootFilter->processPoint(shownImage);
+    }
     //
     // Release our copy of original captured image
     //

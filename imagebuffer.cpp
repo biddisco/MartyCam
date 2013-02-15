@@ -38,11 +38,11 @@ void ImageBuffer::addFrame(const IplImage* image) {
 
 /* Return the oldest frame from the buffer.  
  * This is a blocking operation, so if there are no available images, this function will block until one is available or image acquisition is stopped.
-  * @returns IplImage pointer to the next available frame.  Ownership of the data is passed to the callee, so the image must be released
+ * @returns IplImage pointer to the next available frame.  Ownership of the data is passed to the callee, so the image must be released
  */
 IplImage* ImageBuffer::getFrame() {
   mutex.lock();
-  if(imageQueue.isEmpty()) {
+  if (imageQueue.isEmpty()) {
   //  output << "Get frame waiting on frame";
     bufferNotEmpty.wait(&mutex, 1000);
   //  output << "Get frame has been received";
@@ -52,7 +52,7 @@ IplImage* ImageBuffer::getFrame() {
   IplImage* temp = 0;
 
   mutex.lock();
-  if(!imageQueue.isEmpty()) {
+  if (!imageQueue.isEmpty()) {
     temp = imageQueue.dequeue();
   }
   bufferNotFull.wakeAll();

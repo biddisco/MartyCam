@@ -85,10 +85,11 @@ Chart::Chart(QWidget *parent)
    setSizePolicy (QSizePolicy::Expanding, QSizePolicy::Expanding);
    setWindowTitle(tr("Chart diagram"));
    m_channel=0;
-   timer = new QTimer(this);
-   timer->setInterval(1000);
+   timer = NULL;
+//   timer = new QTimer(this);
+//   timer->setInterval(250);
    m_isPaintOver = false;
-   connect(timer,SIGNAL(timeout()),this,SLOT(setPaintOver()));
+//   connect(timer,SIGNAL(timeout()),this,SLOT(setPaintOver()));
    InitDecorators();
   // setChannel(1); 
    m_showLegend = true;
@@ -145,7 +146,7 @@ void Chart::InitDecorators()
 void Chart::setPaintOver()
 	{
           m_isPaintOver = true;
-          timer->stop();
+//          timer->stop();
           update();
           // By malowalo normalnie wygladzone no chyba ze malujemy z duza czestoliwoscia ...
           m_isPaintOver = true; // kiedy ma byc malowane w antialiasingu jak czesto sie da ...
@@ -159,7 +160,7 @@ void Chart::paintEvent(QPaintEvent * /*event */)
  
    if (m_painterDecorator.get()) m_painterDecorator->paint(painter,this); 
    
-   if (!m_isPaintOver) timer->start();
+//   if (!m_isPaintOver) timer->start();
    m_isPaintOver = false;
    paintCursorPosition(painter); 
 }

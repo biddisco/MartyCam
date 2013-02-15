@@ -15,6 +15,7 @@ CaptureThread::CaptureThread(ImageBuffer* buffer, CvSize &size, int device, QStr
   this->abort             = false;
   this->captureActive     = false;
   this->fps               = 0.0 ;
+  this->FrameCounter      = 0;
   this->deviceIndex       = -1;
   this->AVI_Writing       = false;
   this->AVI_Writer        = NULL; 
@@ -80,6 +81,7 @@ void CaptureThread::run() {
     // add to queue if space is available, 
     if (!imageBuffer->isFull()) {
       imageBuffer->addFrame(workingImage);
+      this->FrameCounter++;
     }
     // always write the frame out if saving movie or in the process of closing AVI
     if (this->AVI_Writing || this->AVI_Writer) {

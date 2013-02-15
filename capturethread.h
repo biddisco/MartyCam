@@ -23,6 +23,8 @@ public:
   //
   double getFPS() { return fps; }
   bool isCapturing() { return captureActive; }
+  
+  int  GetFrameCounter() { return this->FrameCounter; }
 
   void setWriteAVI(bool write) { this->AVI_Writing = write; }
   bool getWriteAVI() { return this->AVI_Writing; }
@@ -57,6 +59,7 @@ private:
   QQueue<int>     frameTimes;
   int             deviceIndex;
   int             rotation;
+  int             FrameCounter;
   //
   CvVideoWriter  *AVI_Writer;
   bool            AVI_Writing;

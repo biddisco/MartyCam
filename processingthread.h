@@ -2,6 +2,11 @@
 #define PROCESSING_THREAD_H
 
 #include <QThread>
+
+#ifndef Q_MOC_RUN
+ #include <boost/circular_buffer.hpp>
+#endif
+
 #include "cv.h"
 #include "highgui.h"
 #include "opencv2/core/core.hpp"
@@ -60,6 +65,9 @@ private:
   IplImage  *noiseImage;
   CvFont     font;
   CvSize     text_size;
+#ifndef Q_MOC_RUN
+  boost::circular_buffer<IplImage*> RecordBuffer;
+#endif
 };
 
 #endif

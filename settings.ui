@@ -253,11 +253,21 @@
       </item>
       <item row="0" column="1" colspan="3">
        <widget class="QTimeEdit" name="AVI_Duration">
+        <property name="dateTime">
+         <datetime>
+          <hour>0</hour>
+          <minute>0</minute>
+          <second>10</second>
+          <year>2000</year>
+          <month>1</month>
+          <day>1</day>
+         </datetime>
+        </property>
         <property name="time">
          <time>
           <hour>0</hour>
           <minute>0</minute>
-          <second>30</second>
+          <second>10</second>
          </time>
         </property>
        </widget>
