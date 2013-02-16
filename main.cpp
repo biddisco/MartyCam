@@ -1,3 +1,4 @@
+#include <windows.h>
 #include "martycam.h"
 
 #pragma comment(linker, "/NODEFAULTLIB:atlthunk.lib")
@@ -20,7 +21,7 @@ int __stdcall WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
   }  
 #endif
 
-  QApplication app(nCmdShow, &lpCmdLine);
+  QApplication app(nCmdShow, NULL);
   QCoreApplication::setOrganizationName("MartyCam");
   QCoreApplication::setOrganizationDomain("MartyCam");
   QCoreApplication::setApplicationName("MartyCam");

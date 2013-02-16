@@ -56,8 +56,8 @@ MartyCam::MartyCam() : QMainWindow(0)
   this->EventRecordCounter      = 0;
   this->insideMotionEvent       = 0;
   this->imageSize               = cvSize(0,0);
-  this->cameraIndex             = 0;
   this->imageBuffer             = new ImageBuffer(2);
+  this->cameraIndex             = 1;
 
   // Layout of - chart
   QWidget * widget = this->ui.motionGroup;
@@ -79,28 +79,39 @@ QLayout * layout3 = new QVBoxLayout();
   //
   settingsDock = new QDockWidget("Settings", this);
   settingsDock->setAllowedAreas(Qt::RightDockWidgetArea | Qt::LeftDockWidgetArea);
-  settingsWidget = new SettingsWidget(this);
-  settingsWidget->setRenderWidget(this->renderWidget);
-  settingsDock->setWidget(settingsWidget);
+  this->settingsWidget = new SettingsWidget(this);
+  this->settingsWidget->setRenderWidget(this->renderWidget);
+  settingsDock->setWidget(this->settingsWidget);
   settingsDock->setMinimumWidth(300);
   addDockWidget(Qt::RightDockWidgetArea, settingsDock);
-  connect(settingsWidget, SIGNAL(resolutionSelected(CvSize)), this, SLOT(onResolutionSelected(CvSize)));
-  connect(settingsWidget, SIGNAL(CameraIndexChanged(int,QString)), this, SLOT(onCameraIndexChanged(int,QString)));
+  connect(this->settingsWidget, SIGNAL(resolutionSelected(CvSize)), this, SLOT(onResolutionSelected(CvSize)));
+  connect(this->settingsWidget, SIGNAL(CameraIndexChanged(int,QString)), this, SLOT(onCameraIndexChanged(int,QString)));
   //
   connect(ui.actionQuit, SIGNAL(triggered()), this, SLOT(close()));
   connect(ui.user_trackval, SIGNAL(valueChanged(int)), this, SLOT(onUserTrackChanged(int))); 
   //
-  this->createCaptureThread(15, this->imageSize, this->cameraIndex, QString());
-  this->imageSize = this->captureThread->getImageSize();
-  this->renderWidget->setFixedSize(this->imageSize.width, this->imageSize.height);
-  this->processingThread = this->createProcessingThread(this->imageSize, NULL);
-  this->processingThread->start();
+  QString camerastring = "Garden";
+  while (this->imageSize.width==0 && this->cameraIndex>=0) {
+    this->createCaptureThread(15, this->imageSize, this->cameraIndex, camerastring);
+    this->imageSize = this->captureThread->getImageSize();
+    if (this->imageSize.width==0) {
+      this->cameraIndex -=1;
+      camerastring = "";
+    }
+  }
+  if (this->imageSize.width>0) {
+    this->renderWidget->setFixedSize(this->imageSize.width, this->imageSize.height);
+    this->processingThread = this->createProcessingThread(this->imageSize, NULL);
+    this->processingThread->start();
+  }
+  //
+  this->settingsWidget->loadSettings();
   //
   this->initChart();
-
 }
 //----------------------------------------------------------------------------
 void MartyCam::closeEvent(QCloseEvent*) {
+  this->settingsWidget->saveSettings();
   this->deleteProcessingThread();
   this->deleteCaptureThread();
 }
@@ -179,7 +190,7 @@ void MartyCam::updateStats() {
   if (this->eventDecision()) {
     eventLevel.push_back(100);
     if (this->ui.RecordingEnabled->isChecked()) {
-      settingsWidget->RecordAVI(true);
+      this->settingsWidget->RecordAVI(true);
     }
   }
   else {

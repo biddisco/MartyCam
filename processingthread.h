@@ -39,6 +39,8 @@ public:
   void run();
   void setAbort(bool a) { this->abort = a; }
 
+  double getPSNR(const cv::Mat& I1, const cv::Mat& I2);
+
 private:
   ImageBuffer *imageBuffer;
   Filter      *rootFilter;

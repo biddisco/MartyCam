@@ -9,6 +9,7 @@
 #include <QButtonGroup>
 
 class RenderWidget;
+class IPCameraForm;
 
 class SettingsWidget : public QWidget {
 Q_OBJECT;
@@ -28,12 +29,16 @@ public slots:
   void onErodeChanged(int value);
   void onDilateChanged(int value);  
   void onBrowseClicked();
+  void onAddCameraClicked();
   void onWriteAVIToggled(bool state);
   void onTimer();
   void onImageSelection(int btn);
   void onRotateSelection(int btn);
   void onBlendChanged(int value);
   void onCameraSelection(int index);
+  //
+  void loadSettings();
+  void saveSettings();
 
 signals:
   void resolutionSelected(CvSize);
@@ -41,7 +46,7 @@ signals:
 
   void CameraIndexChanged(int, QString);
 
-private:
+protected:
   Ui::SettingsWidget  ui;
   CaptureThread      *capturethread;
   ProcessingThread   *processingthread;
@@ -51,6 +56,8 @@ private:
   QButtonGroup        ImageButtonGroup;
   QButtonGroup        RotateButtonGroup;
   RenderWidget       *renderWidget;
+  QString             settingsFileName;
+  IPCameraForm       *cameraForm;
 };
 
 #endif

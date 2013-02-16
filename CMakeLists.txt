@@ -8,7 +8,7 @@ FIND_PACKAGE(Qt4 4.4 REQUIRED)
 FIND_PACKAGE(OpenCV REQUIRED)
 
 # Set up boost (interval) library
-find_package(Boost 1.40 REQUIRED) 
+find_package(Boost 1.49 REQUIRED thread NO_MODULE) 
 INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
   
 INCLUDE(${QT_USE_FILE})
@@ -16,18 +16,10 @@ INCLUDE_DIRECTORIES(include)
 
 ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS)
 
-LINK_DIRECTORIES(
-  C:/bin/ffmpeg/lib
-  C:/Code/OpenCV-2.2.0/3rdparty/lib
-)
-  
-SET(VIDEOLIB_LIBRARY 
-  "C:\\Code\\OpenCV-2.2.0\\3rdparty\\lib\\videoInput.lib" 
-  CACHE FILEPATH "Path to videolib")
-
 SET(QtOpenCV_UIS
   settings.ui
   martycam.ui
+  IPCameraForm.ui
 )
 
 QT4_WRAP_UI(QtOpenCV_UIS_H 
@@ -46,6 +38,7 @@ INCLUDE_DIRECTORIES(
 
 SET(QtOpenCV_QOBJECTS
   martycam.h
+  IPCameraForm.h
   settings.h
   renderwidget.h
   capturethread.h
@@ -55,7 +48,8 @@ QT_WRAP_CPP(MartyCam MartyCam_MOC_FILES ${QtOpenCV_QOBJECTS})
 
 INCLUDE_DIRECTORIES(
   ${CMAKE_SOURCE_DIR} 
-  ${CMAKE_SOURCE_DIR}/src ${QT_INCLUDE_DIR} 
+  ${CMAKE_SOURCE_DIR}/src 
+  ${QT_INCLUDE_DIR} 
   ${QT_QTNETWORK_INCLUDE_DIR} 
   ${QT_QTXML_INCLUDE_DIR}
 )
@@ -76,6 +70,7 @@ SET(QtOpenCV_SRCS
   processingthread.cpp
   renderwidget.cpp
   settings.cpp
+  IPCameraForm.cpp
 )
 
 ADD_EXECUTABLE(MartyCam WIN32 
@@ -89,7 +84,6 @@ target_link_libraries(MartyCam
   ${QT_LIBRARIES} 
   ${OpenCV_LIBS} 
   strmiids
-  ${VIDEOLIB_LIBRARY}
 )
 
 #----------------------------------------------------

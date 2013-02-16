@@ -33,8 +33,8 @@ SET(CPP_SRCS
   )
 
 SET(QOBJECT_HDRS
+  "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/code/item.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/analogwidgets/counter.h"
-  "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/analogwidgets/functions.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/analogwidgets/led.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/analogwidgets/manometer.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/analogwidgets/potentiometer.h"

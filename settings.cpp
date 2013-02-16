@@ -1,14 +1,27 @@
 #include "settings.h"
 #include <QDebug>
 #include <QFileDialog>
-#include "../3rdparty/include/videoInput.h"
+#include <QSettings>
+//
 #include "renderwidget.h"
+#include "IPCameraForm.h"
+//
+#include "opencv2\highgui\highgui.hpp"
+#include "opencv2\highgui\highgui_c.h"
+//
+// we need these to get access to videInput
+// Caution: including cpp file here
+#include "..\..\highgui\src\precomp.hpp"
+#include "..\..\highgui\src\cap_dshow.cpp"
 
 //----------------------------------------------------------------------------
 SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent) 
 {
+  this->cameraForm = NULL;
   ui.setupUi(this);
   setMinimumWidth(150);
+  //
+  settingsFileName = QCoreApplication::applicationDirPath() + "/MartyCam.ini";
   //  
   connect(ui.res640Radio, SIGNAL(toggled(bool)), this, SLOT(on640ResToggled(bool)));
   connect(ui.res320Radio, SIGNAL(toggled(bool)), this, SLOT(on320ResToggled(bool)));
@@ -17,6 +30,8 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   connect(ui.erode, SIGNAL(valueChanged(int)), this, SLOT(onErodeChanged(int)));
   connect(ui.dilate, SIGNAL(valueChanged(int)), this, SLOT(onDilateChanged(int)));
   connect(ui.browse, SIGNAL(clicked()), this, SLOT(onBrowseClicked()));
+  connect(ui.add_camera, SIGNAL(clicked()), this, SLOT(onAddCameraClicked()));
+  
   connect(ui.WriteAVI, SIGNAL(toggled(bool)), this, SLOT(onWriteAVIToggled(bool)));
   connect(&this->clock, SIGNAL(timeout()), this, SLOT(onTimer()));
   connect(ui.blendRatio, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));  
@@ -36,14 +51,15 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   connect(&RotateButtonGroup, SIGNAL(buttonClicked(int)), this, SLOT(onRotateSelection(int)));
 
   //
-	// create a videoInput object to enumerate devices
-  //
-	videoInput VI;
-	int numDevices = VI.listDevices();	
+  // use videoInput object to enumerate devices
+  int numDevices = videoInput::listDevices(false);
+
   for (int i=0; i<numDevices; i++) {
-    this->ui.cameraSelect->addItem(VI.getDeviceName(i));
+    this->ui.cameraSelect->addItem(videoInput::getDeviceName(i));
   }
+  this->ui.cameraSelect->addItem("Garden Camera");
   connect(this->ui.cameraSelect, SIGNAL(currentIndexChanged(int)), this, SLOT(onCameraSelection(int)));
+  this->ui.cameraSelect->setCurrentIndex(numDevices);
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::setThreads(CaptureThread *capthread, ProcessingThread *procthread)
@@ -99,6 +115,18 @@ void SettingsWidget::onBrowseClicked()
     QString fileName = dialog.selectedFiles().at(0);
     this->ui.avi_directory->setText(fileName);
     this->capturethread->setWriteAVIDir(fileName.toStdString().c_str());
+  }
+}
+//----------------------------------------------------------------------------
+void SettingsWidget::onAddCameraClicked()
+{
+  if (!this->cameraForm) {
+    this->cameraForm = new IPCameraForm(this);
+  }
+  if(this->cameraForm->exec()) {
+//    QString fileName = dialog.selectedFiles().at(0);
+//    this->ui.avi_directory->setText(fileName);
+//    this->capturethread->setWriteAVIDir(fileName.toStdString().c_str());
   }
 }
 //----------------------------------------------------------------------------
@@ -204,3 +232,49 @@ void SettingsWidget::onCameraSelection(int index)
   emit(CameraIndexChanged(index, val));
 }
 //----------------------------------------------------------------------------
+void SettingsWidget::saveSettings()
+{
+  QSettings settings(settingsFileName, QSettings::IniFormat);
+  //
+  settings.beginGroup("MotionDetection");
+  settings.setValue("threshold",ui.threshold->value()); 
+  settings.setValue("average",ui.average->value()); 
+  settings.setValue("erode",ui.erode->value()); 
+  settings.setValue("dilate",ui.dilate->value()); 
+  settings.endGroup();
+
+  settings.beginGroup("UserSettings");
+  settings.setValue("resolution_640",ui.res640Radio->isChecked()); 
+  settings.endGroup();
+  }
+//----------------------------------------------------------------------------
+void SettingsWidget::loadSettings()
+{
+  QSettings settings(settingsFileName, QSettings::IniFormat);
+  //
+  settings.beginGroup("MotionDetection");
+  ui.threshold->setValue(settings.value("threshold",3).toInt()); 
+  ui.average->setValue(settings.value("average",10).toInt()); 
+  ui.erode->setValue(settings.value("erode",1).toInt()); 
+  ui.dilate->setValue(settings.value("dilate",1).toInt()); 
+  settings.endGroup();
+
+/*
+  connect(ui.browse, SIGNAL(clicked()), this, SLOT(onBrowseClicked()));
+  connect(ui.WriteAVI, SIGNAL(toggled(bool)), this, SLOT(onWriteAVIToggled(bool)));
+  connect(&this->clock, SIGNAL(timeout()), this, SLOT(onTimer()));
+  connect(ui.blendRatio, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));  
+*/
+  settings.beginGroup("UserSettings");
+  ui.res640Radio->setChecked( settings.value("resolution_640",true).toBool());
+  ui.res320Radio->setChecked(!settings.value("resolution_640",true).toBool());
+  settings.endGroup();
+//  settings.setValue("plaintextedit1text",ui->plainTextEdit->toPlainText()); // store a QString
+
+//    QString sText = settings.value("text", "").toString();
+//    if (m_pLabel)
+//    {
+ //       m_pLabel->setText(sText);
+//    }
+}
+ 
