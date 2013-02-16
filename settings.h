@@ -39,6 +39,7 @@ public slots:
   //
   void loadSettings();
   void saveSettings();
+  void setupCameraList();
 
 signals:
   void resolutionSelected(CvSize);
@@ -56,8 +57,8 @@ protected:
   QButtonGroup        ImageButtonGroup;
   QButtonGroup        RotateButtonGroup;
   RenderWidget       *renderWidget;
-  QString             settingsFileName;
   IPCameraForm       *cameraForm;
+  int                 NumDevices;
 };
 
 #endif

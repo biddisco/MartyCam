@@ -18,10 +18,13 @@ Q_OBJECT
 public:
     MartyCam();
 
+  void loadSettings();
+  void saveSettings();
+
 public slots:
   void updateStats();
   void onResolutionSelected(CvSize newSize);
-  void onCameraIndexChanged(int index, QString val);
+  void onCameraIndexChanged(int index, QString URL);
   void onUserTrackChanged(int value);
   void onRecordingStateChanged(bool state);
   void onMotionDetectionChanged(int state);

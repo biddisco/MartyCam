@@ -46,6 +46,9 @@ SET(QtOpenCV_QOBJECTS
 
 QT_WRAP_CPP(MartyCam MartyCam_MOC_FILES ${QtOpenCV_QOBJECTS})
 
+SET(MartyCam_RCCS resources.qrc)
+QT4_ADD_RESOURCES(MartyCam_RCC_SRCS ${MartyCam_RCCS})
+
 INCLUDE_DIRECTORIES(
   ${CMAKE_SOURCE_DIR} 
   ${CMAKE_SOURCE_DIR}/src 
@@ -71,12 +74,14 @@ SET(QtOpenCV_SRCS
   renderwidget.cpp
   settings.cpp
   IPCameraForm.cpp
+  MartyCam.rc
 )
 
 ADD_EXECUTABLE(MartyCam WIN32 
   ${QtOpenCV_SRCS} 
   ${QtOpenCV_UIS_H} 
   ${MartyCam_MOC_FILES}
+  ${MartyCam_RCC_SRCS}
 )
 
 target_link_libraries(MartyCam 
@@ -95,4 +100,3 @@ ADD_EXECUTABLE(OpenCVCameraTest test/OpenCVCameraTest.cpp)
 target_link_libraries(OpenCVCameraTest
   ${OpenCV_LIBS} 
 )
-

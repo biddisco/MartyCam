@@ -3,19 +3,22 @@
 
 #include "ui_IPCameraForm.h"
 //
-#include <vector>
+#include <map>
 #include <string>
 //
-typedef std::pair< std::string, std::string> stringpair;
-typedef std::vector< stringpair > stringpairlist;
+typedef std::pair< std::string, std::string > stringpair;
+typedef std::map< std::string, std::string > stringpairlist;
 
 class IPCameraForm : public QDialog {
 Q_OBJECT;
 public:
   IPCameraForm(QWidget* parent);
   //
+  void seupModelView();
   void loadSettings();
   void saveSettings();
+
+  stringpairlist& getList() { return this->CameraList; }
 
 signals:
 

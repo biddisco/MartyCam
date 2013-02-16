@@ -6,6 +6,7 @@
 #include <QToolBar>
 #include <QDockWidget>
 #include <QSplitter>
+#include <QSettings>
 //
 #include "chart.h"
 #include "chart/datacontainers.h"
@@ -42,6 +43,9 @@ ldouble press3;
 MartyCam::MartyCam() : QMainWindow(0) 
 {
   ui.setupUi(this);
+  QString settingsFileName = QCoreApplication::applicationDirPath() + "/MartyCam.ini";
+  QSettings settings(settingsFileName, QSettings::IniFormat);
+  restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
   //
   this->renderWidget = new RenderWidget(this);
   this->centralWidget()->layout()->addWidget(this->renderWidget);
@@ -61,18 +65,7 @@ MartyCam::MartyCam() : QMainWindow(0)
 
   // Layout of - chart
   QWidget * widget = this->ui.motionGroup;
-  Chart *chart = this->ui.chart; // new Chart();
-/*
-QLayout * layout3 = new QVBoxLayout();
-  layout3->addWidget(chart);
-  QLayout * wert = new QHBoxLayout(); 
-  wert->addWidget(this->ui.chartPosition); 
-  wert->addWidget(this->ui.zoomBox); 
-  layout3->addItem(wert);
-  layout3->addWidget(this->ui.sizeSlider);
-//  layout3->addItem(this->ui.gridLayout);
-  widget->setLayout(layout3);
-*/
+  Chart *chart = this->ui.chart; 
 
   //
   // create the settings dock widget
@@ -90,7 +83,7 @@ QLayout * layout3 = new QVBoxLayout();
   connect(ui.actionQuit, SIGNAL(triggered()), this, SLOT(close()));
   connect(ui.user_trackval, SIGNAL(valueChanged(int)), this, SLOT(onUserTrackChanged(int))); 
   //
-  QString camerastring = "Garden";
+  QString camerastring = "";
   while (this->imageSize.width==0 && this->cameraIndex>=0) {
     this->createCaptureThread(15, this->imageSize, this->cameraIndex, camerastring);
     this->imageSize = this->captureThread->getImageSize();
@@ -105,12 +98,16 @@ QLayout * layout3 = new QVBoxLayout();
     this->processingThread->start();
   }
   //
+  this->loadSettings();
   this->settingsWidget->loadSettings();
   //
   this->initChart();
+  // 
+  restoreState(settings.value("mainWindowState").toByteArray());
 }
 //----------------------------------------------------------------------------
 void MartyCam::closeEvent(QCloseEvent*) {
+  this->saveSettings();
   this->settingsWidget->saveSettings();
   this->deleteProcessingThread();
   this->deleteCaptureThread();
@@ -154,11 +151,11 @@ ProcessingThread *MartyCam::createProcessingThread(CvSize &size, ProcessingThrea
   return temp;
 }
 //----------------------------------------------------------------------------
-void MartyCam::onCameraIndexChanged(int index, QString val)
+void MartyCam::onCameraIndexChanged(int index, QString URL)
 {
   this->deleteCaptureThread();
   this->cameraIndex = index;
-  this->createCaptureThread(15, this->imageSize, this->cameraIndex, val);
+  this->createCaptureThread(15, this->imageSize, this->cameraIndex, URL);
 }
 //----------------------------------------------------------------------------
 void MartyCam::onResolutionSelected(CvSize newSize) {
@@ -309,3 +306,27 @@ bool MartyCam::eventDecision() {
   return false;
 }
 //----------------------------------------------------------------------------
+//----------------------------------------------------------------------------
+void MartyCam::saveSettings()
+{
+  QString settingsFileName = QCoreApplication::applicationDirPath() + "/MartyCam.ini";
+  QSettings settings(settingsFileName, QSettings::IniFormat);
+  //
+  settings.setValue("mainWindowGeometry", saveGeometry());
+  settings.setValue("mainWindowState", saveState());
+  //
+  settings.beginGroup("Trigger");
+  settings.setValue("trackval",this->ui.user_trackval->value()); 
+  settings.endGroup();
+}
+//----------------------------------------------------------------------------
+void MartyCam::loadSettings()
+{
+  QString settingsFileName = QCoreApplication::applicationDirPath() + "/MartyCam.ini";
+  QSettings settings(settingsFileName, QSettings::IniFormat);
+  //
+  settings.beginGroup("Trigger");
+  this->ui.user_trackval->setValue(settings.value("trackval",50).toInt()); 
+  settings.endGroup();
+}
+ 

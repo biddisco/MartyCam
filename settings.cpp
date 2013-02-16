@@ -17,12 +17,9 @@
 //----------------------------------------------------------------------------
 SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent) 
 {
-  this->cameraForm = NULL;
   ui.setupUi(this);
   setMinimumWidth(150);
   //
-  settingsFileName = QCoreApplication::applicationDirPath() + "/MartyCam.ini";
-  //  
   connect(ui.res640Radio, SIGNAL(toggled(bool)), this, SLOT(on640ResToggled(bool)));
   connect(ui.res320Radio, SIGNAL(toggled(bool)), this, SLOT(on320ResToggled(bool)));
   connect(ui.threshold, SIGNAL(valueChanged(int)), this, SLOT(onThresholdChanged(int)));
@@ -35,6 +32,7 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   connect(ui.WriteAVI, SIGNAL(toggled(bool)), this, SLOT(onWriteAVIToggled(bool)));
   connect(&this->clock, SIGNAL(timeout()), this, SLOT(onTimer()));
   connect(ui.blendRatio, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));  
+  connect(ui.noiseBlend, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));  
   
   ImageButtonGroup.addButton(ui.cameraImage,0);
   ImageButtonGroup.addButton(ui.movingAverage,1);
@@ -49,17 +47,9 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   RotateButtonGroup.addButton(ui.rotate90m,2);
   RotateButtonGroup.addButton(ui.rotate180,3);
   connect(&RotateButtonGroup, SIGNAL(buttonClicked(int)), this, SLOT(onRotateSelection(int)));
-
   //
-  // use videoInput object to enumerate devices
-  int numDevices = videoInput::listDevices(false);
-
-  for (int i=0; i<numDevices; i++) {
-    this->ui.cameraSelect->addItem(videoInput::getDeviceName(i));
-  }
-  this->ui.cameraSelect->addItem("Garden Camera");
-  connect(this->ui.cameraSelect, SIGNAL(currentIndexChanged(int)), this, SLOT(onCameraSelection(int)));
-  this->ui.cameraSelect->setCurrentIndex(numDevices);
+  this->cameraForm = new IPCameraForm(this);
+  this->setupCameraList();
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::setThreads(CaptureThread *capthread, ProcessingThread *procthread)
@@ -120,13 +110,37 @@ void SettingsWidget::onBrowseClicked()
 //----------------------------------------------------------------------------
 void SettingsWidget::onAddCameraClicked()
 {
-  if (!this->cameraForm) {
-    this->cameraForm = new IPCameraForm(this);
-  }
+  this->cameraForm->seupModelView();
   if(this->cameraForm->exec()) {
-//    QString fileName = dialog.selectedFiles().at(0);
-//    this->ui.avi_directory->setText(fileName);
-//    this->capturethread->setWriteAVIDir(fileName.toStdString().c_str());
+    this->cameraForm->saveSettings();
+    this->setupCameraList();
+  }
+}
+//----------------------------------------------------------------------------
+void SettingsWidget::setupCameraList()
+{
+  disconnect(this->ui.cameraSelect, SIGNAL(currentIndexChanged(int)), this, SLOT(onCameraSelection(int)));
+  int index = this->ui.cameraSelect->currentIndex();
+  this->ui.cameraSelect->blockSignals(true);
+  this->ui.cameraSelect->clear();
+  //
+  // use videoInput object to enumerate devices
+  this->NumDevices = videoInput::listDevices(true);
+  for (int i=0; i<this->NumDevices; i++) {
+    this->ui.cameraSelect->addItem(videoInput::getDeviceName(i));
+  }
+  //
+  stringpairlist &cameras = this->cameraForm->getList();
+  for (stringpairlist::iterator it=cameras.begin(); it!=cameras.end(); ++it) {
+    this->ui.cameraSelect->addItem(it->first.c_str());
+  }
+  this->ui.cameraSelect->blockSignals(false);
+  connect(this->ui.cameraSelect, SIGNAL(currentIndexChanged(int)), this, SLOT(onCameraSelection(int)));
+  if (index>=0 && index<this->ui.cameraSelect->count()) {
+    this->ui.cameraSelect->setCurrentIndex(index);
+  }
+  else {
+    this->ui.cameraSelect->setCurrentIndex(0);
   }
 }
 //----------------------------------------------------------------------------
@@ -223,42 +237,57 @@ void SettingsWidget::onRotateSelection(int btn)
 //----------------------------------------------------------------------------
 void SettingsWidget::onBlendChanged(int value)
 {
-  this->processingthread->setBlendRatio(value/100.0);
+  this->processingthread->setBlendRatios(this->ui.blendRatio->value()/100.0, this->ui.noiseBlend->value()/100.0);
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::onCameraSelection(int index)
 {
   QString val = this->ui.cameraSelect->currentText();
+  // if index is a user supplied IP camera, get the URL from the map
+  if (index>=this->NumDevices) {
+    stringpairlist &cameras = this->cameraForm->getList();
+    val = cameras[val.toAscii().data()].c_str();
+  }
+  else {
+    val = "";
+  }
+  //
   emit(CameraIndexChanged(index, val));
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::saveSettings()
 {
+  QString settingsFileName = QCoreApplication::applicationDirPath() + "/MartyCam.ini";
   QSettings settings(settingsFileName, QSettings::IniFormat);
   //
   settings.beginGroup("MotionDetection");
-  settings.setValue("threshold",ui.threshold->value()); 
-  settings.setValue("average",ui.average->value()); 
-  settings.setValue("erode",ui.erode->value()); 
-  settings.setValue("dilate",ui.dilate->value()); 
+  settings.setValue("threshold",this->ui.threshold->value()); 
+  settings.setValue("average",this->ui.average->value()); 
+  settings.setValue("erode",this->ui.erode->value()); 
+  settings.setValue("dilate",this->ui.dilate->value()); 
   settings.endGroup();
 
   settings.beginGroup("UserSettings");
-  settings.setValue("resolution_640",ui.res640Radio->isChecked()); 
+  settings.setValue("resolution_640",this->ui.res640Radio->isChecked()); 
+  settings.setValue("cameraIndex",this->ui.cameraSelect->currentIndex()); 
+  settings.setValue("aviDirectory",this->ui.avi_directory->text()); 
+  settings.setValue("rotation",this->RotateButtonGroup.checkedId());
+  settings.setValue("display",this->ImageButtonGroup.checkedId());
+  settings.setValue("blend",this->ui.blendRatio->value()); 
   settings.endGroup();
-  }
+}
 //----------------------------------------------------------------------------
 void SettingsWidget::loadSettings()
 {
+  QString settingsFileName = QCoreApplication::applicationDirPath() + "/MartyCam.ini";
   QSettings settings(settingsFileName, QSettings::IniFormat);
   //
   settings.beginGroup("MotionDetection");
-  ui.threshold->setValue(settings.value("threshold",3).toInt()); 
-  ui.average->setValue(settings.value("average",10).toInt()); 
-  ui.erode->setValue(settings.value("erode",1).toInt()); 
-  ui.dilate->setValue(settings.value("dilate",1).toInt()); 
+  this->ui.threshold->setValue(settings.value("threshold",3).toInt()); 
+  this->ui.average->setValue(settings.value("average",10).toInt()); 
+  this->ui.erode->setValue(settings.value("erode",1).toInt()); 
+  this->ui.dilate->setValue(settings.value("dilate",1).toInt()); 
   settings.endGroup();
-
 /*
   connect(ui.browse, SIGNAL(clicked()), this, SLOT(onBrowseClicked()));
   connect(ui.WriteAVI, SIGNAL(toggled(bool)), this, SLOT(onWriteAVIToggled(bool)));
@@ -266,15 +295,15 @@ void SettingsWidget::loadSettings()
   connect(ui.blendRatio, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));  
 */
   settings.beginGroup("UserSettings");
-  ui.res640Radio->setChecked( settings.value("resolution_640",true).toBool());
-  ui.res320Radio->setChecked(!settings.value("resolution_640",true).toBool());
+  this->ui.res640Radio->setChecked( settings.value("resolution_640",true).toBool());
+  this->ui.res320Radio->setChecked(!settings.value("resolution_640",true).toBool());
+  this->ui.cameraSelect->setCurrentIndex(settings.value("cameraIndex",0).toInt());
+  this->ui.avi_directory->setText(settings.value("aviDirectory","C:\\Wildlife").toString());
+  //
+  this->RotateButtonGroup.button(settings.value("rotation",0).toInt())->click();
+  this->ImageButtonGroup.button(settings.value("display",0).toInt())->click();
+  this->ui.blendRatio->setValue(settings.value("blend",0.5).toInt()); 
+  //
   settings.endGroup();
-//  settings.setValue("plaintextedit1text",ui->plainTextEdit->toPlainText()); // store a QString
-
-//    QString sText = settings.value("text", "").toString();
-//    if (m_pLabel)
-//    {
- //       m_pLabel->setText(sText);
-//    }
 }
  

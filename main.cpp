@@ -25,6 +25,14 @@ int __stdcall WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
   QCoreApplication::setOrganizationName("MartyCam");
   QCoreApplication::setOrganizationDomain("MartyCam");
   QCoreApplication::setApplicationName("MartyCam");
+  //
+  // App icon
+  //
+  QIcon appIcon(":/images/Marty.png");
+  app.setWindowIcon(appIcon);
+  //
+  //
+  //
   MartyCam *tracker = new MartyCam();
   tracker->show();
   app.exec();

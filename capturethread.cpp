@@ -10,7 +10,7 @@
 // capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/videostream.cgi?req_fps=30&.mjpg");
 //
 //----------------------------------------------------------------------------
-CaptureThread::CaptureThread(ImageBuffer* buffer, CvSize &size, int device, QString &name) : QThread()
+CaptureThread::CaptureThread(ImageBuffer* buffer, CvSize &size, int device, QString &URL) : QThread()
 {
   this->abort             = false;
   this->captureActive     = false;
@@ -32,10 +32,11 @@ CaptureThread::CaptureThread(ImageBuffer* buffer, CvSize &size, int device, QStr
   //
   // start capture device driver
   //
-  if (name.indexOf("Garden") != -1) {
+  if (URL.size()>0) {
     // using an IP camera, assume default string to access martycam
-    //capture = cvCaptureFromFile("http://192.168.1.21/videostream.asf?user=admin&pwd=1234");
-    capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/videostream.cgi?req_fps=30&.mjpg");
+    // capture = cvCaptureFromFile("http://192.168.1.21/videostream.asf?user=admin&pwd=1234");
+    // capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/videostream.cgi?req_fps=30&.mjpg");
+    capture = cvCaptureFromFile(URL.toAscii().data());
   }
   else {
     capture = cvCaptureFromCAM(CV_CAP_DSHOW + this->deviceIndex );

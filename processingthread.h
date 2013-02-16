@@ -14,6 +14,8 @@
 class ImageBuffer;
 class Filter;
 
+using namespace cv;
+
 class ProcessingThread : public QThread {
 public: 
    ProcessingThread(ImageBuffer* buffer, CvSize &size);
@@ -23,7 +25,7 @@ public:
   void DeleteTemporaryStorage();
   // 
   void   countPixels(IplImage *image);
-  void   updateNoiseMap(IplImage *image);
+  void   updateNoiseMap(IplImage *image, double noiseblend);
   double getMotionPercent() { return this->motionPercent; }
   //
   void setRootFilter(Filter* filter) { rootFilter = filter; }
@@ -33,13 +35,17 @@ public:
   void setErodeIterations(int val) { erodeIterations = val; }
   void setDilateIterations(int val) { dilateIterations = val; }
   void setDisplayImage(int image) { displayImage = image; }
-  void setBlendRatio(double ratio) { this->blendRatio = ratio; }
+  void setBlendRatios(double ratio1, double ratio2) { 
+    this->blendRatio = ratio1;
+    this->noiseBlendRatio = ratio2; 
+  }
   void setRotation(int value);
 
   void run();
   void setAbort(bool a) { this->abort = a; }
 
-  double getPSNR(const cv::Mat& I1, const cv::Mat& I2);
+  double getPSNR(const Mat& I1, const Mat& I2);
+  Scalar getMSSIM( const Mat& i1, const Mat& i2);
 
 private:
   ImageBuffer *imageBuffer;
@@ -52,6 +58,7 @@ private:
   double       motionPercent;
   int          displayImage;
   double       blendRatio;
+  double       noiseBlendRatio;
   bool         abort;
   int          rotation;
 
