@@ -3,13 +3,16 @@
 
 #include <QWidget>
 #include <QSemaphore>
+//
+#include <opencv2/core/core.hpp>
+//
 #include "filter.h"
 
 class RenderWidget : public QWidget, public Filter {
 Q_OBJECT;
 public:
   RenderWidget(QWidget* parent);
-  void processPoint(const IplImage* image);
+  void process(const IplImage* image);
 
 public slots:
   void onFrameSizeChanged(int width, int height);

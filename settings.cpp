@@ -6,13 +6,13 @@
 #include "renderwidget.h"
 #include "IPCameraForm.h"
 //
-#include "opencv2\highgui\highgui.hpp"
-#include "opencv2\highgui\highgui_c.h"
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/highgui/highgui_c.h>
 //
-// we need these to get access to videInput
-// Caution: including cpp file here
-#include "..\..\highgui\src\precomp.hpp"
-#include "..\..\highgui\src\cap_dshow.cpp"
+// we need these to get access to videoInput
+// Caution: including cpp file here as routines are not exported from openCV
+#include "../../highgui/src/precomp.hpp"
+#include "../../highgui/src/cap_dshow.cpp"
 
 //----------------------------------------------------------------------------
 SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent) 

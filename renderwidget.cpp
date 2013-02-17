@@ -3,6 +3,8 @@
 #include <QDebug>
 #include <QTime>
 #include <iostream>
+//
+#include <opencv2/imgproc/imgproc.hpp>
 //----------------------------------------------------------------------------
 IplImage* QImage2IplImage(QImage *qimg)
 {
@@ -82,7 +84,7 @@ void RenderWidget::updatePixmap(const IplImage* frame)
   delete temp;
 }
 //----------------------------------------------------------------------------
-void RenderWidget::processPoint(const IplImage* image) {
+void RenderWidget::process(const IplImage* image) {
   // copy the image to the local pixmap and update the display
   this->updatePixmap(image);
   emit(update_signal(true, 12));

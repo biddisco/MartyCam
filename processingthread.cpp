@@ -1,12 +1,14 @@
 #include <QDebug>
 #include <QTime>
 //
-#include <opencv2/imgproc/imgproc.hpp>  // Gaussian Blur
+#include <iostream>
+//
+#include <cv.h>
+#include <opencv2/imgproc/imgproc.hpp>
 //
 #include "filter.h"
 #include "imagebuffer.h"
 #include "processingthread.h"
-#include <iostream>
 //----------------------------------------------------------------------------
 ProcessingThread::ProcessingThread(ImageBuffer* buffer, CvSize &size) : QThread()
 {
@@ -181,7 +183,7 @@ void ProcessingThread::run() {
     // Pass final image to GUI
     //
     if (rootFilter) {
-      rootFilter->processPoint(shownImage);
+      rootFilter->process(shownImage);
     }
     //
     // Release our copy of original captured image

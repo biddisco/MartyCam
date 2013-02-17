@@ -1,70 +1,108 @@
-PROJECT(MartyCam)
+project(MartyCam)
 
+#-----------------------------------------------------------------------------
+# CMake directives
+#-----------------------------------------------------------------------------
+cmake_minimum_required(VERSION 2.8)
 SET(CMAKE_MODULE_PATH ${CMAKE_CURRECT_SOURCE_DIR}/cmake)
 
-cmake_minimum_required(VERSION 2.8)
+#-----------------------------------------------------------------------------
+# Find OpenCV
+#-----------------------------------------------------------------------------
+find_package(OpenCV REQUIRED)
 
-FIND_PACKAGE(Qt4 4.4 REQUIRED)
-FIND_PACKAGE(OpenCV REQUIRED)
+#-----------------------------------------------------------------------------
+# Find Qt
+#-----------------------------------------------------------------------------
+# by default only QtCore and QtGui modules are enabled
+set(QT_USE_QTCORE   TRUE)   
+set(QT_USE_QTGUI    TRUE)   
+set(QT_USE_QTSVG    TRUE)   
+set(QT_USE_QTSCRIPT TRUE)
 
-# Set up boost (interval) library
+find_package(Qt4 4.7 REQUIRED)
+include(${QT_USE_FILE})
+
+#-----------------------------------------------------------------------------
+# Find Boost
+#-----------------------------------------------------------------------------
+option(Boost_USE_STATIC "Use static Boost libraries" ON)
 find_package(Boost 1.49 REQUIRED thread NO_MODULE) 
-INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
-  
-INCLUDE(${QT_USE_FILE})
-INCLUDE_DIRECTORIES(include)
+link_directories(${Boost_LIBRARY_DIRS})
+include_directories(${Boost_INCLUDE_DIR})
 
-ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS)
+#-----------------------------------------------------------------------------
+# MSVC specifics
+#-----------------------------------------------------------------------------
+add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 
-SET(QtOpenCV_UIS
+#-----------------------------------------------------------------------------
+# Qt resource files
+#-----------------------------------------------------------------------------
+SET(MartyCam_QT_RCCS 
+  resources.qrc
+)
+
+#-----------------------------------------------------------------------------
+# Qt GUI interface wrapping
+#-----------------------------------------------------------------------------
+set(MartyCam_QT_UIS
   settings.ui
   martycam.ui
   IPCameraForm.ui
 )
 
-QT4_WRAP_UI(QtOpenCV_UIS_H 
-  ${QtOpenCV_UIS}
-)
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
-
-ADD_SUBDIRECTORY(AnalogWidgets)
-INCLUDE_DIRECTORIES(
-  "${QT_QTSVG_INCLUDE_DIR}"
-  "${QT_QTSCRIPT_INCLUDE_DIR}"
-  "${CMAKE_CURRENT_SOURCE_DIR}/AnalogWidgets/analogwidgets"
-  "${CMAKE_CURRENT_SOURCE_DIR}/AnalogWidgets/analogwidgets/analogwidgets"
-)
-
-
-SET(QtOpenCV_QOBJECTS
+#-----------------------------------------------------------------------------
+# Qt QObjects for MOC
+#-----------------------------------------------------------------------------
+set(MartyCam_QT_MOC_HDRS
   martycam.h
   IPCameraForm.h
   settings.h
   renderwidget.h
   capturethread.h
+  processingthread.h
 )
 
-QT_WRAP_CPP(MartyCam MartyCam_MOC_FILES ${QtOpenCV_QOBJECTS})
+#-----------------------------------------------------------------------------
+# Invoke Qt wrapping
+#-----------------------------------------------------------------------------
 
-SET(MartyCam_RCCS resources.qrc)
-QT4_ADD_RESOURCES(MartyCam_RCC_SRCS ${MartyCam_RCCS})
-
-INCLUDE_DIRECTORIES(
-  ${CMAKE_SOURCE_DIR} 
-  ${CMAKE_SOURCE_DIR}/src 
-  ${QT_INCLUDE_DIR} 
-  ${QT_QTNETWORK_INCLUDE_DIR} 
-  ${QT_QTXML_INCLUDE_DIR}
+# generate rules that will run rcc on the resource files
+QT4_ADD_RESOURCES(MartyCam_RCC_SRCS 
+  ${MartyCam_QT_RCCS}
 )
 
-LINK_LIBRARIES(
-  ${SSL_LIBRARY} 
-  ${QT_LIBRARIES} 
-  ${QT_QTNETWORK_LIBRARIES}
-  ${QT_QTXML_LIBRARIES}
+# generate rules that will run uic on .ui files:
+QT4_WRAP_UI(MartyCam_QT_UIS_H 
+  ${MartyCam_QT_UIS}
 )
 
-SET(QtOpenCV_SRCS
+# generate rules that will run moc on QObject header files
+QT_WRAP_CPP(MartyCam MartyCam_MOC_SRCS 
+  ${MartyCam_QT_MOC_HDRS}
+)
+
+#-----------------------------------------------------------------------------
+# Analogue widgets library used for graph plotting
+#-----------------------------------------------------------------------------
+ADD_SUBDIRECTORY(AnalogWidgets)
+
+#-----------------------------------------------------------------------------
+# Include directories
+#-----------------------------------------------------------------------------
+include_directories(
+  "${CMAKE_CURRENT_SOURCE_DIR}"
+  "${CMAKE_CURRENT_BINARY_DIR}"
+  "${CMAKE_CURRENT_SOURCE_DIR}/AnalogWidgets/analogwidgets"
+  "${CMAKE_CURRENT_SOURCE_DIR}/AnalogWidgets/analogwidgets/analogwidgets"
+  "${QT_INCLUDE_DIR}"
+)
+
+#-----------------------------------------------------------------------------
+# Main source files 
+#-----------------------------------------------------------------------------
+SET(MartyCam_SRCS
   capturethread.cpp
   filter.cpp
   martycam.cpp
@@ -77,25 +115,28 @@ SET(QtOpenCV_SRCS
   MartyCam.rc
 )
 
+#-----------------------------------------------------------------------------
+# Target executable
+#-----------------------------------------------------------------------------
 ADD_EXECUTABLE(MartyCam WIN32 
-  ${QtOpenCV_SRCS} 
-  ${QtOpenCV_UIS_H} 
-  ${MartyCam_MOC_FILES}
+  ${MartyCam_SRCS} 
   ${MartyCam_RCC_SRCS}
+  ${MartyCam_QT_UIS_H}
+  ${MartyCam_MOC_SRCS}
 )
 
 target_link_libraries(MartyCam 
   analogue
   ${QT_LIBRARIES} 
   ${OpenCV_LIBS} 
-  strmiids
 )
 
-#----------------------------------------------------
-# Test
-#----------------------------------------------------
-
-ADD_EXECUTABLE(OpenCVCameraTest test/OpenCVCameraTest.cpp)
+#-----------------------------------------------------------------------------
+# Testing
+#-----------------------------------------------------------------------------
+ADD_EXECUTABLE(OpenCVCameraTest 
+  test/OpenCVCameraTest.cpp
+)
 
 target_link_libraries(OpenCVCameraTest
   ${OpenCV_LIBS} 

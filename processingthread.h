@@ -7,9 +7,9 @@
  #include <boost/circular_buffer.hpp>
 #endif
 
-#include "cv.h"
-#include "highgui.h"
-#include "opencv2/core/core.hpp"
+//
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
 
 class ImageBuffer;
 class Filter;
@@ -17,6 +17,7 @@ class Filter;
 using namespace cv;
 
 class ProcessingThread : public QThread {
+Q_OBJECT;
 public: 
    ProcessingThread(ImageBuffer* buffer, CvSize &size);
   ~ProcessingThread();

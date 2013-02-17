@@ -5,7 +5,8 @@
 #include <QMutex>
 #include <QWaitCondition>
 #include <QQueue>
-#include "opencv/highgui.h"
+//
+#include <opencv2/highgui/highgui.hpp>
 
 class ImageBuffer;
 

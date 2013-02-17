@@ -3,17 +3,19 @@
 
 #include "opencv/cxcore.h"
 
-/**
- * Base class for filters
- */
+//
+// Base class for filter/processor objects
+//
 class Filter {
 public:
   Filter();
-  void setListener(Filter* list);
-  virtual void processPoint(const IplImage* image) = 0;
+  //
+  virtual void setDelegate(Filter* list);
+  virtual void process(const IplImage* image) = 0;
+
 protected:
-  Filter* listener;
-  void notifyListener(const IplImage* image);
+  Filter* delegate;
+  void invokeDelegate(const IplImage* image);
 };
 
 #endif

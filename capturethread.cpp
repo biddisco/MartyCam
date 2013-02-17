@@ -1,8 +1,10 @@
-#include <iostream>
-#include "capturethread.h"
-#include "imagebuffer.h"
 #include <QDebug>
 #include <QTime>
+//
+#include <iostream>
+//
+#include "capturethread.h"
+#include "imagebuffer.h"
 
 //
 // May 2012.

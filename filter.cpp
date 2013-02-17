@@ -1,21 +1,19 @@
 #include "filter.h"
 
-Filter::Filter() : listener(0) {}
+//----------------------------------------------------------------------------
+Filter::Filter() : delegate(0) 
+{
 
-/**
- * Set the filter that will listen to updated head state events.
- * @param filter Listener that should be notified of updated events.
- */
-void Filter::setListener(Filter *filter) {
-  listener = filter;
 }
-
-/**
- * Notify the registered listener of an updated head state.
- * @param state The current state
- */
-void Filter::notifyListener(const IplImage* image) {
-  if(listener) {
-    listener->processPoint(image);
+//----------------------------------------------------------------------------
+void Filter::setDelegate(Filter *filter) 
+{
+  this->delegate = filter;
+}
+//----------------------------------------------------------------------------
+void Filter::invokeDelegate(const IplImage* image) {
+  if (this->delegate) {
+    this->delegate->process(image);
   }
 }
+//----------------------------------------------------------------------------
