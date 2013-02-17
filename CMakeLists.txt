@@ -105,6 +105,7 @@ include_directories(
 SET(MartyCam_SRCS
   capturethread.cpp
   filter.cpp
+  PSNRFilter.cpp
   martycam.cpp
   imagebuffer.cpp
   main.cpp

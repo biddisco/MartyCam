@@ -13,6 +13,7 @@
 
 class ImageBuffer;
 class Filter;
+class PSNRFilter;
 
 using namespace cv;
 
@@ -45,12 +46,13 @@ public:
   void run();
   void setAbort(bool a) { this->abort = a; }
 
-  double getPSNR(const cv::Mat& I1, const cv::Mat& I2);
+  double getPSNR();
   Scalar getMSSIM(const cv::Mat& i1, const cv::Mat& i2);
 
 private:
   ImageBuffer *imageBuffer;
   Filter      *rootFilter;
+  PSNRFilter  *PSNRcalc;
   bool         MotionDetecting;
   int          threshold;
   double       average;

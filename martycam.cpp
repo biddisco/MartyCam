@@ -20,25 +20,20 @@
 using namespace boost::accumulators;    
 accumulator_set<int, stats<tag::rolling_mean> > acc(tag::rolling_window::window_size = 50);
 //
-typedef vector<int> vint;
+typedef vector<int>    vint;
 typedef vector<double> vdouble;
-typedef list <int>  lint;
-typedef list <double> ldouble;
-typedef list< pair<double,double> > lpair;
+typedef list <int>     lint;
+typedef list <double>  ldouble;
 //
 vint     frameNumber;
 vdouble  motionLevel;
 vdouble  movingAverage;
+vdouble  psnr;
 vint     thresholdTime;
 vdouble  thresholdLevel;
 vint     frameNumberEvent;
 vdouble  eventLevel;
 //
-lpair  position;
-vint   velocity;
-lint   press2;
-ldouble press3;
-
 //----------------------------------------------------------------------------
 MartyCam::MartyCam() : QMainWindow(0) 
 {
@@ -148,6 +143,7 @@ void MartyCam::deleteProcessingThread()
   processingThread->setAbort(true);
   processingThread->wait();
   delete processingThread;
+  this->processingThread = NULL;
 }
 //----------------------------------------------------------------------------
 ProcessingThread *MartyCam::createProcessingThread(cv::Size &size, ProcessingThread *oldThread)
@@ -179,6 +175,8 @@ void MartyCam::onResolutionSelected(cv::Size newSize) {
 //----------------------------------------------------------------------------
 void MartyCam::updateStats() {
   //
+  if (!this->processingThread) return;
+  //
   statusBar()->showMessage(QString("FPS: ")+QString::number(this->captureThread->getFPS(), 'f', 1));
   // scale up to 100*100 = 1E4 for log display
   double percent = 100.0*this->processingThread->getMotionPercent();
@@ -191,6 +189,8 @@ void MartyCam::updateStats() {
   motionLevel.push_back(logval);
   acc(logval);
   movingAverage.push_back(rolling_mean(acc));
+  //
+  psnr.push_back(this->processingThread->getPSNR());
   //
   if (this->eventDecision()) {
     eventLevel.push_back(100);
@@ -206,6 +206,7 @@ void MartyCam::updateStats() {
     frameNumber.erase(frameNumber.begin(),frameNumber.begin()+1); 
     motionLevel.erase(motionLevel.begin(),motionLevel.begin()+1); 
     movingAverage.erase(movingAverage.begin(),movingAverage.begin()+1); 
+    psnr.erase(psnr.begin(),psnr.begin()+1); 
     if (eventLevel.size()>475 && eventLevel.back()==0) {
       frameNumberEvent.erase(frameNumberEvent.begin(),frameNumberEvent.end()-475); 
       eventLevel.erase(eventLevel.begin(),eventLevel.end()-475); 
@@ -266,6 +267,10 @@ void MartyCam::initChart()
   Channel mean(0,gmax,
     new DoubleDataContainer<vint,vdouble>(frameNumber,movingAverage), trUtf8("Moving Average"),vPen);
 
+  vPen.setColor(Qt::yellow);
+  Channel PSNR(20,35,
+    new DoubleDataContainer<vint,vdouble>(frameNumber,psnr), trUtf8("PSNR"),vPen);
+
   vPen.setColor(Qt::white);
   Channel eventline(0,gmax,
     new DoubleDataContainer<vint,vdouble>(frameNumberEvent,eventLevel), trUtf8("Event"),vPen);
@@ -285,6 +290,10 @@ void MartyCam::initChart()
   mean.setMaximum(gmax);
   mean.setShowLegend(false);
   mean.setShowScale(false);
+      
+  PSNR.setMaximum(35.0);
+  PSNR.setShowLegend(false);
+  PSNR.setShowScale(false);
 
   trigger.setMaximum(gmax);
   trigger.setShowLegend(false);
@@ -299,6 +308,7 @@ void MartyCam::initChart()
   //chart->scaleGrid().showGrid=false;
   ui.chart->addChannel(motion);
   ui.chart->addChannel(mean);
+  ui.chart->addChannel(PSNR);
   ui.chart->addChannel(trigger);
   ui.chart->addChannel(eventline);
   ui.chart->setSize(100);
