@@ -31,15 +31,15 @@ public:
   bool getWriteAVI() { return this->AVI_Writing; }
   void setWriteAVIDir(const char *dir);
   void setWriteAVIName(const char *name);
-  void saveAVI(IplImage *image);
+  void saveAVI(const cv::Mat &image);
   void closeAVI();
   std::string getCaptureStatusString() { return this->CaptureStatus; }
   void setRotation(int value);
   //
-  IplImage *rotateImage(IplImage *source, IplImage *rotated);
-  void      captionImage(IplImage *source);
+  void  rotateImage(const cv::Mat &source, cv::Mat &rotated);
+  void  captionImage(cv::Mat &image);
 
-  cv::Size    getImageSize() { return this->imageSize; }
+  cv::Size getImageSize() { return this->imageSize; }
 
 signals:
   void RecordingState(bool);
@@ -48,29 +48,28 @@ signals:
 private:
   void updateFPS(int time);
   //
-  bool            abort; 
-  QMutex          captureLock;
-  QWaitCondition  captureWait;
-  ImageBuffer    *imageBuffer;
-  bool            captureActive;
-  cv::Size          imageSize;
-  cv::Size          rotatedSize;
-  CvCapture      *capture;
-  double          fps;
-  QQueue<int>     frameTimes;
-  int             deviceIndex;
-  int             rotation;
-  int             FrameCounter;
+  bool             abort; 
+  QMutex           captureLock;
+  QWaitCondition   captureWait;
+  ImageBuffer     *imageBuffer;
+  bool             captureActive;
+  cv::Size         imageSize;
+  cv::Size         rotatedSize;
+  CvCapture       *capture;
+  double           fps;
+  QQueue<int>      frameTimes;
+  int              deviceIndex;
+  int              rotation;
+  int              FrameCounter;
   //
-  CvVideoWriter  *AVI_Writer;
-  bool            AVI_Writing;
-  std::string     AVI_Directory;
-  std::string     AVI_Name;
-  std::string     CaptureStatus;
+  cv::VideoWriter  AVI_Writer;
+  bool             AVI_Writing;
+  std::string      AVI_Directory;
+  std::string      AVI_Name;
+  std::string      CaptureStatus;
   //
-  CvFont          font;
-  cv::Size          text_size;
-  IplImage       *rotatedImage;
+  cv::Size         text_size;
+  cv::Mat          rotatedImage;
 };
 
 #endif

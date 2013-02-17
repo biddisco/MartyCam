@@ -119,7 +119,8 @@ void ProcessingThread::run() {
       // initialize font and precompute text size
       cvInitFont(&this->font, CV_FONT_HERSHEY_PLAIN, 1.0, 1.0, 0, 1, CV_AA);
       QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
-      cv::getTextSize( timestring.toAscii().data(), CV_FONT_HERSHEY_PLAIN, 1.0, 1, NULL);
+      this->text_size = cv::getTextSize( timestring.toAscii().data(), CV_FONT_HERSHEY_PLAIN, 1.0, 1, NULL);
+      //cv::getTextSize( timestring.toAscii().data(), &this->font, &this->text_size, NULL);
     }
 
     cv::Mat shownImage;
@@ -185,7 +186,7 @@ void ProcessingThread::run() {
     QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
     cv::putText(shownImage, timestring.toAscii().data(), 
       cvPoint(shownImage.size().width - text_size.width - 4, text_size.height+4), 
-      CV_FONT_HERSHEY_PLAIN, 1.0, cv::Scalar(255, 255, 255, 0));
+      CV_FONT_HERSHEY_PLAIN, 1.0, cv::Scalar(255, 255, 255, 0), 1);
     //
     // Pass final image to GUI
     //

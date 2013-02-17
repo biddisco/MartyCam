@@ -20,16 +20,14 @@ CaptureThread::CaptureThread(ImageBuffer* buffer, cv::Size &size, int device, QS
   this->FrameCounter      = 0;
   this->deviceIndex       = -1;
   this->AVI_Writing       = false;
-  this->AVI_Writer        = NULL; 
   this->capture           = NULL;
   this->imageBuffer       = buffer;
   this->deviceIndex       = device;
   this->rotation          = 0;
   this->rotatedImage      = NULL;
   // initialize font and precompute text size
-  cvInitFont(&this->font, CV_FONT_HERSHEY_PLAIN, 1.0, 1.0, 0, 1, CV_AA);
   QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
-  cv::getTextSize( timestring.toAscii().data(), CV_FONT_HERSHEY_PLAIN, 1.0, 1, NULL);
+  this->text_size = cv::getTextSize( timestring.toAscii().data(), CV_FONT_HERSHEY_PLAIN, 1.0, 1, NULL);
 
   //
   // start capture device driver
@@ -77,20 +75,20 @@ void CaptureThread::run() {
       captureLock.unlock();
     }
     // get latest frame from webcam
-    IplImage *frame = cvQueryFrame(capture);
+    cv::Mat frame = cvQueryFrame(capture);
     updateFPS(time.elapsed());
     // rotate image if necessary
-    IplImage *workingImage = this->rotateImage(frame, this->rotatedImage);
+    this->rotateImage(frame, this->rotatedImage);
     // add to queue if space is available, 
     if (!imageBuffer->isFull()) {
-      imageBuffer->addFrame(workingImage);
+      imageBuffer->addFrame(this->rotatedImage);
       this->FrameCounter++;
     }
     // always write the frame out if saving movie or in the process of closing AVI
-    if (this->AVI_Writing || this->AVI_Writer) {
+    if (this->AVI_Writing || this->AVI_Writer.isOpened()) {
       // add date time stamp if enabled
-      this->captionImage(workingImage);
-      this->saveAVI(workingImage);
+      this->captionImage(this->rotatedImage);
+      this->saveAVI(this->rotatedImage);
     }
     emit(NewImage());
   }
@@ -136,29 +134,28 @@ void CaptureThread::stopCapture() {
   captureActive = false;
 }
 //----------------------------------------------------------------------------
-void CaptureThread::saveAVI(IplImage *image) 
+void CaptureThread::saveAVI(const cv::Mat &image) 
 {
   //CV_FOURCC('M', 'J', 'P', 'G'),
   //CV_FOURCC('M', 'P', '4', '2') = MPEG-4.2 codec
   //CV_FOURCC('D', 'I', 'V', '3') = MPEG-4.3 codec
   //CV_FOURCC('D', 'I', 'V', 'X') = MPEG-4 codec
-  if (!this->AVI_Writer) {
+  if (!this->AVI_Writer.isOpened()) {
     std::string path = this->AVI_Directory + "/" + this->AVI_Name + std::string(".avi");
-    this->AVI_Writer = cvCreateVideoWriter(
+    this->AVI_Writer.open(
       path.c_str(),
       0,  
       this->getFPS(),
-      cv::Size(image->width, image->height)
+      image.size()
     );
     emit(RecordingState(true));
   }
-  if (this->AVI_Writer) {
-    cvWriteFrame(this->AVI_Writer, image);
+  if (this->AVI_Writer.isOpened()) {
+    this->AVI_Writer.write(image);
     // if CloseAvi has been called, stop writing.
     if (!this->AVI_Writing) {
-      cvReleaseVideoWriter(&this->AVI_Writer);
+      this->AVI_Writer.release();
       emit(RecordingState(false));
-      this->AVI_Writer = NULL;
     }
   }
   else {
@@ -187,44 +184,38 @@ void CaptureThread::setRotation(int value) {
     return;
   }
   this->rotation = value; 
-  if (this->rotatedImage) {
-    cvReleaseImage(&this->rotatedImage);
-    this->rotatedImage = NULL;
-  }
+  this->rotatedImage.release();
   if (this->rotation==1 || this->rotation==2) {
     cv::Size workingSize = cv::Size(this->imageSize.height, this->imageSize.width);
-    this->rotatedImage = cvCreateImage( workingSize, IPL_DEPTH_8U, 3);
+    this->rotatedImage = cv::Mat( workingSize, CV_8UC3);
   }
 }
 //----------------------------------------------------------------------------
-IplImage *CaptureThread::rotateImage(IplImage *source, IplImage *rotated)
+void CaptureThread::rotateImage(const cv::Mat &source, cv::Mat &rotated)
 {
-  IplImage *result = source;
   switch (this->rotation) {
     case 0:
+      rotated = source;
       break;
     case 1:
-      cvFlip(source, 0, 1);
-      cvTranspose(source, rotated );
-      result = rotated;
+      cv::flip(source, rotated, 1);
+      cv::transpose(rotated, rotated);
       break;
     case 2:
-      cvTranspose(source, rotated );
-      cvFlip(rotated, 0, 1);
-      result = rotated;
+      cv::transpose(source, rotated);
+      cv::flip(rotated, rotated, 1);
       break;
     case 3:
-      cvFlip(source, 0, -1);
+      cv::flip(source, rotated, -1);
       break;
   }
-  return result;
 }
 //----------------------------------------------------------------------------
-void CaptureThread::captionImage(IplImage *sourceImage)
+void CaptureThread::captionImage(cv::Mat &image)
 {
   QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
-  cvPutText(sourceImage, timestring.toAscii(), 
-    cvPoint(sourceImage->width-text_size.width-4, text_size.height+4), 
-    &this->font, cvScalar(255, 255, 255, 0));
+  cv::putText(image, timestring.toAscii().data(), 
+    cvPoint(image.size().width - text_size.width - 4, text_size.height+4), 
+    CV_FONT_HERSHEY_PLAIN, 1.0, cv::Scalar(255, 255, 255, 0), 1);
 }
 //----------------------------------------------------------------------------
