@@ -60,13 +60,13 @@ void SettingsWidget::setThreads(CaptureThread *capthread, ProcessingThread *proc
 //----------------------------------------------------------------------------
 void SettingsWidget::on640ResToggled(bool on) {
   if(on) {
-    emit(resolutionSelected(cvSize(640,480)));
+    emit(resolutionSelected(cv::Size(640,480)));
   }
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::on320ResToggled(bool on) {
   if(on) {
-    emit(resolutionSelected(cvSize(320,240)));
+    emit(resolutionSelected(cv::Size(320,240)));
   }
 }
 //----------------------------------------------------------------------------
@@ -172,12 +172,12 @@ void SettingsWidget::onTimer()
   }
 }
 //----------------------------------------------------------------------------
-CvSize SettingsWidget::getSelectedResolution() 
+cv::Size SettingsWidget::getSelectedResolution() 
 {
   if (ui.res640Radio->isChecked()) {
-    return cvSize(640,480);
+    return cv::Size(640,480);
   }
-  return cvSize(320,240);
+  return cv::Size(320,240);
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::RecordAVI(bool state) 

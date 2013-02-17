@@ -12,7 +12,7 @@
 // capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/videostream.cgi?req_fps=30&.mjpg");
 //
 //----------------------------------------------------------------------------
-CaptureThread::CaptureThread(ImageBuffer* buffer, CvSize &size, int device, QString &URL) : QThread()
+CaptureThread::CaptureThread(ImageBuffer* buffer, cv::Size &size, int device, QString &URL) : QThread()
 {
   this->abort             = false;
   this->captureActive     = false;
@@ -29,7 +29,7 @@ CaptureThread::CaptureThread(ImageBuffer* buffer, CvSize &size, int device, QStr
   // initialize font and precompute text size
   cvInitFont(&this->font, CV_FONT_HERSHEY_PLAIN, 1.0, 1.0, 0, 1, CV_AA);
   QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
-  cvGetTextSize( timestring.toAscii(), &this->font, &this->text_size, NULL);
+  cv::getTextSize( timestring.toAscii().data(), CV_FONT_HERSHEY_PLAIN, 1.0, 1, NULL);
 
   //
   // start capture device driver
@@ -50,8 +50,8 @@ CaptureThread::CaptureThread(ImageBuffer* buffer, CvSize &size, int device, QStr
   }
   int w = cvGetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH);
   int h = cvGetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT);
-  this->imageSize         = cvSize(w,h);
-  this->rotatedSize       = cvSize(h,w);
+  this->imageSize         = cv::Size(w,h);
+  this->rotatedSize       = cv::Size(h,w);
 }
 //----------------------------------------------------------------------------
 CaptureThread::~CaptureThread() 
@@ -148,7 +148,7 @@ void CaptureThread::saveAVI(IplImage *image)
       path.c_str(),
       0,  
       this->getFPS(),
-      cvSize(image->width, image->height)
+      cv::Size(image->width, image->height)
     );
     emit(RecordingState(true));
   }
@@ -192,7 +192,7 @@ void CaptureThread::setRotation(int value) {
     this->rotatedImage = NULL;
   }
   if (this->rotation==1 || this->rotation==2) {
-    CvSize workingSize = cvSize(this->imageSize.height, this->imageSize.width);
+    cv::Size workingSize = cv::Size(this->imageSize.height, this->imageSize.width);
     this->rotatedImage = cvCreateImage( workingSize, IPL_DEPTH_8U, 3);
   }
 }

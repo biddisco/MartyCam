@@ -11,7 +11,7 @@ void Filter::setDelegate(Filter *filter)
   this->delegate = filter;
 }
 //----------------------------------------------------------------------------
-void Filter::invokeDelegate(const IplImage* image) {
+void Filter::invokeDelegate(const cv::Mat &image) {
   if (this->delegate) {
     this->delegate->process(image);
   }

@@ -59,7 +59,7 @@ MartyCam::MartyCam() : QMainWindow(0)
   this->UserDetectionThreshold  = 0.25;
   this->EventRecordCounter      = 0;
   this->insideMotionEvent       = 0;
-  this->imageSize               = cvSize(0,0);
+  this->imageSize               = cv::Size(0,0);
   this->imageBuffer             = new ImageBuffer(2);
   this->cameraIndex             = 1;
 
@@ -68,20 +68,28 @@ MartyCam::MartyCam() : QMainWindow(0)
   Chart *chart = this->ui.chart; 
 
   //
-  // create the settings dock widget
+  // create a dock widget to hold the settings
   //
   settingsDock = new QDockWidget("Settings", this);
   settingsDock->setAllowedAreas(Qt::RightDockWidgetArea | Qt::LeftDockWidgetArea);
+  settingsDock->setObjectName("SettingsDock");
+  //
+  // create the settings widget itself
+  //
   this->settingsWidget = new SettingsWidget(this);
   this->settingsWidget->setRenderWidget(this->renderWidget);
   settingsDock->setWidget(this->settingsWidget);
   settingsDock->setMinimumWidth(300);
   addDockWidget(Qt::RightDockWidgetArea, settingsDock);
-  connect(this->settingsWidget, SIGNAL(resolutionSelected(CvSize)), this, SLOT(onResolutionSelected(CvSize)));
+  connect(this->settingsWidget, SIGNAL(resolutionSelected(cv::Size)), this, SLOT(onResolutionSelected(cv::Size)));
   connect(this->settingsWidget, SIGNAL(CameraIndexChanged(int,QString)), this, SLOT(onCameraIndexChanged(int,QString)));
   //
-  connect(ui.actionQuit, SIGNAL(triggered()), this, SLOT(close()));
+  // not all controls could fit on the settings dock, trackval + graphs are separate.
+  //
   connect(ui.user_trackval, SIGNAL(valueChanged(int)), this, SLOT(onUserTrackChanged(int))); 
+  //
+  connect(ui.actionQuit, SIGNAL(triggered()), this, SLOT(close()));
+  //
   //
   QString camerastring = "";
   while (this->imageSize.width==0 && this->cameraIndex>=0) {
@@ -121,7 +129,7 @@ void MartyCam::deleteCaptureThread()
   delete captureThread;
 }
 //----------------------------------------------------------------------------
-void MartyCam::createCaptureThread(int FPS, CvSize &size, int camera, QString &cameraname)
+void MartyCam::createCaptureThread(int FPS, cv::Size &size, int camera, QString &cameraname)
 {
   captureThread = new CaptureThread(imageBuffer, size, camera, cameraname);
   captureThread->startCapture(FPS);
@@ -142,7 +150,7 @@ void MartyCam::deleteProcessingThread()
   delete processingThread;
 }
 //----------------------------------------------------------------------------
-ProcessingThread *MartyCam::createProcessingThread(CvSize &size, ProcessingThread *oldThread)
+ProcessingThread *MartyCam::createProcessingThread(cv::Size &size, ProcessingThread *oldThread)
 {
   ProcessingThread *temp = new ProcessingThread(imageBuffer, this->imageSize);
   if (oldThread) temp->CopySettings(oldThread);
@@ -158,7 +166,7 @@ void MartyCam::onCameraIndexChanged(int index, QString URL)
   this->createCaptureThread(15, this->imageSize, this->cameraIndex, URL);
 }
 //----------------------------------------------------------------------------
-void MartyCam::onResolutionSelected(CvSize newSize) {
+void MartyCam::onResolutionSelected(cv::Size newSize) {
   this->imageSize = newSize;
   ProcessingThread *temp = this->createProcessingThread(this->imageSize, this->processingThread);
   this->deleteProcessingThread();

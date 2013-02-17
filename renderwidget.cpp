@@ -6,9 +6,10 @@
 //
 #include <opencv2/imgproc/imgproc.hpp>
 //----------------------------------------------------------------------------
-IplImage* QImage2IplImage(QImage *qimg)
+/*
+cv::Mat QImage2IplImage(QImage *qimg)
 {
-  IplImage *imgHeader = cvCreateImageHeader( cvSize(qimg->width(), qimg->width()), IPL_DEPTH_8U, 4);
+  IplImage *imgHeader = cvCreateImageHeader( cv::Size(qimg->width(), qimg->width()), IPL_DEPTH_8U, 4);
   imgHeader->imageData = (char*) qimg->bits();
 
   uchar* newdata = (uchar*) malloc(sizeof(uchar) * qimg->byteCount());
@@ -17,41 +18,42 @@ IplImage* QImage2IplImage(QImage *qimg)
   //cvClo
   return imgHeader;
 }
+*/
 //----------------------------------------------------------------------------
 // this->movingAverage  = cvCreateImage( imageSize, IPL_DEPTH_32F, 3);
 // this->thresholdImage = cvCreateImage( imageSize, IPL_DEPTH_8U, 1);
 //----------------------------------------------------------------------------
 template <typename T> 
-QImage *IplImage2QImage(const IplImage *iplImg)
+QImage *cvMat2QImage(const cv::Mat &mat)
 {
-  int h = iplImg->height;
-  int w = iplImg->width;
-  int channels = iplImg->nChannels;
+  int h = mat.size().height;
+  int w = mat.size().width;
+  int channels = mat.channels();
   QImage *qimg = new QImage(w, h, QImage::Format_ARGB32);
-  const T *data = reinterpret_cast<const T *>(iplImg->imageData);
+  const T *data = reinterpret_cast<const T *>(mat.data);
   //
-  for (int y = 0; y < h; y++, data += iplImg->widthStep/sizeof(T)) {
+  for (int y=0; y<h; y++, data+=mat.step[0]/sizeof(T)) {
     for (int x = 0; x < w; x++) {
       char r, g, b, a = 0;
       if (channels == 1) {
-        r = data[x * channels];
-        g = data[x * channels];
-        b = data[x * channels];
+        r = g = b = data[x];
+        qimg->setPixel(x, y, qRgb(r, g, b));
       }
       else if (channels == 3 || channels == 4) {
         r = data[x * channels + 2];
         g = data[x * channels + 1];
-        b = data[x * channels];
-      }
-      if (channels == 4) {
-        a = data[x * channels + 3];
-        qimg->setPixel(x, y, qRgba(r, g, b, a));
-      }
-      else {
-        qimg->setPixel(x, y, qRgb(r, g, b));
+        b = data[x * channels + 0];
+        if (channels == 4) {
+          a = data[x * channels + 3];
+          qimg->setPixel(x, y, qRgba(r, g, b, a));
+        }
+        else {
+          qimg->setPixel(x, y, qRgb(r, g, b));
+        }
       }
     }
   }
+
   return qimg;
 }
 //----------------------------------------------------------------------------
@@ -70,21 +72,31 @@ void RenderWidget::onFrameSizeChanged(int width, int height) {
   setFixedSize(width, height);
 } 
 //----------------------------------------------------------------------------
-void RenderWidget::updatePixmap(const IplImage* frame) 
+void RenderWidget::updatePixmap(const cv::Mat &frame) 
 {
   QImage *temp = this->bufferImage;
   imageValid.acquire();
-  if (frame->depth == IPL_DEPTH_32F) {
-    this->bufferImage = IplImage2QImage<float>(frame);
-  } 
-  else {
-    this->bufferImage = IplImage2QImage<char>(frame);
+
+  int bytes = frame.elemSize();
+  int bytes_per_channel = bytes/frame.channels();
+
+  if (bytes_per_channel==1) {
+    this->bufferImage = cvMat2QImage<unsigned char>(frame);
   }
+  else if (bytes_per_channel==2) {
+    this->bufferImage = cvMat2QImage<short>(frame);
+  } 
+  else if (bytes_per_channel==4) {
+    this->bufferImage = cvMat2QImage<float>(frame);
+  } 
+  else if (bytes_per_channel==8) {
+    this->bufferImage = cvMat2QImage<double>(frame);
+  } 
   imageValid.release();
   delete temp;
 }
 //----------------------------------------------------------------------------
-void RenderWidget::process(const IplImage* image) {
+void RenderWidget::process(const cv::Mat &image) {
   // copy the image to the local pixmap and update the display
   this->updatePixmap(image);
   emit(update_signal(true, 12));

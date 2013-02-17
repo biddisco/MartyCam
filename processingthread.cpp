@@ -4,13 +4,14 @@
 #include <iostream>
 //
 #include <cv.h>
+#include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 //
 #include "filter.h"
 #include "imagebuffer.h"
 #include "processingthread.h"
 //----------------------------------------------------------------------------
-ProcessingThread::ProcessingThread(ImageBuffer* buffer, CvSize &size) : QThread()
+ProcessingThread::ProcessingThread(ImageBuffer* buffer, cv::Size &size) : QThread()
 {
   this->imageBuffer       = buffer;
   this->rootFilter        = NULL; 
@@ -44,13 +45,14 @@ ProcessingThread::~ProcessingThread()
 //----------------------------------------------------------------------------
 void ProcessingThread::DeleteTemporaryStorage()
 {
-  cvReleaseImage(&this->movingAverage);
-  cvReleaseImage(&this->thresholdImage);
-  cvReleaseImage(&this->greyScaleImage);
-  cvReleaseImage(&this->blendImage);
-  cvReleaseImage(&this->difference);
-  cvReleaseImage(&this->tempImage);
-  cvReleaseImage(&this->noiseImage);
+  this->movingAverage.release();
+  this->thresholdImage.release();
+  this->greyScaleImage.release();
+  this->blendImage.release();
+  this->difference.release();
+  this->tempImage.release();
+  this->noiseImage.release();
+  //
   this->noiseImage        = NULL;
   this->tempImage         = NULL;
   this->difference        = NULL;
@@ -84,12 +86,12 @@ void ProcessingThread::run() {
   while (!this->abort) {
     this->cameraImage = imageBuffer->getFrame();
     // if camera not working or disconnected, abort
-    if (!this->cameraImage) {
+    if (this->cameraImage.empty()) {
       msleep(100);
       continue;
     }
-    IplImage *workingImage = this->cameraImage;
-    CvSize     workingSize = cvSize(this->cameraImage->width, this->cameraImage->height);
+    cv::Mat workingImage = this->cameraImage;
+    cv::Size workingSize = this->cameraImage.size();
     if (workingSize.width!=this->imageSize.width ||
       workingSize.height!=this->imageSize.height) 
     {
@@ -99,52 +101,53 @@ void ProcessingThread::run() {
     //
     // allocate image arrays, only executed on first pass (or size change)
     //
-    if (!this->difference) {
+    if (this->difference.empty()) {
       //
-      this->movingAverage   = cvCreateImage( workingSize, IPL_DEPTH_32F, 3);
-      this->greyScaleImage  = cvCreateImage( workingSize, IPL_DEPTH_8U, 1);
-      this->thresholdImage  = cvCreateImage( workingSize, IPL_DEPTH_8U, 1);
-      this->blendImage      = cvCreateImage( workingSize, IPL_DEPTH_8U, 3);
-      this->noiseImage      = cvCreateImage( workingSize, IPL_DEPTH_32F, 1);
-      this->difference      = cvCloneImage( workingImage );
-      this->tempImage       = cvCloneImage( workingImage );
-      cvConvertScale(workingImage, this->movingAverage, 1.0, 0.0);
+      this->movingAverage   = cv::Mat( workingSize, CV_32FC3);
+      this->greyScaleImage  = cv::Mat( workingSize, CV_8UC1);
+      this->thresholdImage  = cv::Mat( workingSize, CV_8UC1);
+      this->blendImage      = cv::Mat( workingSize, CV_8UC3);
+      this->noiseImage      = cv::Mat( workingSize, CV_32FC1);
+      this->difference      = workingImage.clone();
+      this->tempImage       = workingImage.clone();
+      //
+      workingImage.convertTo(this->movingAverage, this->movingAverage.type(), 1.0, 0.0);
 
       // initialize font and precompute text size
       cvInitFont(&this->font, CV_FONT_HERSHEY_PLAIN, 1.0, 1.0, 0, 1, CV_AA);
       QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
-      cvGetTextSize( timestring.toAscii(), &this->font, &this->text_size, NULL);
+      cv::getTextSize( timestring.toAscii().data(), CV_FONT_HERSHEY_PLAIN, 1.0, 1, NULL);
     }
 
-    IplImage *shownImage;
+    cv::Mat shownImage;
     if (this->MotionDetecting) {
-      cvRunningAvg(workingImage, this->movingAverage, this->average, NULL);
+      cv::accumulateWeighted(workingImage, this->movingAverage, this->average);
 
       // Convert the type of the moving average from float to char
-      cvConvertScale(this->movingAverage, this->tempImage, 1.0, 0.0);
+      this->movingAverage.convertTo(this->tempImage, this->tempImage.type(), 1.0, 0.0);
 
       // Subtract the current frame from the moving average.
-      cvAbsDiff(workingImage, this->tempImage, this->difference);
+      cv::absdiff(workingImage, this->tempImage, this->difference);
 
       // Convert the image to grayscale.
-      cvCvtColor(this->difference, this->greyScaleImage, CV_RGB2GRAY);
+      cv::cvtColor(this->difference, this->greyScaleImage, CV_RGB2GRAY);
 
       // Threshold the image to black/white off/on.
-      cvThreshold(this->greyScaleImage, this->thresholdImage, threshold, 255, CV_THRESH_BINARY);
+      cv::threshold(this->greyScaleImage, this->thresholdImage, threshold, 255, CV_THRESH_BINARY);
 
       // Add current changing pixels to our noise map
       this->updateNoiseMap(this->thresholdImage, this->noiseBlendRatio);
 
       // Erode and Dilate to denoise and produce blobs
       if (this->erodeIterations>0) {
-        cvErode(this->thresholdImage, this->thresholdImage, 0, this->erodeIterations);
+        cv::erode(this->thresholdImage, this->thresholdImage, Mat(), Point(-1,-1), this->erodeIterations);
       }
       if (this->dilateIterations>0) {
-        cvDilate(this->thresholdImage, this->thresholdImage, 0, this->dilateIterations);
+        cv::dilate(this->thresholdImage, this->thresholdImage, Mat(), Point(-1,-1), this->dilateIterations);
       }
 
       // Convert the image to grayscale.
-      cvCvtColor(this->thresholdImage, this->blendImage, CV_GRAY2RGB);
+      cv::cvtColor(this->thresholdImage, this->blendImage, CV_GRAY2RGB);
       this->countPixels(this->thresholdImage);
 
       switch (this->displayImage) {
@@ -160,11 +163,11 @@ void ProcessingThread::run() {
       default:
       case 3:
         /* dst = src1 * alpha + src2 * beta + gamma */
-        cvAddWeighted(workingImage, this->blendRatio, this->blendImage, 1.0-this->blendRatio, 0.0, this->blendImage);
+        cv::addWeighted(workingImage, this->blendRatio, this->blendImage, 1.0-this->blendRatio, 0.0, this->blendImage);
         shownImage = this->blendImage;
         break;
       case 4:
-        cvOr(workingImage, this->blendImage, this->blendImage, NULL);
+        cv::bitwise_or(workingImage, this->blendImage, this->blendImage);
         shownImage = this->blendImage;
         break;
       case 5:
@@ -176,9 +179,9 @@ void ProcessingThread::run() {
     // Add time and data to image
     //
     QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
-    cvPutText(shownImage, timestring.toAscii(), 
-      cvPoint(shownImage->width-text_size.width-4, text_size.height+4), 
-      &this->font, cvScalar(255, 255, 255, 0));
+    cv::putText(shownImage, timestring.toAscii().data(), 
+      cvPoint(shownImage.size().width - text_size.width - 4, text_size.height+4), 
+      CV_FONT_HERSHEY_PLAIN, 1.0, cv::Scalar(255, 255, 255, 0));
     //
     // Pass final image to GUI
     //
@@ -188,19 +191,19 @@ void ProcessingThread::run() {
     //
     // Release our copy of original captured image
     //
-    cvReleaseImage(&this->cameraImage);
+    this->cameraImage.release();
     //    std::cout << "Processed frame " << framenum++ << std::endl;
   }
 }
 //----------------------------------------------------------------------------
-void ProcessingThread::countPixels(IplImage *image) 
+void ProcessingThread::countPixels(const cv::Mat &image) 
 {
   // Acquire image unfo
-  int height    = image->height;
-  int width     = image->width;
-  int step      = image->widthStep;
-  int channels  = image->nChannels;
-  uchar *data = (uchar *)image->imageData;
+  int height    = image.size().height;
+  int width     = image.size().width;
+  int step      = image.step[0];
+  int channels  = image.channels();
+  uchar *data   = image.data;
 
   // Begin
   int white = 0;
@@ -221,13 +224,13 @@ void ProcessingThread::countPixels(IplImage *image)
   this->motionPercent = 100.0*white/(height*width);
 }
 //----------------------------------------------------------------------------
-void ProcessingThread::updateNoiseMap(IplImage *image, double noiseblend) 
+void ProcessingThread::updateNoiseMap(const cv::Mat &image, double noiseblend) 
 {
   static int cnt = 0;
   if (cnt==0) {
-    cvRectangle(
+    cv::rectangle(
       this->noiseImage, 
-      cvPoint(0,0), cvPoint(this->noiseImage->width, this->noiseImage->height),
+      cvPoint(0,0), this->noiseImage.size(),
       cvScalar(0), CV_FILLED);
     cnt = 0;
   }
@@ -239,7 +242,7 @@ void ProcessingThread::updateNoiseMap(IplImage *image, double noiseblend)
 //  cvConvertScale( image, image, -10.0, 255.0);
 
   // Add to running average of 'noisy' pixels
-  cvRunningAvg(image, this->noiseImage, noiseblend, NULL);
+  cv::accumulateWeighted(image, this->noiseImage, noiseblend);
 //  cvThreshold(this->noiseImage, this->noiseImage, threshold, 32, CV_THRESH_BINARY);
 
   // invert pixels using : (255 - x)
@@ -271,31 +274,31 @@ double ProcessingThread::getPSNR(const cv::Mat& I1, const cv::Mat& I2)
   }
 }
 //----------------------------------------------------------------------------
-Scalar ProcessingThread::getMSSIM(const Mat& i1, const Mat& i2)
+Scalar ProcessingThread::getMSSIM(const cv::Mat& i1, const cv::Mat& i2)
 {
   const double C1 = 6.5025, C2 = 58.5225;
   /***************************** INITS **********************************/
   int d = CV_32F;
 
-  Mat I1, I2;
+  cv::Mat I1, I2;
   i1.convertTo(I1, d);           // cannot calculate on one byte large values
   i2.convertTo(I2, d);
 
-  Mat I2_2   = I2.mul(I2);        // I2^2
-  Mat I1_2   = I1.mul(I1);        // I1^2
-  Mat I1_I2  = I1.mul(I2);        // I1 * I2
+  cv::Mat I2_2   = I2.mul(I2);        // I2^2
+  cv::Mat I1_2   = I1.mul(I1);        // I1^2
+  cv::Mat I1_I2  = I1.mul(I2);        // I1 * I2
 
   /***********************PRELIMINARY COMPUTING ******************************/
 
-  Mat mu1, mu2;   //
+  cv::Mat mu1, mu2;   //
   GaussianBlur(I1, mu1, Size(11, 11), 1.5);
   GaussianBlur(I2, mu2, Size(11, 11), 1.5);
 
-  Mat mu1_2   =   mu1.mul(mu1);
-  Mat mu2_2   =   mu2.mul(mu2);
-  Mat mu1_mu2 =   mu1.mul(mu2);
+  cv::Mat mu1_2   =   mu1.mul(mu1);
+  cv::Mat mu2_2   =   mu2.mul(mu2);
+  cv::Mat mu1_mu2 =   mu1.mul(mu2);
 
-  Mat sigma1_2, sigma2_2, sigma12;
+  cv::Mat sigma1_2, sigma2_2, sigma12;
 
   GaussianBlur(I1_2, sigma1_2, Size(11, 11), 1.5);
   sigma1_2 -= mu1_2;
@@ -307,7 +310,7 @@ Scalar ProcessingThread::getMSSIM(const Mat& i1, const Mat& i2)
   sigma12 -= mu1_mu2;
 
   ///////////////////////////////// FORMULA ////////////////////////////////
-  Mat t1, t2, t3;
+  cv::Mat t1, t2, t3;
 
   t1 = 2 * mu1_mu2 + C1;
   t2 = 2 * sigma12 + C2;
@@ -317,7 +320,7 @@ Scalar ProcessingThread::getMSSIM(const Mat& i1, const Mat& i2)
   t2 = sigma1_2 + sigma2_2 + C2;
   t1 = t1.mul(t2);               // t1 =((mu1_2 + mu2_2 + C1).*(sigma1_2 + sigma2_2 + C2))
 
-  Mat ssim_map;
+  cv::Mat ssim_map;
   divide(t3, t1, ssim_map);      // ssim_map =  t3./t1;
 
   Scalar mssim = mean( ssim_map ); // mssim = average of ssim map

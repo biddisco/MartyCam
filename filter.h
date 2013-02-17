@@ -1,7 +1,8 @@
 #ifndef FILTER_H
 #define FILTER_H
 
-#include "opencv/cxcore.h"
+#include "opencv2/core/core_c.h"
+#include "opencv2/core/core.hpp"
 
 //
 // Base class for filter/processor objects
@@ -11,11 +12,11 @@ public:
   Filter();
   //
   virtual void setDelegate(Filter* list);
-  virtual void process(const IplImage* image) = 0;
+  virtual void process(const cv::Mat &image) = 0;
 
 protected:
   Filter* delegate;
-  void invokeDelegate(const IplImage* image);
+  void invokeDelegate(const cv::Mat &image);
 };
 
 #endif

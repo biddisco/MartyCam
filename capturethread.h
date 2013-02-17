@@ -13,7 +13,7 @@ class ImageBuffer;
 class CaptureThread : public QThread {
 Q_OBJECT;
 public: 
-   CaptureThread(ImageBuffer* buffer, CvSize &size, int device, QString &URL);
+   CaptureThread(ImageBuffer* buffer, cv::Size &size, int device, QString &URL);
   ~CaptureThread() ;
 
   void run();
@@ -39,7 +39,7 @@ public:
   IplImage *rotateImage(IplImage *source, IplImage *rotated);
   void      captionImage(IplImage *source);
 
-  CvSize    getImageSize() { return this->imageSize; }
+  cv::Size    getImageSize() { return this->imageSize; }
 
 signals:
   void RecordingState(bool);
@@ -53,8 +53,8 @@ private:
   QWaitCondition  captureWait;
   ImageBuffer    *imageBuffer;
   bool            captureActive;
-  CvSize          imageSize;
-  CvSize          rotatedSize;
+  cv::Size          imageSize;
+  cv::Size          rotatedSize;
   CvCapture      *capture;
   double          fps;
   QQueue<int>     frameTimes;
@@ -69,7 +69,7 @@ private:
   std::string     CaptureStatus;
   //
   CvFont          font;
-  CvSize          text_size;
+  cv::Size          text_size;
   IplImage       *rotatedImage;
 };
 

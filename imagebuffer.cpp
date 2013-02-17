@@ -15,22 +15,22 @@ bool ImageBuffer::isFull()
  * If the buffer is full, the function blocks until it there is space
  * @param image The image to add
  */
-void ImageBuffer::addFrame(const IplImage* image) {
-  if (!image) {
+void ImageBuffer::addFrame(const cv::Mat &image) {
+  if (image.empty()) {
     return;
   }
   //output << "Adding a frame";
   mutex.lock();
-  if(imageQueue.size() == bufferSize) {
+  if (imageQueue.size() == bufferSize) {
     return;
     bufferNotFull.wait(&mutex);
   }
   mutex.unlock();
   
   // copy the image
-  IplImage* temp = cvCloneImage(image);
+  cv::Mat temp = image.clone();
   imageQueue.enqueue(temp);
-  //output << "AF" << time.elapsed();
+  // output << "AF" << time.elapsed();
   mutex.lock();
   bufferNotEmpty.wakeAll();
   mutex.unlock();
@@ -40,7 +40,7 @@ void ImageBuffer::addFrame(const IplImage* image) {
  * This is a blocking operation, so if there are no available images, this function will block until one is available or image acquisition is stopped.
  * @returns IplImage pointer to the next available frame.  Ownership of the data is passed to the callee, so the image must be released
  */
-IplImage* ImageBuffer::getFrame() {
+cv::Mat ImageBuffer::getFrame() {
   mutex.lock();
   if (imageQueue.isEmpty()) {
   //  output << "Get frame waiting on frame";
@@ -49,7 +49,7 @@ IplImage* ImageBuffer::getFrame() {
   }
   mutex.unlock();
 
-  IplImage* temp = 0;
+  cv::Mat temp;
 
   mutex.lock();
   if (!imageQueue.isEmpty()) {

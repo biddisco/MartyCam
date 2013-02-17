@@ -12,7 +12,7 @@ class RenderWidget : public QWidget, public Filter {
 Q_OBJECT;
 public:
   RenderWidget(QWidget* parent);
-  void process(const IplImage* image);
+  void process(const cv::Mat &image);
 
 public slots:
   void onFrameSizeChanged(int width, int height);
@@ -24,7 +24,7 @@ signals:
 
 protected:
   void paintEvent(QPaintEvent*);
-  void updatePixmap(const IplImage* frame);
+  void updatePixmap(const cv::Mat &frame);
 
 private:
   QImage         *bufferImage;

@@ -15,7 +15,7 @@ class SettingsWidget : public QWidget {
 Q_OBJECT;
 public:
   SettingsWidget(QWidget* parent);
-  CvSize getSelectedResolution();
+  cv::Size getSelectedResolution();
   void RecordAVI(bool state);
 
   void setThreads(CaptureThread *capthread, ProcessingThread *procthread);
@@ -42,7 +42,7 @@ public slots:
   void setupCameraList();
 
 signals:
-  void resolutionSelected(CvSize);
+  void resolutionSelected(cv::Size);
   void rotationChanged(int);
 
   void CameraIndexChanged(int, QString);

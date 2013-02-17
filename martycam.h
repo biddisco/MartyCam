@@ -1,11 +1,14 @@
 #ifndef HEAD_TRACKER_H
 #define HEAD_TRACKER_H
 
+#include <QMainWindow>
+#include <QTimer>
+//
+#include <opencv2/core/core.hpp>
+//
 #include "ui_martycam.h"
 #include "capturethread.h"
 #include "processingthread.h"
-#include <QMainWindow>
-#include <QTimer>
 
 class TrackController;
 class RenderWidget;
@@ -23,7 +26,7 @@ public:
 
 public slots:
   void updateStats();
-  void onResolutionSelected(CvSize newSize);
+  void onResolutionSelected(cv::Size newSize);
   void onCameraIndexChanged(int index, QString URL);
   void onUserTrackChanged(int value);
   void onRecordingStateChanged(bool state);
@@ -32,9 +35,9 @@ public slots:
 protected:
   void closeEvent(QCloseEvent*);
   void deleteCaptureThread();
-  void createCaptureThread(int FPS, CvSize &size, int camera, QString &cameraname);
+  void createCaptureThread(int FPS, cv::Size &size, int camera, QString &cameraname);
   void deleteProcessingThread();
-  ProcessingThread *MartyCam::createProcessingThread(CvSize &size, ProcessingThread *oldThread);
+  ProcessingThread *createProcessingThread(cv::Size &size, ProcessingThread *oldThread);
   
   void initChart();
   bool eventDecision();
@@ -45,7 +48,7 @@ private:
   QDockWidget             *progressToolbar;
   QDockWidget             *settingsDock;
   SettingsWidget          *settingsWidget;
-  CvSize                   imageSize;
+  cv::Size                 imageSize;
   int                      cameraIndex;
   CaptureThread           *captureThread;
   ProcessingThread        *processingThread;

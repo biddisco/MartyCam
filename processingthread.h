@@ -19,14 +19,14 @@ using namespace cv;
 class ProcessingThread : public QThread {
 Q_OBJECT;
 public: 
-   ProcessingThread(ImageBuffer* buffer, CvSize &size);
+   ProcessingThread(ImageBuffer* buffer, cv::Size &size);
   ~ProcessingThread();
   //
   void CopySettings(ProcessingThread *thread);
   void DeleteTemporaryStorage();
   // 
-  void   countPixels(IplImage *image);
-  void   updateNoiseMap(IplImage *image, double noiseblend);
+  void   countPixels(const cv::Mat &image);
+  void   updateNoiseMap(const cv::Mat &image, double noiseblend);
   double getMotionPercent() { return this->motionPercent; }
   //
   void setRootFilter(Filter* filter) { rootFilter = filter; }
@@ -45,8 +45,8 @@ public:
   void run();
   void setAbort(bool a) { this->abort = a; }
 
-  double getPSNR(const Mat& I1, const Mat& I2);
-  Scalar getMSSIM( const Mat& i1, const Mat& i2);
+  double getPSNR(const cv::Mat& I1, const cv::Mat& I2);
+  Scalar getMSSIM(const cv::Mat& i1, const cv::Mat& i2);
 
 private:
   ImageBuffer *imageBuffer;
@@ -63,20 +63,20 @@ private:
   bool         abort;
   int          rotation;
 
-  //Images to use in the program.
-  CvSize     imageSize;
-  IplImage  *cameraImage;
-  IplImage  *greyScaleImage;
-  IplImage  *thresholdImage;
-  IplImage  *blendImage;
-  IplImage  *movingAverage;
-  IplImage  *difference;
-  IplImage  *tempImage;
-  IplImage  *noiseImage;
-  CvFont     font;
-  CvSize     text_size;
+  // Images to use in the program.
+  cv::Size  imageSize;
+  cv::Mat   cameraImage;
+  cv::Mat   greyScaleImage;
+  cv::Mat   thresholdImage;
+  cv::Mat   blendImage;
+  cv::Mat   movingAverage;
+  cv::Mat   difference;
+  cv::Mat   tempImage;
+  cv::Mat   noiseImage;
+  CvFont    font;
+  cv::Size  text_size;
 #ifndef Q_MOC_RUN
-  boost::circular_buffer<IplImage*> RecordBuffer;
+  boost::circular_buffer<cv::Mat> RecordBuffer;
 #endif
 };
 
