@@ -17,6 +17,9 @@
 //----------------------------------------------------------------------------
 SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent) 
 {
+  this->processingthread = NULL;
+  this->capturethread    = NULL;
+  //
   ui.setupUi(this);
   setMinimumWidth(150);
   //

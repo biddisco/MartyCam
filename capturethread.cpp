@@ -32,16 +32,25 @@ CaptureThread::CaptureThread(ImageBuffer* buffer, cv::Size &size, int device, QS
   //
   // start capture device driver
   //
-  if (URL.size()>0) {
-    // using an IP camera, assume default string to access martycam
-    // capture = cvCaptureFromFile("http://192.168.1.21/videostream.asf?user=admin&pwd=1234");
-    // capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/videostream.cgi?req_fps=30&.mjpg");
-    capture = cvCaptureFromFile(URL.toAscii().data());
+  if (URL=="NO_CAMERA") {
+    capture = NULL;
   }
   else {
-    capture = cvCaptureFromCAM(CV_CAP_DSHOW + this->deviceIndex );
+    if (URL.size()>0) {
+      std::cout << "Attempting IP camera connection " << URL.toAscii().data() << std::endl;
+      // using an IP camera, assume default string to access martycam
+      // capture = cvCaptureFromFile("http://192.168.1.21/videostream.asf?user=admin&pwd=1234");
+      // capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/videostream.cgi?req_fps=30&.mjpg");
+      capture = cvCaptureFromFile(URL.toAscii().data());
+    }
+    else {
+      capture = cvCaptureFromCAM(CV_CAP_DSHOW + this->deviceIndex );
+    }
+    if (!capture) {
+      std::cout << "Camera connection failed" << std::endl;
+      return;
+    }
   }
-
   if (size.width>0 && size.height>0) {
     cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH,  size.width);
     cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, size.height);
@@ -76,6 +85,10 @@ void CaptureThread::run() {
     }
     // get latest frame from webcam
     cv::Mat frame = cvQueryFrame(capture);
+    if (frame.empty()) {
+      this->setAbort(true);
+      continue;
+    }
     updateFPS(time.elapsed());
     // rotate image if necessary
     this->rotateImage(frame, this->rotatedImage);

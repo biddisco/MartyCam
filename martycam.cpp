@@ -85,8 +85,7 @@ MartyCam::MartyCam() : QMainWindow(0)
   //
   connect(ui.actionQuit, SIGNAL(triggered()), this, SLOT(close()));
   //
-  //
-  QString camerastring = "";
+  QString camerastring = "NO_CAMERA";
   while (this->imageSize.width==0 && this->cameraIndex>=0) {
     this->createCaptureThread(15, this->imageSize, this->cameraIndex, camerastring);
     this->imageSize = this->captureThread->getImageSize();
