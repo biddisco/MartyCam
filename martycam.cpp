@@ -16,23 +16,63 @@
 #include <boost/accumulators/statistics/rolling_mean.hpp>
 #include <boost/accumulators/statistics/median.hpp>
 #include <boost/accumulators/statistics/weighted_median.hpp>
+#include <boost/circular_buffer.hpp>
 //
 using namespace boost::accumulators;    
 accumulator_set<int, stats<tag::rolling_mean> > acc(tag::rolling_window::window_size = 50);
 //
-typedef vector<int>    vint;
-typedef vector<double> vdouble;
-typedef list <int>     lint;
-typedef list <double>  ldouble;
+#define CIRCULAR_BUFFER_SIZE 500
 //
-vint     frameNumber;
-vdouble  motionLevel;
-vdouble  movingAverage;
-vdouble  psnr;
-vint     thresholdTime;
-vdouble  thresholdLevel;
-vint     frameNumberEvent;
-vdouble  eventLevel;
+template<typename T1, typename T2>
+class Plottable {  
+  public:
+    typedef boost::circular_buffer<T1> xListType;
+    typedef boost::circular_buffer<T2> yListType;
+    typedef DoubleDataContainer<xListType, yListType> channelType;
+
+  public:
+    Plottable(QPen &Pen, T2 Minval, T2 Maxval, const char *Title, xListType *xcont, yListType *ycont) : pen(Pen), minVal(Minval), maxVal(Maxval), title(Title)
+    {
+      xContainer = xcont ? xcont : new xListType(CIRCULAR_BUFFER_SIZE);
+      yContainer = ycont ? ycont : new yListType(CIRCULAR_BUFFER_SIZE);
+      deletex = (xcont==NULL);
+      deletey = (ycont==NULL);
+      data = new channelType(*xContainer, *yContainer);
+    }
+
+    ~Plottable()
+    {
+      if (deletex) delete xContainer;
+      if (deletey) delete yContainer;
+      delete data;
+    }
+
+    //
+    QPen         pen;
+    xListType   *xContainer;
+    yListType   *yContainer;
+    bool         deletex, deletey;
+    channelType *data;
+    T2           minVal;
+    T2           maxVal;
+    std::string  title;
+
+};
+
+typedef boost::circular_buffer<int>    vint;
+typedef boost::circular_buffer<double> vdouble;
+//
+vint     frameNumber(CIRCULAR_BUFFER_SIZE);
+vint     thresholdTime(2);
+vdouble  thresholdLevel(2);
+//
+Plottable<int, double> movingAverage(QPen(QColor(Qt::blue)), 0, 100.0, "Moving Average", &frameNumber, NULL);
+Plottable<int, double> motionLevel(QPen(QColor(Qt::green)),  0, 100.0, "Motion",         &frameNumber, NULL);
+Plottable<int, double> psnr(QPen(QColor(Qt::yellow)),     20.0,  40.0, "PSNR",           &frameNumber, NULL);
+Plottable<int, int> events(QPen(QColor(Qt::white)),        0.0, 100.0, "EventLevel",     &frameNumber, NULL);
+Plottable<int, double> threshold(QPen(QColor(Qt::red)),    0.0, 100.0, "Threshold",      &thresholdTime, &thresholdLevel);
+
+
 //
 //----------------------------------------------------------------------------
 MartyCam::MartyCam() : QMainWindow(0) 
@@ -180,39 +220,25 @@ void MartyCam::updateStats() {
   // scale up to 100*100 = 1E4 for log display
   double percent = 100.0*this->processingThread->getMotionPercent();
   double logval = percent>1 ? (100.0/4.0)*log10(percent) : 0;
-  this->ui.detect_value->setText(QString("%1").arg(this->processingThread->getMotionPercent(),4 , 'f', 2));
-  //
-  int counter = captureThread->GetFrameCounter();
-  frameNumber.push_back(counter);
-  frameNumberEvent.push_back(counter);
-  motionLevel.push_back(logval);
   acc(logval);
-  movingAverage.push_back(rolling_mean(acc));
+  this->ui.detect_value->setText(QString("%1").arg(this->processingThread->getMotionPercent(),4 , 'f', 2));
+  int eventvalue = this->eventDecision() ? 100 : 0;
+
+  // x-axis is frame counter
+  double counter = captureThread->GetFrameCounter();
+  frameNumber.push_back(static_cast<int>(counter));
+  // update y-values of graphs
+  motionLevel.yContainer->push_back(logval);
+  movingAverage.yContainer->push_back(rolling_mean(acc));
+  psnr.yContainer->push_back(this->processingThread->getPSNR());
+  events.yContainer->push_back(eventvalue);
   //
-  psnr.push_back(this->processingThread->getPSNR());
-  //
-  if (this->eventDecision()) {
-    eventLevel.push_back(100);
-    if (this->ui.RecordingEnabled->isChecked()) {
-      this->settingsWidget->RecordAVI(true);
-    }
+  if (eventvalue==100 && this->ui.RecordingEnabled->isChecked()) {
+    this->settingsWidget->RecordAVI(true);
   }
-  else {
-    eventLevel.push_back(0);
-  }
-  //
-  if (frameNumber.size()>475) {
-    frameNumber.erase(frameNumber.begin(),frameNumber.begin()+1); 
-    motionLevel.erase(motionLevel.begin(),motionLevel.begin()+1); 
-    movingAverage.erase(movingAverage.begin(),movingAverage.begin()+1); 
-    psnr.erase(psnr.begin(),psnr.begin()+1); 
-    if (eventLevel.size()>475 && eventLevel.back()==0) {
-      frameNumberEvent.erase(frameNumberEvent.begin(),frameNumberEvent.end()-475); 
-      eventLevel.erase(eventLevel.begin(),eventLevel.end()-475); 
-    }
-  }
+  // The threshold line is just two points, update them each time step
   thresholdTime[0] = frameNumber.front();
-  thresholdTime[1] = frameNumber.back();
+  thresholdTime[1] = thresholdTime[0] + this->ui.chart->width();
   thresholdLevel[0] = this->UserDetectionThreshold;
   thresholdLevel[1] = this->UserDetectionThreshold;
   //
@@ -252,65 +278,38 @@ void MartyCam::onMotionDetectionChanged(int state)
 //----------------------------------------------------------------------------
 void MartyCam::initChart()
 {
-  const double gmax = 80;
-
-  QPen vPen;
-  vPen.setColor(Qt::red);
-  vPen.setWidthF(2.0);
-
-  vPen.setColor(Qt::green);
-  Channel motion(0,gmax,
-    new DoubleDataContainer<vint,vdouble>(frameNumber,motionLevel), trUtf8("Motion Level"),vPen);
-
-  vPen.setColor(Qt::blue);
-  Channel mean(0,gmax,
-    new DoubleDataContainer<vint,vdouble>(frameNumber,movingAverage), trUtf8("Moving Average"),vPen);
-
-  vPen.setColor(Qt::yellow);
-  Channel PSNR(20,35,
-    new DoubleDataContainer<vint,vdouble>(frameNumber,psnr), trUtf8("PSNR"),vPen);
-
-  vPen.setColor(Qt::white);
-  Channel eventline(0,gmax,
-    new DoubleDataContainer<vint,vdouble>(frameNumberEvent,eventLevel), trUtf8("Event"),vPen);
-
   thresholdTime.push_back(0);
-  thresholdTime.push_back(500);
+  thresholdTime.push_back(CIRCULAR_BUFFER_SIZE);
+  //
   thresholdLevel.push_back(this->UserDetectionThreshold);
   thresholdLevel.push_back(this->UserDetectionThreshold);
-  vPen.setColor(Qt::red);
-  Channel trigger(0,gmax,
-    new DoubleDataContainer<vint,vdouble>(thresholdTime,thresholdLevel), trUtf8("Trigger"),vPen);
+  //
+  Channel motion(motionLevel.minVal, motionLevel.maxVal, motionLevel.data, motionLevel.title.c_str(), motionLevel.pen);
+  Channel mean(movingAverage.minVal, movingAverage.maxVal, movingAverage.data, movingAverage.title.c_str(), movingAverage.pen);
+  Channel PSNR(psnr.minVal, psnr.maxVal, psnr.data, psnr.title.c_str(), psnr.pen);
+  Channel eventline(events.minVal, events.maxVal, events.data, events.title.c_str(), events.pen);
+  Channel trigger(threshold.minVal, threshold.maxVal, threshold.data, threshold.title.c_str(), threshold.pen);
 
   motion.setShowScale(true); 
   motion.setShowLegend(true);
-  motion.setMaximum(gmax);
 
-  mean.setMaximum(gmax);
   mean.setShowLegend(false);
   mean.setShowScale(false);
       
-  PSNR.setMaximum(35.0);
   PSNR.setShowLegend(false);
   PSNR.setShowScale(false);
 
-  trigger.setMaximum(gmax);
   trigger.setShowLegend(false);
   trigger.setShowScale(false);
 
-  eventline.setMaximum(gmax);
   eventline.setShowLegend(false);
   eventline.setShowScale(false);
 
-  //pozycja.showScale = predkosc.showScale = false ;
-  //chart->scaleGrid().showScale=false;
-  //chart->scaleGrid().showGrid=false;
   ui.chart->addChannel(motion);
   ui.chart->addChannel(mean);
   ui.chart->addChannel(PSNR);
   ui.chart->addChannel(trigger);
   ui.chart->addChannel(eventline);
-  ui.chart->setSize(100);
 }
 //----------------------------------------------------------------------------
 bool MartyCam::eventDecision() {
