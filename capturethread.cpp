@@ -2,6 +2,7 @@
 #include <QTime>
 //
 #include <iostream>
+#include <iomanip>
 //
 #include "capturethread.h"
 #include "imagebuffer.h"
@@ -87,23 +88,34 @@ void CaptureThread::run() {
     cv::Mat frame = cvQueryFrame(capture);
     if (frame.empty()) {
       this->setAbort(true);
+      std::cout << "Empty camera image, aborting capture " <<std::endl;
       continue;
     }
-    updateFPS(time.elapsed());
-    // rotate image if necessary
-    this->rotateImage(frame, this->rotatedImage);
-    // add to queue if space is available, 
-    if (!imageBuffer->isFull()) {
-      imageBuffer->addFrame(this->rotatedImage);
-      this->FrameCounter++;
-    }
+
     // always write the frame out if saving movie or in the process of closing AVI
     if (this->AVI_Writing || this->AVI_Writer.isOpened()) {
       // add date time stamp if enabled
       this->captionImage(this->rotatedImage);
       this->saveAVI(this->rotatedImage);
     }
-    emit(NewImage());
+
+    // add to queue if space is available, 
+//    if (!imageBuffer->isFull()) {
+      // rotate image if necessary
+      this->rotateImage(frame, this->rotatedImage);
+      //
+      imageBuffer->addFrame(this->rotatedImage);
+      this->FrameCounter++;
+      //
+//      std::cout << "Calling Emit " << std::endl;
+     updateFPS(time.elapsed());
+     emit(NewImage());
+//    }
+    //else {
+    //  static int dropped = 0;
+    //  std::cout << std::setw(6) << dropped++ << " Image buffer full, dropped frame " << std::endl;
+    //  this->msleep(1000);
+    //}
   }
 }
 //----------------------------------------------------------------------------

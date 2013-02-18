@@ -21,7 +21,8 @@
 using namespace boost::accumulators;    
 accumulator_set<int, stats<tag::rolling_mean> > acc(tag::rolling_window::window_size = 50);
 //
-#define CIRCULAR_BUFFER_SIZE 500
+const int CIRCULAR_BUFF_SIZE = 500;
+const int GRAPH_EXTENSION = 50;
 //
 template<typename T1, typename T2>
 class Plottable {  
@@ -33,8 +34,8 @@ class Plottable {
   public:
     Plottable(QPen &Pen, T2 Minval, T2 Maxval, const char *Title, xListType *xcont, yListType *ycont) : pen(Pen), minVal(Minval), maxVal(Maxval), title(Title)
     {
-      xContainer = xcont ? xcont : new xListType(CIRCULAR_BUFFER_SIZE);
-      yContainer = ycont ? ycont : new yListType(CIRCULAR_BUFFER_SIZE);
+      xContainer = xcont ? xcont : new xListType(CIRCULAR_BUFF_SIZE);
+      yContainer = ycont ? ycont : new yListType(CIRCULAR_BUFF_SIZE);
       deletex = (xcont==NULL);
       deletey = (ycont==NULL);
       data = new channelType(*xContainer, *yContainer);
@@ -46,7 +47,10 @@ class Plottable {
       if (deletey) delete yContainer;
       delete data;
     }
-
+    void clear() {
+      xContainer->clear();
+      yContainer->clear();
+    }
     //
     QPen         pen;
     xListType   *xContainer;
@@ -62,22 +66,22 @@ class Plottable {
 typedef boost::circular_buffer<int>    vint;
 typedef boost::circular_buffer<double> vdouble;
 //
-vint     frameNumber(CIRCULAR_BUFFER_SIZE);
+vint     frameNumber(CIRCULAR_BUFF_SIZE);
 vint     thresholdTime(2);
 vdouble  thresholdLevel(2);
 //
-Plottable<int, double> movingAverage(QPen(QColor(Qt::blue)), 0, 100.0, "Moving Average", &frameNumber, NULL);
-Plottable<int, double> motionLevel(QPen(QColor(Qt::green)),  0, 100.0, "Motion",         &frameNumber, NULL);
-Plottable<int, double> psnr(QPen(QColor(Qt::yellow)),     20.0,  40.0, "PSNR",           &frameNumber, NULL);
-Plottable<int, int> events(QPen(QColor(Qt::white)),        0.0, 100.0, "EventLevel",     &frameNumber, NULL);
-Plottable<int, double> threshold(QPen(QColor(Qt::red)),    0.0, 100.0, "Threshold",      &thresholdTime, &thresholdLevel);
-
-
+Plottable<int, double> movingAverage(QPen(QColor(Qt::blue)), 0.0, 100.0, "Moving Average", &frameNumber, NULL);
+Plottable<int, double> motionLevel(QPen(QColor(Qt::green)),  0.0, 100.0, "Motion",         &frameNumber, NULL);
+Plottable<int, double> psnr(QPen(QColor(Qt::yellow)),       0,  90.0, "PSNR",           &frameNumber, NULL);
+Plottable<int, int>    events(QPen(QColor(Qt::white)),       0.0, 100.0, "EventLevel",     &frameNumber, NULL);
+Plottable<int, double> threshold(QPen(QColor(Qt::red)),      0.0, 100.0, "Threshold",      &thresholdTime, &thresholdLevel);
 //
+Plottable<int, double> fastDecay(QPen(QColor(Qt::cyan)),     0.0, 100.0, "Fast Decay", &frameNumber, NULL);
+Plottable<int, double> slowDecay(QPen(QColor(Qt::darkCyan)), 0.0, 100.0, "Slow Decay", &frameNumber, NULL);
 //----------------------------------------------------------------------------
 MartyCam::MartyCam() : QMainWindow(0) 
 {
-  ui.setupUi(this);
+  this->ui.setupUi(this);
   QString settingsFileName = QCoreApplication::applicationDirPath() + "/MartyCam.ini";
   QSettings settings(settingsFileName, QSettings::IniFormat);
   restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
@@ -95,7 +99,7 @@ MartyCam::MartyCam() : QMainWindow(0)
   this->EventRecordCounter      = 0;
   this->insideMotionEvent       = 0;
   this->imageSize               = cv::Size(0,0);
-  this->imageBuffer             = new ImageBuffer(2);
+  this->imageBuffer             = new ImageBuffer(3);
   this->cameraIndex             = 1;
 
   // Layout of - chart
@@ -121,9 +125,9 @@ MartyCam::MartyCam() : QMainWindow(0)
   //
   // not all controls could fit on the settings dock, trackval + graphs are separate.
   //
-  connect(ui.user_trackval, SIGNAL(valueChanged(int)), this, SLOT(onUserTrackChanged(int))); 
+  connect(this->ui.user_trackval, SIGNAL(valueChanged(int)), this, SLOT(onUserTrackChanged(int))); 
   //
-  connect(ui.actionQuit, SIGNAL(triggered()), this, SLOT(close()));
+  connect(this->ui.actionQuit, SIGNAL(triggered()), this, SLOT(close()));
   //
   QString camerastring = "NO_CAMERA";
   while (this->imageSize.width==0 && this->cameraIndex>=0) {
@@ -157,10 +161,11 @@ void MartyCam::closeEvent(QCloseEvent*) {
 //----------------------------------------------------------------------------
 void MartyCam::deleteCaptureThread()
 {
-//  updateTimer.stop();
+  this->imageBuffer->clear();
   captureThread->setAbort(true);
   captureThread->wait();
   delete captureThread;
+  this->imageBuffer->clear();
 }
 //----------------------------------------------------------------------------
 void MartyCam::createCaptureThread(int FPS, cv::Size &size, int camera, QString &cameraname)
@@ -196,9 +201,14 @@ ProcessingThread *MartyCam::createProcessingThread(cv::Size &size, ProcessingThr
 //----------------------------------------------------------------------------
 void MartyCam::onCameraIndexChanged(int index, QString URL)
 {
+  this->deleteProcessingThread();
   this->deleteCaptureThread();
   this->cameraIndex = index;
   this->createCaptureThread(15, this->imageSize, this->cameraIndex, URL);
+  this->processingThread = this->createProcessingThread(this->imageSize, this->processingThread);
+  this->processingThread->start(QThread::IdlePriority);
+  //
+  this->clearGraphs();
 }
 //----------------------------------------------------------------------------
 void MartyCam::onResolutionSelected(cv::Size newSize) {
@@ -206,17 +216,18 @@ void MartyCam::onResolutionSelected(cv::Size newSize) {
   ProcessingThread *temp = this->createProcessingThread(this->imageSize, this->processingThread);
   this->deleteProcessingThread();
   this->deleteCaptureThread();
-  this->imageBuffer->clear();
   this->createCaptureThread(15, this->imageSize, this->cameraIndex, QString());
   this->processingThread = temp;
   this->processingThread->start(QThread::IdlePriority);
+  //
+  this->clearGraphs();
 }
 //----------------------------------------------------------------------------
 void MartyCam::updateStats() {
   //
   if (!this->processingThread) return;
   //
-  statusBar()->showMessage(QString("FPS: ")+QString::number(this->captureThread->getFPS(), 'f', 1));
+
   // scale up to 100*100 = 1E4 for log display
   double percent = 100.0*this->processingThread->getMotionPercent();
   double logval = percent>1 ? (100.0/4.0)*log10(percent) : 0;
@@ -225,27 +236,55 @@ void MartyCam::updateStats() {
   int eventvalue = this->eventDecision() ? 100 : 0;
 
   // x-axis is frame counter
-  double counter = captureThread->GetFrameCounter();
-  frameNumber.push_back(static_cast<int>(counter));
+  int counter = captureThread->GetFrameCounter();
+  frameNumber.push_back(counter);
+
+//  std::cout << " Inside UpdateStats " << counter << std::endl;
+  statusBar()->showMessage(QString("FPS : %1, Counter : %2, Buffer : %3").arg(this->captureThread->getFPS(), 5, 'f', 2).arg(captureThread->GetFrameCounter(), 5).arg(frameNumber.size(), 5));
+
   // update y-values of graphs
   motionLevel.yContainer->push_back(logval);
   movingAverage.yContainer->push_back(rolling_mean(acc));
   psnr.yContainer->push_back(this->processingThread->getPSNR());
   events.yContainer->push_back(eventvalue);
+
+  // The threshold line is just two points, update them each time step
+  thresholdTime[0] = frameNumber.front();
+  thresholdTime[1] = thresholdTime[0] + CIRCULAR_BUFF_SIZE;
+  thresholdLevel[0] = this->UserDetectionThreshold;
+  thresholdLevel[1] = this->UserDetectionThreshold;
+  //
+  // if an event was triggered, start recording
   //
   if (eventvalue==100 && this->ui.RecordingEnabled->isChecked()) {
     this->settingsWidget->RecordAVI(true);
   }
-  // The threshold line is just two points, update them each time step
-  thresholdTime[0] = frameNumber.front();
-  thresholdTime[1] = thresholdTime[0] + this->ui.chart->width();
-  thresholdLevel[0] = this->UserDetectionThreshold;
-  thresholdLevel[1] = this->UserDetectionThreshold;
+  //
+  // as the data scrolls, we move the x-axis start and end (size)
   //
   this->ui.chart->setUpdatesEnabled(0);
-  this->ui.chart->setSize(this->ui.chart->width()+50);
   this->ui.chart->setPosition(frameNumber.front());
+  this->ui.chart->setSize(CIRCULAR_BUFF_SIZE + GRAPH_EXTENSION);
+  this->ui.chart->setZoom(1.0);
   this->ui.chart->setUpdatesEnabled(1);
+}
+//----------------------------------------------------------------------------
+void MartyCam::clearGraphs()
+{
+  frameNumber.clear();
+  //
+  movingAverage.clear();
+  motionLevel.clear();
+  psnr.clear();
+  events.clear();
+  //
+  fastDecay.clear();
+  slowDecay.clear();
+  //
+//  threshold.clear();
+//  vint     thresholdTime(2);
+//  vdouble  thresholdLevel(2);
+
 }
 //----------------------------------------------------------------------------
 void MartyCam::onUserTrackChanged(int value)
@@ -279,7 +318,7 @@ void MartyCam::onMotionDetectionChanged(int state)
 void MartyCam::initChart()
 {
   thresholdTime.push_back(0);
-  thresholdTime.push_back(CIRCULAR_BUFFER_SIZE);
+  thresholdTime.push_back(CIRCULAR_BUFF_SIZE);
   //
   thresholdLevel.push_back(this->UserDetectionThreshold);
   thresholdLevel.push_back(this->UserDetectionThreshold);
@@ -305,12 +344,16 @@ void MartyCam::initChart()
   eventline.setShowLegend(false);
   eventline.setShowScale(false);
 
-  ui.chart->addChannel(motion);
-  ui.chart->addChannel(mean);
-  ui.chart->addChannel(PSNR);
-  ui.chart->addChannel(trigger);
-  ui.chart->addChannel(eventline);
+  this->ui.chart->addChannel(motion);
+  this->ui.chart->addChannel(mean);
+  this->ui.chart->addChannel(PSNR);
+  this->ui.chart->addChannel(trigger);
+  this->ui.chart->addChannel(eventline);
+//  this->ui.chart->setSize(this->ui.chart->width()-GRAPH_EXTENSION);
+  this->ui.chart->setSize(CIRCULAR_BUFF_SIZE + GRAPH_EXTENSION);
+  this->ui.chart->setZoom(1.0);
 }
+  
 //----------------------------------------------------------------------------
 bool MartyCam::eventDecision() {
   double percent = 100.0*this->processingThread->getMotionPercent();

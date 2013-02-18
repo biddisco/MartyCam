@@ -23,6 +23,7 @@ public:
 
   void loadSettings();
   void saveSettings();
+  void clearGraphs();
 
 public slots:
   void updateStats();

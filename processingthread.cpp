@@ -144,10 +144,10 @@ void ProcessingThread::run() {
 
       // Erode and Dilate to denoise and produce blobs
       if (this->erodeIterations>0) {
-        cv::erode(this->thresholdImage, this->thresholdImage, Mat(), Point(-1,-1), this->erodeIterations);
+        cv::erode(this->thresholdImage, this->thresholdImage, cv::Mat(), cv::Point(-1,-1), this->erodeIterations);
       }
       if (this->dilateIterations>0) {
-        cv::dilate(this->thresholdImage, this->thresholdImage, Mat(), Point(-1,-1), this->dilateIterations);
+        cv::dilate(this->thresholdImage, this->thresholdImage, cv::Mat(), cv::Point(-1,-1), this->dilateIterations);
       }
 
       // Convert the image to grayscale.
@@ -263,7 +263,7 @@ double ProcessingThread::getPSNR()
   return this->PSNRcalc->PSNR;
 }
 //----------------------------------------------------------------------------
-Scalar ProcessingThread::getMSSIM(const cv::Mat& i1, const cv::Mat& i2)
+cv::Scalar ProcessingThread::getMSSIM(const cv::Mat& i1, const cv::Mat& i2)
 {
   const double C1 = 6.5025, C2 = 58.5225;
   /***************************** INITS **********************************/
@@ -280,8 +280,8 @@ Scalar ProcessingThread::getMSSIM(const cv::Mat& i1, const cv::Mat& i2)
   /***********************PRELIMINARY COMPUTING ******************************/
 
   cv::Mat mu1, mu2;   //
-  GaussianBlur(I1, mu1, Size(11, 11), 1.5);
-  GaussianBlur(I2, mu2, Size(11, 11), 1.5);
+  GaussianBlur(I1, mu1, cv::Size(11, 11), 1.5);
+  GaussianBlur(I2, mu2, cv::Size(11, 11), 1.5);
 
   cv::Mat mu1_2   =   mu1.mul(mu1);
   cv::Mat mu2_2   =   mu2.mul(mu2);
@@ -289,13 +289,13 @@ Scalar ProcessingThread::getMSSIM(const cv::Mat& i1, const cv::Mat& i2)
 
   cv::Mat sigma1_2, sigma2_2, sigma12;
 
-  GaussianBlur(I1_2, sigma1_2, Size(11, 11), 1.5);
+  GaussianBlur(I1_2, sigma1_2, cv::Size(11, 11), 1.5);
   sigma1_2 -= mu1_2;
 
-  GaussianBlur(I2_2, sigma2_2, Size(11, 11), 1.5);
+  GaussianBlur(I2_2, sigma2_2, cv::Size(11, 11), 1.5);
   sigma2_2 -= mu2_2;
 
-  GaussianBlur(I1_I2, sigma12, Size(11, 11), 1.5);
+  GaussianBlur(I1_I2, sigma12, cv::Size(11, 11), 1.5);
   sigma12 -= mu1_mu2;
 
   ///////////////////////////////// FORMULA ////////////////////////////////
@@ -312,6 +312,6 @@ Scalar ProcessingThread::getMSSIM(const cv::Mat& i1, const cv::Mat& i2)
   cv::Mat ssim_map;
   divide(t3, t1, ssim_map);      // ssim_map =  t3./t1;
 
-  Scalar mssim = mean( ssim_map ); // mssim = average of ssim map
+  cv::Scalar mssim = cv::mean( ssim_map ); // mssim = average of ssim map
   return mssim;
 }

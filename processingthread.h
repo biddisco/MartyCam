@@ -15,8 +15,6 @@ class ImageBuffer;
 class Filter;
 class PSNRFilter;
 
-using namespace cv;
-
 class ProcessingThread : public QThread {
 Q_OBJECT;
 public: 
@@ -47,7 +45,7 @@ public:
   void setAbort(bool a) { this->abort = a; }
 
   double getPSNR();
-  Scalar getMSSIM(const cv::Mat& i1, const cv::Mat& i2);
+  cv::Scalar getMSSIM(const cv::Mat& i1, const cv::Mat& i2);
 
 private:
   ImageBuffer *imageBuffer;
