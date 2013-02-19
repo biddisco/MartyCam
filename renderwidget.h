@@ -14,6 +14,8 @@ public:
   RenderWidget(QWidget* parent);
   void process(const cv::Mat &image);
 
+  virtual void mouseDoubleClickEvent ( QMouseEvent * event );
+
 public slots:
   void onFrameSizeChanged(int width, int height);
   void UpdateTrigger(bool, int);
@@ -21,6 +23,7 @@ public slots:
 signals:
   void frameSizeChanged(int width, int height);
   void update_signal(bool, int);
+  void mouseDblClicked(const QPoint&);
 
 protected:
   void paintEvent(QPaintEvent*);

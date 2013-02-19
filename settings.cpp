@@ -2,6 +2,7 @@
 #include <QDebug>
 #include <QFileDialog>
 #include <QSettings>
+#include <QClipboard.h>
 //
 #include "renderwidget.h"
 #include "IPCameraForm.h"
@@ -19,6 +20,7 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
 {
   this->processingthread = NULL;
   this->capturethread    = NULL;
+  this->SnapshotId       = 0;
   //
   ui.setupUi(this);
   setMinimumWidth(150);
@@ -36,7 +38,11 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   connect(&this->clock, SIGNAL(timeout()), this, SLOT(onTimer()));
   connect(ui.blendRatio, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));  
   connect(ui.noiseBlend, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));  
+  //
+  connect(ui.snapButton, SIGNAL(clicked()), this, SLOT(onSnapClicked()));  
+
   
+
   ImageButtonGroup.addButton(ui.cameraImage,0);
   ImageButtonGroup.addButton(ui.movingAverage,1);
   ImageButtonGroup.addButton(ui.differenceImage,2);
@@ -276,7 +282,12 @@ void SettingsWidget::saveSettings()
   settings.setValue("aviDirectory",this->ui.avi_directory->text()); 
   settings.setValue("rotation",this->RotateButtonGroup.checkedId());
   settings.setValue("display",this->ImageButtonGroup.checkedId());
-  settings.setValue("blend",this->ui.blendRatio->value()); 
+  settings.setValue("blendImage",this->ui.blendRatio->value()); 
+  settings.setValue("blendNoise",this->ui.noiseBlend->value());
+  settings.endGroup();
+
+  settings.beginGroup("Miscellaneous");
+  settings.setValue("snapshot",this->SnapshotId);
   settings.endGroup();
 }
 //----------------------------------------------------------------------------
@@ -305,8 +316,20 @@ void SettingsWidget::loadSettings()
   //
   this->RotateButtonGroup.button(settings.value("rotation",0).toInt())->click();
   this->ImageButtonGroup.button(settings.value("display",0).toInt())->click();
-  this->ui.blendRatio->setValue(settings.value("blend",0.5).toInt()); 
-  //
+  this->ui.blendRatio->setValue(settings.value("blendImage",0.5).toInt()); 
+  this->ui.noiseBlend->setValue(settings.value("blendNoise",0.5).toInt()); 
+  settings.endGroup();
+
+  settings.beginGroup("Miscellaneous");
+  this->SnapshotId = settings.value("snapshot",0).toInt();
   settings.endGroup();
 }
- 
+//----------------------------------------------------------------------------
+void SettingsWidget::onSnapClicked()
+{
+  QPixmap p = QPixmap::grabWidget(this->renderWidget);
+  QString filename = QString("%1/MartySnap\-%2").arg(this->ui.avi_directory->text()).arg(SnapshotId, 3, 10, QChar('0')) + QString(".png");
+  p.save(filename);
+  QClipboard *clipboard = QApplication::clipboard();
+  clipboard->setPixmap(p);
+}

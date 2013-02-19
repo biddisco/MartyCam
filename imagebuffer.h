@@ -20,13 +20,14 @@ class ImageBuffer {
     //
     void clear();
     bool isFull();
+    int  size();
 
   private:
     QWaitCondition bufferNotEmpty;
     QWaitCondition bufferNotFull;
     QMutex         mutex;
-    int           bufferSize;
-    /** Queue of IplImage objects to store the data. **/
+    int            bufferSize;
+    /** Queue of cv::Mat objects to store the data. **/
     QQueue<cv::Mat> imageQueue;
 };
 

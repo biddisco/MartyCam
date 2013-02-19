@@ -26,13 +26,14 @@ public:
   void clearGraphs();
 
 public slots:
-  void updateStats();
+  void updateGUI();
   void onResolutionSelected(cv::Size newSize);
   void onCameraIndexChanged(int index, QString URL);
   void onUserTrackChanged(int value);
   void onRecordingStateChanged(bool state);
-  void onMotionDetectionChanged(int state);
   //
+  void onMouseDoubleClickEvent(const QPoint&);
+
 protected:
   void closeEvent(QCloseEvent*);
   void deleteCaptureThread();

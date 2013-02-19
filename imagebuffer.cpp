@@ -10,6 +10,12 @@ bool ImageBuffer::isFull()
 {
   return (imageQueue.size() == bufferSize);
 }
+    int  size();
+//----------------------------------------------------------------------------
+int ImageBuffer::size()
+{
+  return imageQueue.size();
+}
 //----------------------------------------------------------------------------
 /* Add a frame to the buffer.  
  * The data in the frame is copied to the internal image buffer.  
@@ -34,9 +40,10 @@ void ImageBuffer::addFrame(const cv::Mat &image)
   mutex.unlock();
   
   //
-  // add to the queue
+  // add a ref counted copy of the image to the queue
   //
-  imageQueue.enqueue(image);
+  cv::Mat imagecopy = image;
+  imageQueue.enqueue(imagecopy);
 
   //
   // wake anyone who's waiting for an image

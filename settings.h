@@ -37,6 +37,8 @@ public slots:
   void onBlendChanged(int value);
   void onCameraSelection(int index);
   //
+  void onSnapClicked();
+
   void loadSettings();
   void saveSettings();
   void setupCameraList();
@@ -54,6 +56,7 @@ protected:
   QTime               AVI_StartTime;
   QTime               AVI_EndTime;
   QTimer              clock;
+  int                 SnapshotId;
   QButtonGroup        ImageButtonGroup;
   QButtonGroup        RotateButtonGroup;
   RenderWidget       *renderWidget;

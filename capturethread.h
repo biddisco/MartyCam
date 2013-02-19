@@ -43,7 +43,6 @@ public:
 
 signals:
   void RecordingState(bool);
-  void NewImage();
 
 private:
   void updateFPS(int time);
@@ -55,7 +54,7 @@ private:
   bool             captureActive;
   cv::Size         imageSize;
   cv::Size         rotatedSize;
-  CvCapture       *capture;
+  cv::VideoCapture capture;
   double           fps;
   QQueue<int>      frameTimes;
   int              deviceIndex;

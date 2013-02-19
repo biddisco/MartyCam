@@ -1,7 +1,10 @@
 #include "renderwidget.h"
+//
 #include <QPainter>
 #include <QDebug>
 #include <QTime>
+#include <QMouseEvent>
+//
 #include <iostream>
 //
 #include <opencv2/imgproc/imgproc.hpp>
@@ -118,4 +121,10 @@ void RenderWidget::paintEvent(QPaintEvent*) {
 void RenderWidget::UpdateTrigger(bool, int) {
   this->repaint();
 //  std::cout << "Rendered frame " << std::endl;
+}
+//----------------------------------------------------------------------------
+void RenderWidget::mouseDoubleClickEvent ( QMouseEvent * event )
+{
+  const QPoint p = event->pos();
+  emit mouseDblClicked( p );
 }

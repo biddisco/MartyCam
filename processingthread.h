@@ -14,6 +14,8 @@
 class ImageBuffer;
 class Filter;
 class PSNRFilter;
+class GraphUpdateFilter;
+#include "MotionFilter.h"
 
 class ProcessingThread : public QThread {
 Q_OBJECT;
@@ -24,22 +26,18 @@ public:
   void CopySettings(ProcessingThread *thread);
   void DeleteTemporaryStorage();
   // 
-  void   countPixels(const cv::Mat &image);
-  void   updateNoiseMap(const cv::Mat &image, double noiseblend);
-  double getMotionPercent() { return this->motionPercent; }
+  double getMotionPercent() { return this->motionFilter->motionPercent; }
   //
-  void setRootFilter(Filter* filter) { rootFilter = filter; }
-  void setMotionDetecting(bool md) { this->MotionDetecting = md; }
-  void setThreshold(int val) { threshold = val; }
-  void setAveraging(double val) { average = val; }
-  void setErodeIterations(int val) { erodeIterations = val; }
-  void setDilateIterations(int val) { dilateIterations = val; }
-  void setDisplayImage(int image) { displayImage = image; }
+  void setRootFilter(Filter* filter) {   this->motionFilter->renderer = filter; }
+  void setThreshold(int val) { this->motionFilter->threshold = val; }
+  void setAveraging(double val) { this->motionFilter->average = val; }
+  void setErodeIterations(int val) { this->motionFilter->erodeIterations = val; }
+  void setDilateIterations(int val) { this->motionFilter->dilateIterations = val; }
+  void setDisplayImage(int image) { this->motionFilter->displayImage = image; }
   void setBlendRatios(double ratio1, double ratio2) { 
-    this->blendRatio = ratio1;
-    this->noiseBlendRatio = ratio2; 
+    this->motionFilter->blendRatio = ratio1;
+    this->motionFilter->noiseBlendRatio = ratio2; 
   }
-  void setRotation(int value);
 
   void run();
   void setAbort(bool a) { this->abort = a; }
@@ -47,34 +45,17 @@ public:
   double getPSNR();
   cv::Scalar getMSSIM(const cv::Mat& i1, const cv::Mat& i2);
 
-private:
-  ImageBuffer *imageBuffer;
-  Filter      *rootFilter;
-  PSNRFilter  *PSNRcalc;
-  bool         MotionDetecting;
-  int          threshold;
-  double       average;
-  int          erodeIterations;
-  int          dilateIterations;
-  double       motionPercent;
-  int          displayImage;
-  double       blendRatio;
-  double       noiseBlendRatio;
-  bool         abort;
-  int          rotation;
+  //
+  GraphUpdateFilter  *graphFilter;
+  MotionFilter       *motionFilter;
 
-  // Images to use in the program.
-  cv::Size  imageSize;
-  cv::Mat   cameraImage;
-  cv::Mat   greyScaleImage;
-  cv::Mat   thresholdImage;
-  cv::Mat   blendImage;
-  cv::Mat   movingAverage;
-  cv::Mat   difference;
-  cv::Mat   tempImage;
-  cv::Mat   noiseImage;
-  CvFont    font;
-  cv::Size  text_size;
+signals:
+  void NewData();
+
+private:
+  ImageBuffer        *imageBuffer;
+  bool                abort;
+  //
 #ifndef Q_MOC_RUN
   boost::circular_buffer<cv::Mat> RecordBuffer;
 #endif

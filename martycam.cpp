@@ -2,82 +2,15 @@
 #include "renderwidget.h"
 #include "settings.h"
 #include "imagebuffer.h"
+//
 #include <QTimer>
 #include <QToolBar>
 #include <QDockWidget>
 #include <QSplitter>
 #include <QSettings>
 //
-#include "chart.h"
-#include "chart/datacontainers.h"
+#include "GraphUpdateFilter.h"
 //
-#include <boost/accumulators/accumulators.hpp>
-#include <boost/accumulators/statistics/stats.hpp>
-#include <boost/accumulators/statistics/rolling_mean.hpp>
-#include <boost/accumulators/statistics/median.hpp>
-#include <boost/accumulators/statistics/weighted_median.hpp>
-#include <boost/circular_buffer.hpp>
-//
-using namespace boost::accumulators;    
-accumulator_set<int, stats<tag::rolling_mean> > acc(tag::rolling_window::window_size = 50);
-//
-const int CIRCULAR_BUFF_SIZE = 500;
-const int GRAPH_EXTENSION = 50;
-//
-template<typename T1, typename T2>
-class Plottable {  
-  public:
-    typedef boost::circular_buffer<T1> xListType;
-    typedef boost::circular_buffer<T2> yListType;
-    typedef DoubleDataContainer<xListType, yListType> channelType;
-
-  public:
-    Plottable(QPen &Pen, T2 Minval, T2 Maxval, const char *Title, xListType *xcont, yListType *ycont) : pen(Pen), minVal(Minval), maxVal(Maxval), title(Title)
-    {
-      xContainer = xcont ? xcont : new xListType(CIRCULAR_BUFF_SIZE);
-      yContainer = ycont ? ycont : new yListType(CIRCULAR_BUFF_SIZE);
-      deletex = (xcont==NULL);
-      deletey = (ycont==NULL);
-      data = new channelType(*xContainer, *yContainer);
-    }
-
-    ~Plottable()
-    {
-      if (deletex) delete xContainer;
-      if (deletey) delete yContainer;
-      delete data;
-    }
-    void clear() {
-      xContainer->clear();
-      yContainer->clear();
-    }
-    //
-    QPen         pen;
-    xListType   *xContainer;
-    yListType   *yContainer;
-    bool         deletex, deletey;
-    channelType *data;
-    T2           minVal;
-    T2           maxVal;
-    std::string  title;
-
-};
-
-typedef boost::circular_buffer<int>    vint;
-typedef boost::circular_buffer<double> vdouble;
-//
-vint     frameNumber(CIRCULAR_BUFF_SIZE);
-vint     thresholdTime(2);
-vdouble  thresholdLevel(2);
-//
-Plottable<int, double> movingAverage(QPen(QColor(Qt::blue)), 0.0, 100.0, "Moving Average", &frameNumber, NULL);
-Plottable<int, double> motionLevel(QPen(QColor(Qt::green)),  0.0, 100.0, "Motion",         &frameNumber, NULL);
-Plottable<int, double> psnr(QPen(QColor(Qt::yellow)),       0,  90.0, "PSNR",           &frameNumber, NULL);
-Plottable<int, int>    events(QPen(QColor(Qt::white)),       0.0, 100.0, "EventLevel",     &frameNumber, NULL);
-Plottable<int, double> threshold(QPen(QColor(Qt::red)),      0.0, 100.0, "Threshold",      &thresholdTime, &thresholdLevel);
-//
-Plottable<int, double> fastDecay(QPen(QColor(Qt::cyan)),     0.0, 100.0, "Fast Decay", &frameNumber, NULL);
-Plottable<int, double> slowDecay(QPen(QColor(Qt::darkCyan)), 0.0, 100.0, "Slow Decay", &frameNumber, NULL);
 //----------------------------------------------------------------------------
 MartyCam::MartyCam() : QMainWindow(0) 
 {
@@ -93,13 +26,16 @@ MartyCam::MartyCam() : QMainWindow(0)
   splitter->addWidget(renderWidget);
   this->setCentralWidget(splitter);
   //
+  connect(this->renderWidget, SIGNAL(mouseDblClicked(const QPoint&)), this,
+    SLOT (onMouseDoubleClickEvent(const QPoint&)));
+  //
   // Main threads for capture and processing
   //
   this->UserDetectionThreshold  = 0.25;
   this->EventRecordCounter      = 0;
   this->insideMotionEvent       = 0;
   this->imageSize               = cv::Size(0,0);
-  this->imageBuffer             = new ImageBuffer(3);
+  this->imageBuffer             = new ImageBuffer(100);
   this->cameraIndex             = 1;
 
   // Layout of - chart
@@ -177,9 +113,6 @@ void MartyCam::createCaptureThread(int FPS, cv::Size &size, int camera, QString 
 
   connect(this->captureThread, SIGNAL(RecordingState(bool)), 
     this, SLOT(onRecordingStateChanged(bool)),Qt::QueuedConnection); 
-
-  connect(this->captureThread, SIGNAL(NewImage()), 
-    this, SLOT(updateStats()),Qt::QueuedConnection); 
 }
 //----------------------------------------------------------------------------
 void MartyCam::deleteProcessingThread()
@@ -196,6 +129,10 @@ ProcessingThread *MartyCam::createProcessingThread(cv::Size &size, ProcessingThr
   if (oldThread) temp->CopySettings(oldThread);
   temp->setRootFilter(renderWidget);
   this->settingsWidget->setThreads(this->captureThread, temp);
+  //
+  connect(temp, SIGNAL(NewData()), 
+    this, SLOT(updateGUI()),Qt::QueuedConnection);
+  //
   return temp;
 }
 //----------------------------------------------------------------------------
@@ -223,68 +160,19 @@ void MartyCam::onResolutionSelected(cv::Size newSize) {
   this->clearGraphs();
 }
 //----------------------------------------------------------------------------
-void MartyCam::updateStats() {
+void MartyCam::updateGUI() {
   //
   if (!this->processingThread) return;
   //
-
-  // scale up to 100*100 = 1E4 for log display
-  double percent = 100.0*this->processingThread->getMotionPercent();
-  double logval = percent>1 ? (100.0/4.0)*log10(percent) : 0;
-  acc(logval);
-  this->ui.detect_value->setText(QString("%1").arg(this->processingThread->getMotionPercent(),4 , 'f', 2));
-  int eventvalue = this->eventDecision() ? 100 : 0;
-
-  // x-axis is frame counter
-  int counter = captureThread->GetFrameCounter();
-  frameNumber.push_back(counter);
-
-//  std::cout << " Inside UpdateStats " << counter << std::endl;
-  statusBar()->showMessage(QString("FPS : %1, Counter : %2, Buffer : %3").arg(this->captureThread->getFPS(), 5, 'f', 2).arg(captureThread->GetFrameCounter(), 5).arg(frameNumber.size(), 5));
-
-  // update y-values of graphs
-  motionLevel.yContainer->push_back(logval);
-  movingAverage.yContainer->push_back(rolling_mean(acc));
-  psnr.yContainer->push_back(this->processingThread->getPSNR());
-  events.yContainer->push_back(eventvalue);
-
-  // The threshold line is just two points, update them each time step
-  thresholdTime[0] = frameNumber.front();
-  thresholdTime[1] = thresholdTime[0] + CIRCULAR_BUFF_SIZE;
-  thresholdLevel[0] = this->UserDetectionThreshold;
-  thresholdLevel[1] = this->UserDetectionThreshold;
-  //
-  // if an event was triggered, start recording
-  //
-  if (eventvalue==100 && this->ui.RecordingEnabled->isChecked()) {
-    this->settingsWidget->RecordAVI(true);
-  }
   //
   // as the data scrolls, we move the x-axis start and end (size)
   //
-  this->ui.chart->setUpdatesEnabled(0);
-  this->ui.chart->setPosition(frameNumber.front());
-  this->ui.chart->setSize(CIRCULAR_BUFF_SIZE + GRAPH_EXTENSION);
-  this->ui.chart->setZoom(1.0);
-  this->ui.chart->setUpdatesEnabled(1);
+  this->processingThread->graphFilter->updateChart(this->ui.chart);
 }
 //----------------------------------------------------------------------------
 void MartyCam::clearGraphs()
 {
-  frameNumber.clear();
-  //
-  movingAverage.clear();
-  motionLevel.clear();
-  psnr.clear();
-  events.clear();
-  //
-  fastDecay.clear();
-  slowDecay.clear();
-  //
-//  threshold.clear();
-//  vint     thresholdTime(2);
-//  vdouble  thresholdLevel(2);
-
+  this->processingThread->graphFilter->clearChart();
 }
 //----------------------------------------------------------------------------
 void MartyCam::onUserTrackChanged(int value)
@@ -310,61 +198,21 @@ void MartyCam::onRecordingStateChanged(bool state)
   }
 }
 //----------------------------------------------------------------------------
-void MartyCam::onMotionDetectionChanged(int state)
-{
-  this->processingThread->setMotionDetecting(state);
-}
-//----------------------------------------------------------------------------
 void MartyCam::initChart()
 {
-  thresholdTime.push_back(0);
-  thresholdTime.push_back(CIRCULAR_BUFF_SIZE);
-  //
-  thresholdLevel.push_back(this->UserDetectionThreshold);
-  thresholdLevel.push_back(this->UserDetectionThreshold);
-  //
-  Channel motion(motionLevel.minVal, motionLevel.maxVal, motionLevel.data, motionLevel.title.c_str(), motionLevel.pen);
-  Channel mean(movingAverage.minVal, movingAverage.maxVal, movingAverage.data, movingAverage.title.c_str(), movingAverage.pen);
-  Channel PSNR(psnr.minVal, psnr.maxVal, psnr.data, psnr.title.c_str(), psnr.pen);
-  Channel eventline(events.minVal, events.maxVal, events.data, events.title.c_str(), events.pen);
-  Channel trigger(threshold.minVal, threshold.maxVal, threshold.data, threshold.title.c_str(), threshold.pen);
-
-  motion.setShowScale(true); 
-  motion.setShowLegend(true);
-
-  mean.setShowLegend(false);
-  mean.setShowScale(false);
-      
-  PSNR.setShowLegend(false);
-  PSNR.setShowScale(false);
-
-  trigger.setShowLegend(false);
-  trigger.setShowScale(false);
-
-  eventline.setShowLegend(false);
-  eventline.setShowScale(false);
-
-  this->ui.chart->addChannel(motion);
-  this->ui.chart->addChannel(mean);
-  this->ui.chart->addChannel(PSNR);
-  this->ui.chart->addChannel(trigger);
-  this->ui.chart->addChannel(eventline);
-//  this->ui.chart->setSize(this->ui.chart->width()-GRAPH_EXTENSION);
-  this->ui.chart->setSize(CIRCULAR_BUFF_SIZE + GRAPH_EXTENSION);
-  this->ui.chart->setZoom(1.0);
+  this->processingThread->graphFilter->initChart(this->ui.chart);
 }
   
 //----------------------------------------------------------------------------
 bool MartyCam::eventDecision() {
-  double percent = 100.0*this->processingThread->getMotionPercent();
-  double logval = percent>1 ? (100.0/4.0)*log10(percent) : 0;
-//  if (logval>this->UserDetectionThreshold) {
- if (rolling_mean(acc)>this->UserDetectionThreshold) { 
-    return true; 
-  }
+//  double percent = 100.0*this->processingThread->getMotionPercent();
+//  double logval = percent>1 ? (100.0/4.0)*log10(percent) : 0;
+////  if (logval>this->UserDetectionThreshold) {
+// if (rolling_mean(acc)>this->UserDetectionThreshold) { 
+//    return true; 
+//  }
   return false;
 }
-//----------------------------------------------------------------------------
 //----------------------------------------------------------------------------
 void MartyCam::saveSettings()
 {
@@ -388,4 +236,8 @@ void MartyCam::loadSettings()
   this->ui.user_trackval->setValue(settings.value("trackval",50).toInt()); 
   settings.endGroup();
 }
- 
+//----------------------------------------------------------------------------
+void MartyCam::onMouseDoubleClickEvent(const QPoint&)
+{
+  this->renderWidget->showFullScreen();
+}

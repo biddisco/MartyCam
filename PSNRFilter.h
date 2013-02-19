@@ -17,6 +17,9 @@ public:
   cv::Mat lastFrame;
   double   PSNR;
 
+  double minClamp;
+  double maxClamp;
+
 protected:
 };
 
