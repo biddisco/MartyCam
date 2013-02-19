@@ -109,7 +109,6 @@ SET(MartyCam_SRCS
   MotionFilter.cpp
   GraphUpdateFilter.cpp
   martycam.cpp
-  imagebuffer.cpp
   main.cpp
   processingthread.cpp
   renderwidget.cpp

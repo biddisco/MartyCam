@@ -5,7 +5,7 @@
 #include <iomanip>
 //
 #include "capturethread.h"
-#include "imagebuffer.h"
+typedef boost::shared_ptr< ConcurrentCircularBuffer<cv::Mat> > ImageBuffer;
 
 //
 // May 2012.
@@ -13,7 +13,7 @@
 // capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/videostream.cgi?req_fps=30&.mjpg");
 //
 //----------------------------------------------------------------------------
-CaptureThread::CaptureThread(ImageBuffer* buffer, cv::Size &size, int device, QString &URL) : QThread()
+CaptureThread::CaptureThread(ImageBuffer buffer, cv::Size &size, int device, QString &URL) : QThread()
 {
   this->abort             = false;
   this->captureActive     = false;
@@ -33,6 +33,7 @@ CaptureThread::CaptureThread(ImageBuffer* buffer, cv::Size &size, int device, QS
   //
   // start capture device driver
   //
+  capture.release();
   if (URL=="NO_CAMERA") {
     capture.release();
   }
@@ -42,7 +43,7 @@ CaptureThread::CaptureThread(ImageBuffer* buffer, cv::Size &size, int device, QS
       // using an IP camera, assume default string to access martycam
       // capture = cvCaptureFromFile("http://192.168.1.21/videostream.asf?user=admin&pwd=1234");
       // capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/videostream.cgi?req_fps=30&.mjpg");
-      capture.open(URL.toAscii().data());
+      capture.open(URL.toStdString());
     }
     else {
       capture.open(CV_CAP_DSHOW + this->deviceIndex );
@@ -108,7 +109,7 @@ void CaptureThread::run() {
 
     // add to queue if space is available, 
     //
-    imageBuffer->addFrame(this->rotatedImage);
+    imageBuffer->send(this->rotatedImage);
     this->FrameCounter++;
       //
 //      std::cout << "Calling Emit " << std::endl;

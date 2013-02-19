@@ -1,17 +1,17 @@
 #ifndef PROCESSING_THREAD_H
 #define PROCESSING_THREAD_H
-
+//
 #include <QThread>
-
-#ifndef Q_MOC_RUN
- #include <boost/circular_buffer.hpp>
-#endif
-
 //
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
-
-class ImageBuffer;
+//
+#ifndef Q_MOC_RUN
+ #include <boost/shared_ptr.hpp>
+ #include "ConcurrentCircularBuffer.h"
+ typedef boost::shared_ptr< ConcurrentCircularBuffer<cv::Mat> > ImageBuffer;
+#endif
+//
 class Filter;
 class PSNRFilter;
 class GraphUpdateFilter;
@@ -20,7 +20,7 @@ class GraphUpdateFilter;
 class ProcessingThread : public QThread {
 Q_OBJECT;
 public: 
-   ProcessingThread(ImageBuffer* buffer, cv::Size &size);
+   ProcessingThread(ImageBuffer buffer, cv::Size &size);
   ~ProcessingThread();
   //
   void CopySettings(ProcessingThread *thread);
@@ -53,8 +53,8 @@ signals:
   void NewData();
 
 private:
-  ImageBuffer        *imageBuffer;
-  bool                abort;
+  ImageBuffer  imageBuffer;
+  bool         abort;
   //
 #ifndef Q_MOC_RUN
   boost::circular_buffer<cv::Mat> RecordBuffer;

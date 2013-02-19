@@ -1,7 +1,6 @@
 #include "martycam.h"
 #include "renderwidget.h"
 #include "settings.h"
-#include "imagebuffer.h"
 //
 #include <QTimer>
 #include <QToolBar>
@@ -35,7 +34,7 @@ MartyCam::MartyCam() : QMainWindow(0)
   this->EventRecordCounter      = 0;
   this->insideMotionEvent       = 0;
   this->imageSize               = cv::Size(0,0);
-  this->imageBuffer             = new ImageBuffer(100);
+  this->imageBuffer             = ImageBuffer(new ConcurrentCircularBuffer<cv::Mat>(100));
   this->cameraIndex             = 1;
 
   // Layout of - chart

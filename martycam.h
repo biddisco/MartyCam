@@ -54,7 +54,7 @@ private:
   int                      cameraIndex;
   CaptureThread           *captureThread;
   ProcessingThread        *processingThread;
-  ImageBuffer             *imageBuffer;
+  ImageBuffer              imageBuffer;
   double                   UserDetectionThreshold;
   int                      EventRecordCounter;
   int                      insideMotionEvent;

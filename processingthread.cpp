@@ -9,14 +9,12 @@
 //
 #include "processingthread.h"
 //
-#include "imagebuffer.h"
-//
 #include "filter.h"
 #include "PSNRFilter.h"
 #include "GraphUpdateFilter.h"
 //
 //----------------------------------------------------------------------------
-ProcessingThread::ProcessingThread(ImageBuffer* buffer, cv::Size &size) : QThread()
+ProcessingThread::ProcessingThread(ImageBuffer buffer, cv::Size &size) : QThread()
 {
   this->imageBuffer       = buffer;
   this->graphFilter       = new GraphUpdateFilter();
@@ -48,7 +46,7 @@ void ProcessingThread::run() {
   int framenum = 0;
   while (!this->abort) {
     // blocking : waits until next image is available if necessary
-    cv::Mat cameraImage = imageBuffer->getFrame();
+    cv::Mat cameraImage = imageBuffer->receive();
     // if camera not working or disconnected, abort
     if (cameraImage.empty()) {
       msleep(100);

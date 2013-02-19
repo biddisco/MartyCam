@@ -6,14 +6,20 @@
 #include <QWaitCondition>
 #include <QQueue>
 //
+#include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
-
-class ImageBuffer;
+//
+#ifndef Q_MOC_RUN
+ #include <boost/shared_ptr.hpp>
+ #include "ConcurrentCircularBuffer.h"
+ typedef boost::shared_ptr< ConcurrentCircularBuffer<cv::Mat> > ImageBuffer;
+#endif
+//
 
 class CaptureThread : public QThread {
 Q_OBJECT;
 public: 
-   CaptureThread(ImageBuffer* buffer, cv::Size &size, int device, QString &URL);
+   CaptureThread(ImageBuffer buffer, cv::Size &size, int device, QString &URL);
   ~CaptureThread() ;
 
   void run();
@@ -50,7 +56,7 @@ private:
   bool             abort; 
   QMutex           captureLock;
   QWaitCondition   captureWait;
-  ImageBuffer     *imageBuffer;
+  ImageBuffer      imageBuffer;
   bool             captureActive;
   cv::Size         imageSize;
   cv::Size         rotatedSize;
