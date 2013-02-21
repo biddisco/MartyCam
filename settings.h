@@ -16,7 +16,7 @@ Q_OBJECT;
 public:
   SettingsWidget(QWidget* parent);
   cv::Size getSelectedResolution();
-  void RecordAVI(bool state);
+  void RecordMotionAVI(bool state);
 
   void setThreads(CaptureThread *capthread, ProcessingThread *procthread);
   void setRenderWidget(RenderWidget *rw) { this->renderWidget = rw; }
@@ -30,7 +30,7 @@ public slots:
   void onDilateChanged(int value);  
   void onBrowseClicked();
   void onAddCameraClicked();
-  void onWriteAVIToggled(bool state);
+  void onWriteMotionAVIToggled(bool state);
   void onTimer();
   void onImageSelection(int btn);
   void onRotateSelection(int btn);

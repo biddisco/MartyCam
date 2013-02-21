@@ -7,6 +7,10 @@
 //
 #include <QDateTime>
 #include <QString>
+//
+boost::accumulators::accumulator_set<int, boost::accumulators::stats<boost::accumulators::tag::rolling_mean> > 
+  acc(boost::accumulators::tag::rolling_window::window_size = 10);
+//
 //----------------------------------------------------------------------------
 MotionFilter::MotionFilter()
 {
@@ -22,7 +26,7 @@ MotionFilter::MotionFilter()
   this->PSNR_Filter       = new PSNRFilter();
   this->renderer          = NULL;
   //
-  this->motionPercent     = 0.0;
+  this->triggerLevel      = 100.0;
   this->threshold         = 2;
   this->average           = 0.01;
   this->erodeIterations   = 1;
@@ -30,6 +34,11 @@ MotionFilter::MotionFilter()
   this->displayImage      = 3;
   this->blendRatio        = 0.75;
   this->noiseBlendRatio   = 0.75;
+  //
+  this->motionPercent = 0.0;
+  this->logMotion     = 0.0;
+  this->rollingMean   = 0.0;
+  this->eventLevel    = 0.0;
 }
 //----------------------------------------------------------------------------
 MotionFilter::~MotionFilter()
@@ -123,28 +132,28 @@ void MotionFilter::process(const cv::Mat &image)
       this->countPixels(this->thresholdImage);
 
       switch (this->displayImage) {
-      case 0:
-        shownImage = workingImage;
-        break;
-      case 1:
-        shownImage = this->movingAverage;
-        break;
-      case 2:
-        shownImage = this->thresholdImage;
-        break;
-      default:
-      case 3:
-        /* dst = src1 * alpha + src2 * beta + gamma */
-        cv::addWeighted(workingImage, this->blendRatio, this->blendImage, 1.0-this->blendRatio, 0.0, this->blendImage);
-        shownImage = this->blendImage;
-        break;
-      case 4:
-        cv::bitwise_or(workingImage, this->blendImage, this->blendImage);
-        shownImage = this->blendImage;
-        break;
-      case 5:
-        shownImage = this->noiseImage;
-        break;
+        case 0:
+          shownImage = workingImage;
+          break;
+        case 1:
+          shownImage = this->movingAverage;
+          break;
+        case 2:
+          shownImage = this->thresholdImage;
+          break;
+        default:
+        case 3:
+          /* dst = src1 * alpha + src2 * beta + gamma */
+          cv::addWeighted(workingImage, this->blendRatio, this->blendImage, 1.0-this->blendRatio, 0.0, this->blendImage);
+          shownImage = this->blendImage;
+          break;
+        case 4:
+          cv::bitwise_or(workingImage, this->blendImage, this->blendImage);
+          shownImage = this->blendImage;
+          break;
+        case 5:
+          shownImage = this->noiseImage;
+          break;
       }
     }
     this->PSNR_Filter->process(image);
@@ -162,6 +171,15 @@ void MotionFilter::process(const cv::Mat &image)
       renderer->process(shownImage);
     }
     //    std::cout << "Processed frame " << framenum++ << std::endl;
+
+    // scale up to 100*100 = 1E4 for log display
+    double percent = 100.0*this->motionPercent;
+    this->logMotion = percent>1 ? (100.0/4.0)*log10(percent) : 0;
+
+    acc(this->PSNR_Filter->PSNR);
+    this->rollingMean = boost::accumulators::rolling_mean(acc);
+    //
+    this->eventLevel = (rollingMean>this->triggerLevel) ? 100 : 0;
   }
   //
   this->lastFrame = image.clone();

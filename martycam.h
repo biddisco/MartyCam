@@ -41,8 +41,8 @@ protected:
   void deleteProcessingThread();
   ProcessingThread *createProcessingThread(cv::Size &size, ProcessingThread *oldThread);
   
+  void resetChart();
   void initChart();
-  bool eventDecision();
 
 private:
   Ui::MartyCam ui;

@@ -1,6 +1,5 @@
 #include "GraphUpdateFilter.h"
 //
-boost::accumulators::accumulator_set<int, boost::accumulators::stats<boost::accumulators::tag::rolling_mean> > acc(boost::accumulators::tag::rolling_window::window_size = 50);
 //----------------------------------------------------------------------------
 GraphUpdateFilter::GraphUpdateFilter()
 {
@@ -27,40 +26,26 @@ GraphUpdateFilter::GraphUpdateFilter()
 //----------------------------------------------------------------------------
 GraphUpdateFilter::~GraphUpdateFilter()
 {
-  movingAverage = new Plottable<int, double>( 0.0, 100.0, "Moving Average", &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
-  motionLevel   = new Plottable<int, double>( 0.0, 100.0, "Motion",         &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
-  psnr          = new Plottable<int, double>( 0.0, 100.0, "PSNR",           &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
-  events        = new Plottable<int, int>   ( 0.0, 100.0, "EventLevel",     &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
-  threshold     = new Plottable<int, double>( 0.0, 100.0, "Threshold",      &thresholdTime, &thresholdLevel, 2);
+  delete movingAverage;
+  delete motionLevel;  
+  delete psnr;         
+  delete events;       
+  delete threshold;    
   //
-  fastDecay     = new Plottable<int, double>( 0.0, 100.0, "Fast Decay",     &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
-  slowDecay     = new Plottable<int, double>( 0.0, 100.0, "Slow Decay",     &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
+  delete fastDecay;    
+  delete slowDecay;    
 }
 //----------------------------------------------------------------------------
-void GraphUpdateFilter::process(double PSNR, double motion, int framenumber, double userlevel)
+void GraphUpdateFilter::process(double PSNR, double motion, double mean, int framenumber, double userlevel, double eventLevel)
 {
-  // scale up to 100*100 = 1E4 for log display
-  double percent = 100.0*motion;
-  double logval = percent>1 ? (100.0/4.0)*log10(percent) : 0;
-  acc(logval);
-
-//  this->ui.detect_value->setText(QString("%1").arg(this->processingThread->getMotionPercent(),4 , 'f', 2));
-//  int eventvalue = this->eventDecision() ? 100 : 0;
-  int eventvalue = 1;
   // x-axis is frame counter
   frameNumber.push_back(framenumber);
 
-//  std::cout << " Inside UpdateStats " << counter << std::endl;
-  //statusBar()->showMessage(QString("FPS : %1, Counter : %2, Buffer : %3").
-  //  arg(this->captureThread->getFPS(), 5, 'f', 2).
-  //  arg(captureThread->GetFrameCounter(), 5).
-  //  arg(this->imageBuffer->size(), 5));
-
   // update y-values of graphs
-  motionLevel->yContainer->push_back(logval);
-  movingAverage->yContainer->push_back(boost::accumulators::rolling_mean(acc));
+  motionLevel->yContainer->push_back(motion);
+  movingAverage->yContainer->push_back(mean);
   psnr->yContainer->push_back(PSNR);
-  events->yContainer->push_back(eventvalue);
+  events->yContainer->push_back(eventLevel);
 
   // The threshold line is just two points, update them each time step
   thresholdTime[0] = frameNumber.front();
@@ -109,6 +94,9 @@ void GraphUpdateFilter::initChart(Chart *chart)
 //----------------------------------------------------------------------------
 void GraphUpdateFilter::updateChart(Chart *chart)
 {
+  if (frameNumber.empty()) {
+    return;
+  }
   chart->setUpdatesEnabled(0);
   chart->setPosition(frameNumber.front());
   chart->setSize(CIRCULAR_BUFF_SIZE + GRAPH_EXTENSION);

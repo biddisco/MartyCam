@@ -20,7 +20,7 @@ CaptureThread::CaptureThread(ImageBuffer buffer, cv::Size &size, int device, QSt
   this->fps               = 0.0 ;
   this->FrameCounter      = 0;
   this->deviceIndex       = -1;
-  this->AVI_Writing       = false;
+  this->MotionAVI_Writing = false;
   this->capture           = NULL;
   this->imageBuffer       = buffer;
   this->deviceIndex       = device;
@@ -101,7 +101,7 @@ void CaptureThread::run() {
     this->rotateImage(frame, this->rotatedImage);
 
     // always write the frame out if saving movie or in the process of closing AVI
-    if (this->AVI_Writing || this->AVI_Writer.isOpened()) {
+    if (this->MotionAVI_Writing || this->MotionAVI_Writer.isOpened()) {
       // add date time stamp if enabled
       this->captionImage(this->rotatedImage);
       this->saveAVI(this->rotatedImage);
@@ -163,9 +163,9 @@ void CaptureThread::saveAVI(const cv::Mat &image)
   //CV_FOURCC('M', 'P', '4', '2') = MPEG-4.2 codec
   //CV_FOURCC('D', 'I', 'V', '3') = MPEG-4.3 codec
   //CV_FOURCC('D', 'I', 'V', 'X') = MPEG-4 codec
-  if (!this->AVI_Writer.isOpened()) {
-    std::string path = this->AVI_Directory + "/" + this->AVI_Name + std::string(".avi");
-    this->AVI_Writer.open(
+  if (!this->MotionAVI_Writer.isOpened()) {
+    std::string path = this->AVI_Directory + "/" + this->MotionAVI_Name + std::string(".avi");
+    this->MotionAVI_Writer.open(
       path.c_str(),
       0,  
       this->getFPS(),
@@ -173,11 +173,11 @@ void CaptureThread::saveAVI(const cv::Mat &image)
     );
     emit(RecordingState(true));
   }
-  if (this->AVI_Writer.isOpened()) {
-    this->AVI_Writer.write(image);
+  if (this->MotionAVI_Writer.isOpened()) {
+    this->MotionAVI_Writer.write(image);
     // if CloseAvi has been called, stop writing.
-    if (!this->AVI_Writing) {
-      this->AVI_Writer.release();
+    if (!this->MotionAVI_Writing) {
+      this->MotionAVI_Writer.release();
       emit(RecordingState(false));
     }
   }
@@ -189,17 +189,17 @@ void CaptureThread::saveAVI(const cv::Mat &image)
 //----------------------------------------------------------------------------
 void CaptureThread::closeAVI() 
 {
-  this->AVI_Writing = false;
+  this->MotionAVI_Writing = false;
 }
 //----------------------------------------------------------------------------
-void CaptureThread::setWriteAVIDir(const char *dir)
+void CaptureThread::setWriteMotionAVIDir(const char *dir)
 {
   this->AVI_Directory = dir;
 }
 //----------------------------------------------------------------------------
-void CaptureThread::setWriteAVIName(const char *name)
+void CaptureThread::setWriteMotionAVIName(const char *name)
 {
-  this->AVI_Name = name;
+  this->MotionAVI_Name = name;
 }
 //----------------------------------------------------------------------------
 void CaptureThread::setRotation(int value) { 

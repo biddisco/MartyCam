@@ -4,14 +4,10 @@
 // Base filter class
 #include "filter.h"
 #include "PSNRFilter.h"
-// Boost Accumulators
-#include <boost/accumulators/accumulators.hpp>
-#include <boost/accumulators/statistics/stats.hpp>
-#include <boost/accumulators/statistics/rolling_mean.hpp>
-#include <boost/accumulators/statistics/median.hpp>
-#include <boost/accumulators/statistics/weighted_median.hpp>
+
 // Boost Circular Buffer
 #include <boost/circular_buffer.hpp>
+
 // Chart plotting declarations
 #include "chart.h"
 #include "chart/datacontainers.h"
@@ -66,7 +62,7 @@ class GraphUpdateFilter {
     ~GraphUpdateFilter();
      GraphUpdateFilter();
     //
-    void process(double PSNR, double motion, int framenumber, double userlevel);
+    void process(double PSNR, double motion, double mean, int framenumber, double userlevel, double eventlLevel);
     //
     void initChart(Chart *chart);
     void updateChart(Chart *chart);

@@ -4,6 +4,13 @@
 #include "opencv2/core/core_c.h"
 #include "opencv2/core/core.hpp"
 
+// Boost Accumulators
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
+#include <boost/accumulators/statistics/rolling_mean.hpp>
+#include <boost/accumulators/statistics/median.hpp>
+#include <boost/accumulators/statistics/weighted_median.hpp>
+
 class PSNRFilter;
 class Filter;
 
@@ -23,14 +30,23 @@ public:
 
   PSNRFilter  *PSNR_Filter;
   Filter      *renderer;
+
   //
-  // variables
+  // output values
   //
+  double       motionPercent;
+  double       logMotion;
+  double       rollingMean;
+  double       eventLevel;
+
+  //
+  // input variables
+  //
+  double       triggerLevel;
   int          threshold;
   double       average;
   int          erodeIterations;
   int          dilateIterations;
-  double       motionPercent;
   int          displayImage;
   double       blendRatio;
   double       noiseBlendRatio;

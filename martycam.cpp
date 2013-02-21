@@ -14,6 +14,9 @@
 MartyCam::MartyCam() : QMainWindow(0) 
 {
   this->ui.setupUi(this);
+  this->processingThread = NULL;
+  this->captureThread = NULL;
+  //
   QString settingsFileName = QCoreApplication::applicationDirPath() + "/MartyCam.ini";
   QSettings settings(settingsFileName, QSettings::IniFormat);
   restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
@@ -30,7 +33,6 @@ MartyCam::MartyCam() : QMainWindow(0)
   //
   // Main threads for capture and processing
   //
-  this->UserDetectionThreshold  = 0.25;
   this->EventRecordCounter      = 0;
   this->insideMotionEvent       = 0;
   this->imageSize               = cv::Size(0,0);
@@ -97,17 +99,17 @@ void MartyCam::closeEvent(QCloseEvent*) {
 void MartyCam::deleteCaptureThread()
 {
   this->imageBuffer->clear();
-  captureThread->setAbort(true);
-  captureThread->wait();
+  this->captureThread->setAbort(true);
+  this->captureThread->wait();
   delete captureThread;
   this->imageBuffer->clear();
 }
 //----------------------------------------------------------------------------
 void MartyCam::createCaptureThread(int FPS, cv::Size &size, int camera, QString &cameraname)
 {
-  captureThread = new CaptureThread(imageBuffer, size, camera, cameraname);
-  captureThread->startCapture(FPS);
-  captureThread->start(QThread::IdlePriority);
+  this->captureThread = new CaptureThread(imageBuffer, size, camera, cameraname);
+  this->captureThread->startCapture(FPS);
+  this->captureThread->start(QThread::IdlePriority);
   this->settingsWidget->setThreads(this->captureThread, this->processingThread);
 
   connect(this->captureThread, SIGNAL(RecordingState(bool)), 
@@ -116,8 +118,8 @@ void MartyCam::createCaptureThread(int FPS, cv::Size &size, int camera, QString 
 //----------------------------------------------------------------------------
 void MartyCam::deleteProcessingThread()
 {
-  processingThread->setAbort(true);
-  processingThread->wait();
+  this->processingThread->setAbort(true);
+  this->processingThread->wait();
   delete processingThread;
   this->processingThread = NULL;
 }
@@ -137,14 +139,17 @@ ProcessingThread *MartyCam::createProcessingThread(cv::Size &size, ProcessingThr
 //----------------------------------------------------------------------------
 void MartyCam::onCameraIndexChanged(int index, QString URL)
 {
+  this->resetChart();
+  ProcessingThread *temp = this->createProcessingThread(this->imageSize, this->processingThread);
   this->deleteProcessingThread();
   this->deleteCaptureThread();
   this->cameraIndex = index;
+  this->processingThread = temp;
   this->createCaptureThread(15, this->imageSize, this->cameraIndex, URL);
-  this->processingThread = this->createProcessingThread(this->imageSize, this->processingThread);
-  this->processingThread->start(QThread::IdlePriority);
   //
+  this->initChart();
   this->clearGraphs();
+  this->processingThread->start(QThread::IdlePriority);
 }
 //----------------------------------------------------------------------------
 void MartyCam::onResolutionSelected(cv::Size newSize) {
@@ -152,11 +157,11 @@ void MartyCam::onResolutionSelected(cv::Size newSize) {
   ProcessingThread *temp = this->createProcessingThread(this->imageSize, this->processingThread);
   this->deleteProcessingThread();
   this->deleteCaptureThread();
-  this->createCaptureThread(15, this->imageSize, this->cameraIndex, QString());
   this->processingThread = temp;
-  this->processingThread->start(QThread::IdlePriority);
+  this->createCaptureThread(15, this->imageSize, this->cameraIndex, QString());
   //
   this->clearGraphs();
+  this->processingThread->start(QThread::IdlePriority);
 }
 //----------------------------------------------------------------------------
 void MartyCam::updateGUI() {
@@ -167,6 +172,20 @@ void MartyCam::updateGUI() {
   // as the data scrolls, we move the x-axis start and end (size)
   //
   this->processingThread->graphFilter->updateChart(this->ui.chart);
+  this->ui.detect_value->setText(QString("%1").arg(this->processingThread->motionFilter->motionPercent,4 , 'f', 2));
+
+  //
+  // if an event was triggered, start recording
+  //
+  if (this->processingThread->motionFilter->eventLevel>=100 && this->ui.RecordingEnabled->isChecked()) {
+    this->settingsWidget->RecordMotionAVI(true);
+  }
+
+  statusBar()->showMessage(QString("FPS : %1, Counter : %2, Buffer : %3").
+    arg(this->captureThread->getFPS(), 5, 'f', 2).
+    arg(captureThread->GetFrameCounter(), 5).
+    arg(this->imageBuffer->size(), 5));
+
 }
 //----------------------------------------------------------------------------
 void MartyCam::clearGraphs()
@@ -177,11 +196,13 @@ void MartyCam::clearGraphs()
 void MartyCam::onUserTrackChanged(int value)
 {
   double percent = value;
+  this->processingThread->motionFilter->triggerLevel = percent; 
+
   double logval = percent>1 ? (100.0/4.0)*log10(percent) : 0;
   this->ui.set_value->setText(QString("%1").arg(logval,4 , 'f', 2));
   // threshold back from log to original
-  this->UserDetectionThreshold = pow(10,value*(4.0/100.0))/100.0;
-  this->ui.set_value->setText(QString("%1").arg(this->UserDetectionThreshold,4 , 'f', 2));
+  double trigger = pow(10,value*(4.0/100.0))/100.0;
+  this->ui.set_value->setText(QString("%1").arg(trigger, 4 , 'f', 2));
 }
 //----------------------------------------------------------------------------
 void MartyCam::onRecordingStateChanged(bool state)
@@ -197,20 +218,14 @@ void MartyCam::onRecordingStateChanged(bool state)
   }
 }
 //----------------------------------------------------------------------------
+void MartyCam::resetChart()
+{
+  this->ui.chart->channels().clear();
+}
+//----------------------------------------------------------------------------
 void MartyCam::initChart()
 {
   this->processingThread->graphFilter->initChart(this->ui.chart);
-}
-  
-//----------------------------------------------------------------------------
-bool MartyCam::eventDecision() {
-//  double percent = 100.0*this->processingThread->getMotionPercent();
-//  double logval = percent>1 ? (100.0/4.0)*log10(percent) : 0;
-////  if (logval>this->UserDetectionThreshold) {
-// if (rolling_mean(acc)>this->UserDetectionThreshold) { 
-//    return true; 
-//  }
-  return false;
 }
 //----------------------------------------------------------------------------
 void MartyCam::saveSettings()

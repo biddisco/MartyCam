@@ -30,16 +30,14 @@ ProcessingThread::~ProcessingThread()
 //----------------------------------------------------------------------------
 void ProcessingThread::CopySettings(ProcessingThread *thread)
 {
-/*
-  this->motionPercent     = thread->motionPercent;
-  this->threshold         = thread->threshold;
-  this->average           = thread->average;
-  this->erodeIterations   = thread->erodeIterations;
-  this->dilateIterations  = thread->dilateIterations;
-  this->displayImage      = thread->displayImage;
-  this->blendRatio        = thread->blendRatio;
-  this->rotation          = thread->rotation;
-*/
+  this->motionFilter->triggerLevel = thread->motionFilter->triggerLevel;
+  this->motionFilter->threshold = thread->motionFilter->threshold;
+  this->motionFilter->average =  thread->motionFilter->average;
+  this->motionFilter->erodeIterations =  thread->motionFilter->erodeIterations;
+  this->motionFilter->dilateIterations =  thread->motionFilter->dilateIterations;
+  this->motionFilter->displayImage =  thread->motionFilter->displayImage;
+  this->motionFilter->blendRatio =  thread->motionFilter->blendRatio;
+  this->motionFilter->noiseBlendRatio =  thread->motionFilter->noiseBlendRatio;
 }
 //----------------------------------------------------------------------------
 void ProcessingThread::run() {
@@ -56,18 +54,15 @@ void ProcessingThread::run() {
     this->motionFilter->process(cameraImage);
     this->graphFilter->process(
       this->motionFilter->PSNR_Filter->PSNR, 
-      this->motionFilter->motionPercent,
+      this->motionFilter->logMotion,
+      this->motionFilter->rollingMean,
       framenum++,
-      50.0);
+      this->motionFilter->triggerLevel,
+      this->motionFilter->eventLevel);
 
-    //
-    // if an event was triggered, start recording
-    //
-//    if (eventvalue==100 && this->ui.RecordingEnabled->isChecked()) {
-//      this->settingsWidget->RecordAVI(true);
-//    }
      emit (NewData());
   }
+  this->abort = 0;
 }
 //----------------------------------------------------------------------------
 cv::Scalar ProcessingThread::getMSSIM(const cv::Mat& i1, const cv::Mat& i2)

@@ -32,14 +32,28 @@ public:
   bool isCapturing() { return captureActive; }
   
   int  GetFrameCounter() { return this->FrameCounter; }
+  std::string getCaptureStatusString() { return this->CaptureStatus; }
 
-  void setWriteAVI(bool write) { this->AVI_Writing = write; }
-  bool getWriteAVI() { return this->AVI_Writing; }
-  void setWriteAVIDir(const char *dir);
-  void setWriteAVIName(const char *name);
+  //
+  // Motion film
+  //
+  void setWriteMotionAVI(bool write) { this->MotionAVI_Writing = write; }
+  bool getWriteMotionAVI() { return this->MotionAVI_Writing; }
+  void setWriteMotionAVIName(const char *name);
+
+  //
+  // Time Lapse film
+  //
+  void addNextFrameToTimeLapse(bool write) { this->MotionAVI_Writing = write; }
+  void setWriteTimeLapseAVIName(const char *name);
+
+  //
+  // General
+  //
+  void setWriteMotionAVIDir(const char *dir);
   void saveAVI(const cv::Mat &image);
   void closeAVI();
-  std::string getCaptureStatusString() { return this->CaptureStatus; }
+
   void setRotation(int value);
   //
   void  rotateImage(const cv::Mat &source, cv::Mat &rotated);
@@ -67,10 +81,12 @@ private:
   int              rotation;
   int              FrameCounter;
   //
-  cv::VideoWriter  AVI_Writer;
-  bool             AVI_Writing;
+  cv::VideoWriter  MotionAVI_Writer;
+  cv::VideoWriter  TimeLapseAVI_Writer;
+  bool             MotionAVI_Writing;
   std::string      AVI_Directory;
-  std::string      AVI_Name;
+  std::string      MotionAVI_Name;
+  std::string      TimeLapseAVI_Name;
   std::string      CaptureStatus;
   //
   cv::Size         text_size;

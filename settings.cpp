@@ -34,7 +34,7 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   connect(ui.browse, SIGNAL(clicked()), this, SLOT(onBrowseClicked()));
   connect(ui.add_camera, SIGNAL(clicked()), this, SLOT(onAddCameraClicked()));
   
-  connect(ui.WriteAVI, SIGNAL(toggled(bool)), this, SLOT(onWriteAVIToggled(bool)));
+  connect(ui.WriteMotionAVI, SIGNAL(toggled(bool)), this, SLOT(onWriteMotionAVIToggled(bool)));
   connect(&this->clock, SIGNAL(timeout()), this, SLOT(onTimer()));
   connect(ui.blendRatio, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));  
   connect(ui.noiseBlend, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));  
@@ -113,7 +113,7 @@ void SettingsWidget::onBrowseClicked()
   if(dialog.exec()) {
     QString fileName = dialog.selectedFiles().at(0);
     this->ui.avi_directory->setText(fileName);
-    this->capturethread->setWriteAVIDir(fileName.toStdString().c_str());
+    this->capturethread->setWriteMotionAVIDir(fileName.toStdString().c_str());
   }
 }
 //----------------------------------------------------------------------------
@@ -153,9 +153,9 @@ void SettingsWidget::setupCameraList()
   }
 }
 //----------------------------------------------------------------------------
-void SettingsWidget::onWriteAVIToggled(bool state) 
+void SettingsWidget::onWriteMotionAVIToggled(bool state) 
 {
-  this->RecordAVI(state);
+  this->RecordMotionAVI(state);
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::onTimer() 
@@ -177,7 +177,7 @@ void SettingsWidget::onTimer()
     this->ui.remaining->setText(QTime(h,m,s,0).toString("hh:mm:ss"));
   }
   else {
-    this->ui.WriteAVI->setChecked(false);
+    this->ui.WriteMotionAVI->setChecked(false);
   }
 }
 //----------------------------------------------------------------------------
@@ -189,16 +189,18 @@ cv::Size SettingsWidget::getSelectedResolution()
   return cv::Size(320,240);
 }
 //----------------------------------------------------------------------------
-void SettingsWidget::RecordAVI(bool state) 
+void SettingsWidget::RecordMotionAVI(bool state) 
 {
-  this->ui.WriteAVI->setChecked(state);
+  this->ui.WriteMotionAVI->setChecked(state);
   //
   QString filePath = this->ui.avi_directory->text();
   QString fileName = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
-  this->capturethread->setWriteAVIName(fileName.toAscii().constData());
-  this->capturethread->setWriteAVIDir(filePath.toAscii().constData());
+  this->capturethread->setWriteMotionAVIName(fileName.toAscii().constData());
+  this->capturethread->setWriteMotionAVIDir(filePath.toAscii().constData());
+
   //
   // add duration to end time even if already running
+  //
   QTime duration = this->ui.AVI_Duration->time();
   int secs = duration.second();
   int mins = duration.minute();
@@ -206,15 +208,15 @@ void SettingsWidget::RecordAVI(bool state)
   this->AVI_EndTime = QTime::currentTime().addSecs(secs+mins*60+hrs*60*60).addMSecs(500);
   //
   if (!state) {    
-    this->capturethread->setWriteAVI(state);
-    this->ui.WriteAVI->setText("Write AVI");
+    this->capturethread->setWriteMotionAVI(state);
+    this->ui.WriteMotionAVI->setText("Write AVI");
     this->capturethread->closeAVI();
     this->clock.stop();
   }
-  else if (!this->capturethread->getWriteAVI()) {
-    this->capturethread->setWriteAVI(state);
+  else if (!this->capturethread->getWriteMotionAVI()) {
+    this->capturethread->setWriteMotionAVI(state);
     this->AVI_StartTime = QTime::currentTime();
-    this->ui.WriteAVI->setText("Stop AVI");
+    this->ui.WriteMotionAVI->setText("Stop AVI");
     this->ui.elapsed->setText("00:00:00");
     this->ui.remaining->setText(duration.toString("hh:mm:ss"));
     this->clock.setInterval(1000);
@@ -304,7 +306,7 @@ void SettingsWidget::loadSettings()
   settings.endGroup();
 /*
   connect(ui.browse, SIGNAL(clicked()), this, SLOT(onBrowseClicked()));
-  connect(ui.WriteAVI, SIGNAL(toggled(bool)), this, SLOT(onWriteAVIToggled(bool)));
+  connect(ui.WriteMotionAVI, SIGNAL(toggled(bool)), this, SLOT(onWriteMotionAVIToggled(bool)));
   connect(&this->clock, SIGNAL(timeout()), this, SLOT(onTimer()));
   connect(ui.blendRatio, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));  
 */
@@ -328,7 +330,7 @@ void SettingsWidget::loadSettings()
 void SettingsWidget::onSnapClicked()
 {
   QPixmap p = QPixmap::grabWidget(this->renderWidget);
-  QString filename = QString("%1/MartySnap\-%2").arg(this->ui.avi_directory->text()).arg(SnapshotId, 3, 10, QChar('0')) + QString(".png");
+  QString filename = QString("%1/MartySnap-%2").arg(this->ui.avi_directory->text()).arg(SnapshotId, 3, 10, QChar('0')) + QString(".png");
   p.save(filename);
   QClipboard *clipboard = QApplication::clipboard();
   clipboard->setPixmap(p);
