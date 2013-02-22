@@ -62,6 +62,7 @@ set(MartyCam_QT_MOC_HDRS
   renderwidget.h
   capturethread.h
   processingthread.h
+  DatePopup.h
 )
 
 #-----------------------------------------------------------------------------
@@ -114,6 +115,7 @@ SET(MartyCam_SRCS
   renderwidget.cpp
   settings.cpp
   IPCameraForm.cpp
+  DatePopup.cpp 
   MartyCam.rc
 )
 

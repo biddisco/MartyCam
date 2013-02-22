@@ -20,6 +20,11 @@ public:
 
   void setThreads(CaptureThread *capthread, ProcessingThread *procthread);
   void setRenderWidget(RenderWidget *rw) { this->renderWidget = rw; }
+  QDateTime TimeLapseStart();
+  QDateTime TimeLapseEnd();
+  QTime TimeLapseInterval() { return this->ui.interval->time(); }
+  double  TimeLapseFPS() { return this->ui.timeLapseFPS->value(); }
+
 
 public slots:
   void on640ResToggled(bool on);
@@ -38,10 +43,13 @@ public slots:
   void onCameraSelection(int index);
   //
   void onSnapClicked();
+  void onStartTimeLapseClicked();
+  void onCalButtonClicked();
 
   void loadSettings();
   void saveSettings();
   void setupCameraList();
+  void SetupAVIStrings() ;
 
 signals:
   void resolutionSelected(cv::Size);

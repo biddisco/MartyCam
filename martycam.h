@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QTimer>
+#include <QDateTime>
 //
 #include <opencv2/core/core.hpp>
 //
@@ -58,6 +59,7 @@ private:
   double                   UserDetectionThreshold;
   int                      EventRecordCounter;
   int                      insideMotionEvent;
+  QDateTime                lastTimeLapse;
 };
 
 #endif

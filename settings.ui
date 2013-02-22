@@ -23,7 +23,7 @@
    <item>
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="tab">
       <attribute name="title">
@@ -557,21 +557,21 @@
           <string>Timing Information</string>
          </property>
          <layout class="QGridLayout" name="gridLayout_7">
-          <item row="5" column="0" colspan="3">
+          <item row="6" column="0" colspan="3">
            <widget class="QLineEdit" name="avi_directory_TL">
             <property name="text">
              <string>c:\wildlife</string>
             </property>
            </widget>
           </item>
-          <item row="3" column="2">
+          <item row="4" column="2">
            <widget class="QLabel" name="label_7">
             <property name="text">
              <string>Remaining</string>
             </property>
            </widget>
           </item>
-          <item row="5" column="3">
+          <item row="6" column="3">
            <widget class="QPushButton" name="browse_3">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
@@ -597,7 +597,7 @@
            </widget>
           </item>
           <item row="0" column="2" colspan="2">
-           <widget class="QTimeEdit" name="Interval">
+           <widget class="QTimeEdit" name="interval">
             <property name="dateTime">
              <datetime>
               <hour>0</hour>
@@ -625,7 +625,7 @@
            </widget>
           </item>
           <item row="1" column="2" colspan="2">
-           <widget class="QTimeEdit" name="Interval_2">
+           <widget class="QTimeEdit" name="duration">
             <property name="dateTime">
              <datetime>
               <hour>0</hour>
@@ -648,29 +648,29 @@
             </property>
            </widget>
           </item>
-          <item row="3" column="0">
+          <item row="4" column="0">
            <widget class="QLabel" name="label_8">
             <property name="text">
              <string>Elapsed</string>
             </property>
            </widget>
           </item>
-          <item row="3" column="1">
+          <item row="4" column="1">
            <widget class="QLabel" name="elapsed_3">
             <property name="text">
              <string>00:00:00</string>
             </property>
            </widget>
           </item>
-          <item row="3" column="3">
+          <item row="4" column="3">
            <widget class="QLabel" name="remaining_3">
             <property name="text">
              <string>00:00:00</string>
             </property>
            </widget>
           </item>
-          <item row="4" column="0" colspan="2">
-           <widget class="QPushButton" name="StartTimeLapse">
+          <item row="5" column="0" colspan="2">
+           <widget class="QPushButton" name="startTimeLapse">
             <property name="text">
              <string>Start Time Lapse</string>
             </property>
@@ -686,15 +686,15 @@
             </property>
            </widget>
           </item>
-          <item row="2" column="0">
+          <item row="3" column="0">
            <widget class="QLabel" name="label_12">
             <property name="text">
              <string>Start</string>
             </property>
            </widget>
           </item>
-          <item row="2" column="1" colspan="2">
-           <widget class="QDateTimeEdit" name="dateTimeEdit">
+          <item row="3" column="1" colspan="2">
+           <widget class="QDateTimeEdit" name="startDateTime">
             <property name="dateTime">
              <datetime>
               <hour>0</hour>
@@ -707,8 +707,8 @@
             </property>
            </widget>
           </item>
-          <item row="2" column="3">
-           <widget class="QPushButton" name="browse_4">
+          <item row="3" column="3">
+           <widget class="QPushButton" name="calButton">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
               <horstretch>0</horstretch>
@@ -729,120 +729,20 @@
             </property>
             <property name="text">
              <string>...</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item>
-        <widget class="QGroupBox" name="groupBox_9">
-         <property name="title">
-          <string>Animation Saving</string>
-         </property>
-         <layout class="QGridLayout" name="gridLayout_6">
-          <item row="3" column="0" colspan="3">
-           <widget class="QLineEdit" name="avi_directory_2">
-            <property name="text">
-             <string>c:\wildlife</string>
             </property>
            </widget>
           </item>
           <item row="2" column="0">
-           <widget class="QPushButton" name="WriteMotionAVI_2">
-            <property name="text">
-             <string>Write AVI</string>
-            </property>
-            <property name="checkable">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="1">
-           <widget class="QLabel" name="elapsed_2">
-            <property name="text">
-             <string>00:00:00</string>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="2">
-           <widget class="QLabel" name="remaining_2">
-            <property name="text">
-             <string>00:00:00</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="2">
-           <widget class="QLabel" name="label_5">
-            <property name="text">
-             <string>Remaining</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1">
-           <widget class="QLabel" name="label_6">
-            <property name="text">
-             <string>Elapsed</string>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="3">
-           <widget class="QPushButton" name="browse_2">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="minimumSize">
-             <size>
-              <width>16</width>
-              <height>0</height>
-             </size>
-            </property>
-            <property name="maximumSize">
-             <size>
-              <width>24</width>
-              <height>16777215</height>
-             </size>
-            </property>
-            <property name="text">
-             <string>...</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="1" colspan="3">
-           <widget class="QTimeEdit" name="AVI_Duration_2">
-            <property name="dateTime">
-             <datetime>
-              <hour>0</hour>
-              <minute>0</minute>
-              <second>10</second>
-              <year>2000</year>
-              <month>1</month>
-              <day>1</day>
-             </datetime>
-            </property>
-            <property name="time">
-             <time>
-              <hour>0</hour>
-              <minute>0</minute>
-              <second>10</second>
-             </time>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="0">
            <widget class="QLabel" name="label_2">
             <property name="text">
-             <string>Duration</string>
+             <string>Preferred FPS</string>
             </property>
            </widget>
           </item>
-          <item row="1" column="0">
-           <widget class="QPushButton" name="snapButton_2">
-            <property name="text">
-             <string>Snapshot</string>
+          <item row="2" column="2" colspan="2">
+           <widget class="QDoubleSpinBox" name="timeLapseFPS">
+            <property name="value">
+             <double>5.000000000000000</double>
             </property>
            </widget>
           </item>

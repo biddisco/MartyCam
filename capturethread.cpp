@@ -21,6 +21,7 @@ CaptureThread::CaptureThread(ImageBuffer buffer, cv::Size &size, int device, QSt
   this->FrameCounter      = 0;
   this->deviceIndex       = -1;
   this->MotionAVI_Writing = false;
+  this->TimeLapseAVI_Writing = false;
   this->capture           = NULL;
   this->imageBuffer       = buffer;
   this->deviceIndex       = device;
@@ -107,6 +108,8 @@ void CaptureThread::run() {
       this->saveAVI(this->rotatedImage);
     }
 
+    this->currentFrame = frame;
+
     // add to queue if space is available, 
     //
     imageBuffer->send(this->rotatedImage);
@@ -114,6 +117,15 @@ void CaptureThread::run() {
       //
 //      std::cout << "Calling Emit " << std::endl;
      updateFPS(time.elapsed());
+  }
+}
+//----------------------------------------------------------------------------
+void CaptureThread::updateTimeLapse() 
+{
+  // always write the frame out if saving movie or in the process of closing AVI
+  if (this->TimeLapseAVI_Writer.isOpened()) {
+    // add date time stamp if enabled
+    this->saveTimeLapseAVI(this->currentFrame);
   }
 }
 //----------------------------------------------------------------------------
@@ -155,6 +167,44 @@ bool CaptureThread::startCapture(int framerate) {
 //----------------------------------------------------------------------------
 void CaptureThread::stopCapture() {
   captureActive = false;
+}
+//----------------------------------------------------------------------------
+void CaptureThread::saveTimeLapseAVI(const cv::Mat &image) 
+{
+  if (!this->TimeLapseAVI_Writing) {
+    this->TimeLapseAVI_Writer.release();
+  }
+  else if (this->TimeLapseAVI_Writer.isOpened()) {
+    this->TimeLapseAVI_Writer.write(image);
+  }
+}
+//----------------------------------------------------------------------------
+void CaptureThread::startTimeLapse(double fps) 
+{
+  std::string path = this->AVI_Directory + "/" + this->TimeLapseAVI_Name + std::string(".avi");
+  if (!this->TimeLapseAVI_Writer.isOpened()) {
+    this->TimeLapseAVI_Writer.open(
+      path.c_str(),
+      0,  
+      fps,
+      this->getImageSize()
+    );
+//    emit(RecordingState(true));
+  }
+
+  if (!this->TimeLapseAVI_Writer.isOpened()) {
+    std::cout << "Failed to open Time Lapse AVI writer : " << path.c_str() << std::endl;
+    this->TimeLapseAVI_Writing = false;
+  }
+  else {
+    this->TimeLapseAVI_Writing = true;
+  }
+}
+//----------------------------------------------------------------------------
+void CaptureThread::stopTimeLapse() 
+{
+  this->TimeLapseAVI_Writing = false;
+//    emit(RecordingState(true));
 }
 //----------------------------------------------------------------------------
 void CaptureThread::saveAVI(const cv::Mat &image) 
@@ -200,6 +250,11 @@ void CaptureThread::setWriteMotionAVIDir(const char *dir)
 void CaptureThread::setWriteMotionAVIName(const char *name)
 {
   this->MotionAVI_Name = name;
+}
+//----------------------------------------------------------------------------
+void CaptureThread::setWriteTimeLapseAVIName(const char *name)
+{
+  this->TimeLapseAVI_Name = name;
 }
 //----------------------------------------------------------------------------
 void CaptureThread::setRotation(int value) { 

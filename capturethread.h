@@ -54,6 +54,11 @@ public:
   void saveAVI(const cv::Mat &image);
   void closeAVI();
 
+  void saveTimeLapseAVI(const cv::Mat &image);
+  void startTimeLapse(double fps); 
+  void stopTimeLapse(); 
+  void updateTimeLapse();
+
   void setRotation(int value);
   //
   void  rotateImage(const cv::Mat &source, cv::Mat &rotated);
@@ -64,7 +69,7 @@ public:
 signals:
   void RecordingState(bool);
 
-private:
+public:
   void updateFPS(int time);
   //
   bool             abort; 
@@ -80,16 +85,19 @@ private:
   int              deviceIndex;
   int              rotation;
   int              FrameCounter;
+  ImageBuffer      aviBuffer;
   //
   cv::VideoWriter  MotionAVI_Writer;
   cv::VideoWriter  TimeLapseAVI_Writer;
   bool             MotionAVI_Writing;
+  bool             TimeLapseAVI_Writing;
   std::string      AVI_Directory;
   std::string      MotionAVI_Name;
   std::string      TimeLapseAVI_Name;
   std::string      CaptureStatus;
   //
   cv::Size         text_size;
+  cv::Mat          currentFrame;
   cv::Mat          rotatedImage;
 };
 

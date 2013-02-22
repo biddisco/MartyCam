@@ -6,6 +6,7 @@
 //
 #include "renderwidget.h"
 #include "IPCameraForm.h"
+#include "DatePopup.h"
 //
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/highgui/highgui_c.h>
@@ -40,8 +41,8 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   connect(ui.noiseBlend, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));  
   //
   connect(ui.snapButton, SIGNAL(clicked()), this, SLOT(onSnapClicked()));  
-
-  
+  connect(ui.startTimeLapse, SIGNAL(clicked()), this, SLOT(onStartTimeLapseClicked()));  
+  connect(ui.calButton, SIGNAL(clicked()), this, SLOT(onCalButtonClicked()));  
 
   ImageButtonGroup.addButton(ui.cameraImage,0);
   ImageButtonGroup.addButton(ui.movingAverage,1);
@@ -189,6 +190,16 @@ cv::Size SettingsWidget::getSelectedResolution()
   return cv::Size(320,240);
 }
 //----------------------------------------------------------------------------
+void SettingsWidget::SetupAVIStrings() 
+{
+  QString filePath = this->ui.avi_directory->text();
+  QString fileName = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
+  this->capturethread->setWriteMotionAVIName(fileName.toAscii().constData());
+  this->capturethread->setWriteMotionAVIDir(filePath.toAscii().constData());
+  QString fileName2 = "TimeLapse" + QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
+  this->capturethread->setWriteTimeLapseAVIName(fileName2.toAscii().constData());
+}
+//----------------------------------------------------------------------------
 void SettingsWidget::RecordMotionAVI(bool state) 
 {
   this->ui.WriteMotionAVI->setChecked(state);
@@ -288,8 +299,15 @@ void SettingsWidget::saveSettings()
   settings.setValue("blendNoise",this->ui.noiseBlend->value());
   settings.endGroup();
 
-  settings.beginGroup("Miscellaneous");
+  settings.beginGroup("MotionAVI");
   settings.setValue("snapshot",this->SnapshotId);
+  settings.setValue("aviDuration", this->ui.AVI_Duration->time());
+  settings.endGroup();
+
+  settings.beginGroup("TimeLapse");
+  settings.setValue("interval", this->ui.interval->time());
+  settings.setValue("duration", this->ui.duration->dateTime());
+  settings.setValue("startDateTime", this->ui.startDateTime->dateTime());
   settings.endGroup();
 }
 //----------------------------------------------------------------------------
@@ -322,8 +340,19 @@ void SettingsWidget::loadSettings()
   this->ui.noiseBlend->setValue(settings.value("blendNoise",0.5).toInt()); 
   settings.endGroup();
 
-  settings.beginGroup("Miscellaneous");
-  this->SnapshotId = settings.value("snapshot",0).toInt();
+  settings.beginGroup("MotionAVI");
+  this->SnapshotId = settings.value("snapshot",0).toInt();  
+  this->ui.AVI_Duration->setTime(settings.value("aviDuration", QTime(0,0,10)).toTime());
+  settings.endGroup();
+
+  settings.beginGroup("TimeLapse");
+
+  this->ui.startDateTime->setDateTime(settings.value("startDateTime", QDateTime(QDate::currentDate(), QTime::currentTime())).toDateTime());
+  this->ui.interval->setTime(settings.value("interval", QTime(0,1,00)).toTime());
+  this->ui.duration->setTime(settings.value("duration", QDateTime(QDate(0,0,1), QTime(0,1,0))).toTime());
+
+  this->SnapshotId = settings.value("snapshot",0).toInt();  
+  this->ui.AVI_Duration->setTime(settings.value("aviDuration", QTime(0,0,10)).toTime());
   settings.endGroup();
 }
 //----------------------------------------------------------------------------
@@ -335,3 +364,38 @@ void SettingsWidget::onSnapClicked()
   QClipboard *clipboard = QApplication::clipboard();
   clipboard->setPixmap(p);
 }
+//----------------------------------------------------------------------------
+void SettingsWidget::onStartTimeLapseClicked()
+{
+  QPixmap p = QPixmap::grabWidget(this->renderWidget);
+  QString filename = QString("%1/MartySnap-%2").arg(this->ui.avi_directory->text()).arg(SnapshotId, 3, 10, QChar('0')) + QString(".png");
+  p.save(filename);
+  QClipboard *clipboard = QApplication::clipboard();
+  clipboard->setPixmap(p);
+}
+//----------------------------------------------------------------------------
+void SettingsWidget::onCalButtonClicked()
+{
+  DatePopup popup;
+
+  int result = popup.exec();
+  if (result == QDialog::Accepted) {
+    QDate date = popup.selectedDate();
+    QTime time = popup.selectedTime();
+    this->ui.startDateTime->setDateTime( QDateTime(date, time) );
+  }
+}
+//----------------------------------------------------------------------------
+QDateTime SettingsWidget::TimeLapseStart()
+{
+  return this->ui.startDateTime->dateTime();
+}
+//----------------------------------------------------------------------------
+QDateTime SettingsWidget::TimeLapseEnd()
+{
+  QDateTime finish = this->ui.duration->dateTime();
+  int days = QDateTime().daysTo(finish);
+  QDateTime result = this->TimeLapseStart().addDays(days);
+  return result;
+}
+
