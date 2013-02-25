@@ -50,11 +50,13 @@ void ProcessingThread::run() {
       msleep(100);
       continue;
     }
+    cv::Mat cameracopy = cameraImage.clone();
     //
-    this->motionFilter->process(cameraImage);
+    this->motionFilter->process(cameracopy);
     this->graphFilter->process(
       this->motionFilter->PSNR_Filter->PSNR, 
       this->motionFilter->logMotion,
+      this->motionFilter->normalizedMotion,
       this->motionFilter->rollingMean,
       framenum++,
       this->motionFilter->triggerLevel,

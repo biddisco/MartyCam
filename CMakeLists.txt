@@ -62,7 +62,6 @@ set(MartyCam_QT_MOC_HDRS
   renderwidget.h
   capturethread.h
   processingthread.h
-  DatePopup.h
 )
 
 #-----------------------------------------------------------------------------
@@ -97,6 +96,7 @@ include_directories(
   "${CMAKE_CURRENT_BINARY_DIR}"
   "${CMAKE_CURRENT_SOURCE_DIR}/AnalogWidgets/analogwidgets"
   "${CMAKE_CURRENT_SOURCE_DIR}/AnalogWidgets/analogwidgets/analogwidgets"
+  "${CMAKE_CURRENT_SOURCE_DIR}/streamulus/src"
   "${QT_INCLUDE_DIR}"
 )
 
@@ -108,6 +108,7 @@ SET(MartyCam_SRCS
   filter.cpp
   PSNRFilter.cpp
   MotionFilter.cpp
+#  DecayFilter.cpp
   GraphUpdateFilter.cpp
   martycam.cpp
   main.cpp
@@ -115,7 +116,6 @@ SET(MartyCam_SRCS
   renderwidget.cpp
   settings.cpp
   IPCameraForm.cpp
-  DatePopup.cpp 
   MartyCam.rc
 )
 

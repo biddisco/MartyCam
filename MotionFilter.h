@@ -34,9 +34,10 @@ public:
   //
   // output values
   //
-  double       motionPercent;
+  double       motionEstimate;
   double       logMotion;
   double       rollingMean;
+  double       normalizedMotion;
   double       eventLevel;
 
   //
@@ -60,7 +61,7 @@ public:
   cv::Mat   blendImage;
   cv::Mat   movingAverage;
   cv::Mat   difference;
-  cv::Mat   tempImage;
+  cv::Mat   floatImage;
   cv::Mat   noiseImage;
   cv::Size  text_size;
   //

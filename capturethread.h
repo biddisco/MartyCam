@@ -4,7 +4,6 @@
 #include <QThread>
 #include <QMutex>
 #include <QWaitCondition>
-#include <QQueue>
 //
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -12,6 +11,7 @@
 #ifndef Q_MOC_RUN
  #include <boost/shared_ptr.hpp>
  #include "ConcurrentCircularBuffer.h"
+ typedef boost::circular_buffer< int > FrameSpeedBuffer;
  typedef boost::shared_ptr< ConcurrentCircularBuffer<cv::Mat> > ImageBuffer;
 #endif
 //
@@ -81,7 +81,7 @@ public:
   cv::Size         rotatedSize;
   cv::VideoCapture capture;
   double           fps;
-  QQueue<int>      frameTimes;
+  FrameSpeedBuffer frameTimes;
   int              deviceIndex;
   int              rotation;
   int              FrameCounter;

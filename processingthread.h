@@ -26,7 +26,7 @@ public:
   void CopySettings(ProcessingThread *thread);
   void DeleteTemporaryStorage();
   // 
-  double getMotionPercent() { return this->motionFilter->motionPercent; }
+  double getmotionEstimate() { return this->motionFilter->motionEstimate; }
   //
   void setRootFilter(Filter* filter) {   this->motionFilter->renderer = filter; }
   void setThreshold(int val) { this->motionFilter->threshold = val; }

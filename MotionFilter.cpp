@@ -15,7 +15,7 @@ boost::accumulators::accumulator_set<int, boost::accumulators::stats<boost::accu
 MotionFilter::MotionFilter()
 {
   this->imageSize         = cv::Size(-1,-1);
-  this->tempImage         = NULL;
+  this->floatImage        = NULL;
   this->difference        = NULL;
   this->blendImage        = NULL;
   this->greyScaleImage    = NULL;
@@ -35,10 +35,11 @@ MotionFilter::MotionFilter()
   this->blendRatio        = 0.75;
   this->noiseBlendRatio   = 0.75;
   //
-  this->motionPercent = 0.0;
-  this->logMotion     = 0.0;
-  this->rollingMean   = 0.0;
-  this->eventLevel    = 0.0;
+  this->motionEstimate   = 0.0;
+  this->logMotion        = 0.0;
+  this->normalizedMotion = 0.0;
+  this->rollingMean      = 0.0;
+  this->eventLevel       = 0.0;
 }
 //----------------------------------------------------------------------------
 MotionFilter::~MotionFilter()
@@ -54,16 +55,8 @@ void MotionFilter::DeleteTemporaryStorage()
   this->greyScaleImage.release();
   this->blendImage.release();
   this->difference.release();
-  this->tempImage.release();
+  this->floatImage.release();
   this->noiseImage.release();
-  //
-  this->noiseImage        = NULL;
-  this->tempImage         = NULL;
-  this->difference        = NULL;
-  this->blendImage        = NULL;
-  this->greyScaleImage    = NULL;
-  this->thresholdImage    = NULL;
-  this->movingAverage     = NULL;
 }
 //----------------------------------------------------------------------------
 void MotionFilter::process(const cv::Mat &image)
@@ -72,7 +65,7 @@ void MotionFilter::process(const cv::Mat &image)
 
   }
   else {
-    cv::Mat workingImage = image;
+    cv::Mat currentFrame = image;
     cv::Size workingSize = image.size();
     if (workingSize.width!=this->imageSize.width ||
       workingSize.height!=this->imageSize.height) 
@@ -90,10 +83,10 @@ void MotionFilter::process(const cv::Mat &image)
       this->thresholdImage  = cv::Mat( workingSize, CV_8UC1);
       this->blendImage      = cv::Mat( workingSize, CV_8UC3);
       this->noiseImage      = cv::Mat( workingSize, CV_32FC1);
-      this->difference      = workingImage.clone();
-      this->tempImage       = workingImage.clone();
+      this->floatImage      = cv::Mat( workingSize, CV_8UC3);
+      this->difference      = cv::Mat( workingSize, CV_8UC3);
       //
-      workingImage.convertTo(this->movingAverage, this->movingAverage.type(), 1.0, 0.0);
+      currentFrame.convertTo(this->movingAverage, this->movingAverage.type(), 1.0, 0.0);
 
       // initialize font and precompute text size
       QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
@@ -102,13 +95,20 @@ void MotionFilter::process(const cv::Mat &image)
 
     cv::Mat shownImage;
     if (1) {
-      cv::accumulateWeighted(workingImage, this->movingAverage, this->average);
+      // add last frame to weighted moving average 
+      // if average = 1 we compare this frame to last frame
+      // if average = epsilon, we compare this frame to smoothed average of previous frames
+      cv::accumulateWeighted(this->lastFrame, this->movingAverage, this->average);
 
-      // Convert the type of the moving average from float to char
-      this->movingAverage.convertTo(this->tempImage, this->tempImage.type(), 1.0, 0.0);
+      // Convert the current frame to float for diffing channels
+      // we should leave as uchar, but his if for future use when we do more complex operations
+      this->movingAverage.convertTo(this->floatImage, this->floatImage.type());
 
-      // Subtract the current frame from the moving average.
-      cv::absdiff(workingImage, this->tempImage, this->difference);
+//      cv::Mat med2;
+//      cv::medianBlur(this->floatImage, med2, 5);
+
+      // get the difference of this frame from the moving average.
+      cv::absdiff(currentFrame, this->floatImage, this->difference);
 
       // Convert the image to grayscale.
       cv::cvtColor(this->difference, this->greyScaleImage, CV_RGB2GRAY);
@@ -128,12 +128,11 @@ void MotionFilter::process(const cv::Mat &image)
       }
 
       // Convert the image to grayscale.
-      cv::cvtColor(this->thresholdImage, this->blendImage, CV_GRAY2RGB);
-      this->countPixels(this->thresholdImage);
+      cv::cvtColor(this->thresholdImage, this->blendImage, CV_GRAY2BGR);
 
       switch (this->displayImage) {
         case 0:
-          shownImage = workingImage;
+          shownImage = currentFrame;
           break;
         case 1:
           shownImage = this->movingAverage;
@@ -144,11 +143,11 @@ void MotionFilter::process(const cv::Mat &image)
         default:
         case 3:
           /* dst = src1 * alpha + src2 * beta + gamma */
-          cv::addWeighted(workingImage, this->blendRatio, this->blendImage, 1.0-this->blendRatio, 0.0, this->blendImage);
+          cv::addWeighted(currentFrame, this->blendRatio, this->blendImage, 1.0-this->blendRatio, 0.0, this->blendImage);
           shownImage = this->blendImage;
           break;
         case 4:
-          cv::bitwise_or(workingImage, this->blendImage, this->blendImage);
+          cv::bitwise_or(currentFrame, this->blendImage, this->blendImage);
           shownImage = this->blendImage;
           break;
         case 5:
@@ -156,7 +155,31 @@ void MotionFilter::process(const cv::Mat &image)
           break;
       }
     }
+
     this->PSNR_Filter->process(image);
+
+    double nonzero = cv::countNonZero(this->thresholdImage);
+    double pixels = this->thresholdImage.total();
+    // max 1, min 0
+    this->motionEstimate = nonzero/pixels;
+    // 10.0*log10(1  / 640*480) = -54dB : so max is 0, min -54 
+    // 10.0*log10(10 / 640*480) = -44dB : 
+    this->logMotion = this->motionEstimate>0 ? -10.0*log10(this->motionEstimate) : 54.0;
+    // clamp values 
+    this->logMotion = (this->logMotion>54.0) ? 54.0 : this->logMotion;
+    this->logMotion = 100.0*(54.0-this->logMotion)/54.0;
+    //
+    if (this->motionEstimate>0.0) {
+      this->normalizedMotion = sqrt(this->PSNR_Filter->TotalNoise)/(nonzero);
+    }
+    this->normalizedMotion = (this->normalizedMotion>100.0) ? 100.0 : this->normalizedMotion;
+
+
+    acc(this->normalizedMotion);
+    this->rollingMean = boost::accumulators::rolling_mean(acc);
+    //
+    this->eventLevel = (rollingMean>this->triggerLevel) ? 100 : 0;
+
     //
     // Add time and data to image
     //
@@ -171,18 +194,9 @@ void MotionFilter::process(const cv::Mat &image)
       renderer->process(shownImage);
     }
     //    std::cout << "Processed frame " << framenum++ << std::endl;
-
-    // scale up to 100*100 = 1E4 for log display
-    double percent = 100.0*this->motionPercent;
-    this->logMotion = percent>1 ? (100.0/4.0)*log10(percent) : 0;
-
-    acc(this->PSNR_Filter->PSNR);
-    this->rollingMean = boost::accumulators::rolling_mean(acc);
-    //
-    this->eventLevel = (rollingMean>this->triggerLevel) ? 100 : 0;
   }
   //
-  this->lastFrame = image.clone();
+  this->lastFrame = image;
 }
 //----------------------------------------------------------------------------
 void MotionFilter::updateNoiseMap(const cv::Mat &image, double noiseblend) 
@@ -239,5 +253,5 @@ void MotionFilter::countPixels(const cv::Mat &image)
     }
   }           
 
-  this->motionPercent = 100.0*white/(height*width);
+  this->motionEstimate = 100.0*white/(height*width);
 }

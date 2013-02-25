@@ -36,7 +36,7 @@ MartyCam::MartyCam() : QMainWindow(0)
   this->EventRecordCounter      = 0;
   this->insideMotionEvent       = 0;
   this->imageSize               = cv::Size(0,0);
-  this->imageBuffer             = ImageBuffer(new ConcurrentCircularBuffer<cv::Mat>(100));
+  this->imageBuffer             = ImageBuffer(new ConcurrentCircularBuffer<cv::Mat>(5));
   this->cameraIndex             = 1;
 
   // Layout of - chart
@@ -172,7 +172,7 @@ void MartyCam::updateGUI() {
   // as the data scrolls, we move the x-axis start and end (size)
   //
   this->processingThread->graphFilter->updateChart(this->ui.chart);
-  this->ui.detect_value->setText(QString("%1").arg(this->processingThread->motionFilter->motionPercent,4 , 'f', 2));
+  this->ui.detect_value->setText(QString("%1").arg(this->processingThread->motionFilter->motionEstimate,4 , 'f', 2));
 
   //
   // if an event was triggered, start recording
@@ -194,18 +194,20 @@ void MartyCam::updateGUI() {
   QDateTime next = this->lastTimeLapse.addSecs(secs);
 
   if (!this->captureThread->TimeLapseAVI_Writing) {
-    if (now>start && now<stop) {
-      this->settingsWidget->SetupAVIStrings();
-      this->captureThread->startTimeLapse(this->settingsWidget->TimeLapseFPS());
-      this->captureThread->updateTimeLapse(); 
-      this->lastTimeLapse = now;
+    if (this->settingsWidget->TimeLapseEnabled()) {
+      if (now>start && now<stop) {
+        this->settingsWidget->SetupAVIStrings();
+        this->captureThread->startTimeLapse(this->settingsWidget->TimeLapseFPS());
+        this->captureThread->updateTimeLapse(); 
+        this->lastTimeLapse = now;
+      }
     }
   }
-  else if (now>next && now<stop) {
+  else if ((now>next && now<stop) && this->settingsWidget->TimeLapseEnabled()) {
     this->captureThread->updateTimeLapse(); 
     this->lastTimeLapse = now;
   }
-  else if (now>stop) {
+  else if (now>stop || !this->settingsWidget->TimeLapseEnabled()) {
     this->captureThread->stopTimeLapse();
   }
 }

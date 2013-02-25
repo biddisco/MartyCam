@@ -62,7 +62,7 @@ class GraphUpdateFilter {
     ~GraphUpdateFilter();
      GraphUpdateFilter();
     //
-    void process(double PSNR, double motion, double mean, int framenumber, double userlevel, double eventlLevel);
+    void process(double PSNR, double motion, double norm, double mean, int framenumber, double userlevel, double eventlLevel);
     //
     void initChart(Chart *chart);
     void updateChart(Chart *chart);
@@ -84,6 +84,7 @@ class GraphUpdateFilter {
     Plottable<int, double> *movingAverage;
     Plottable<int, double> *motionLevel;
     Plottable<int, double> *psnr;
+    Plottable<int, double> *normalized;
     Plottable<int, int>    *events;
     Plottable<int, double> *threshold;
     //

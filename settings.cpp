@@ -6,7 +6,6 @@
 //
 #include "renderwidget.h"
 #include "IPCameraForm.h"
-#include "DatePopup.h"
 //
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/highgui/highgui_c.h>
@@ -42,7 +41,6 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   //
   connect(ui.snapButton, SIGNAL(clicked()), this, SLOT(onSnapClicked()));  
   connect(ui.startTimeLapse, SIGNAL(clicked()), this, SLOT(onStartTimeLapseClicked()));  
-  connect(ui.calButton, SIGNAL(clicked()), this, SLOT(onCalButtonClicked()));  
 
   ImageButtonGroup.addButton(ui.cameraImage,0);
   ImageButtonGroup.addButton(ui.movingAverage,1);
@@ -372,18 +370,6 @@ void SettingsWidget::onStartTimeLapseClicked()
   p.save(filename);
   QClipboard *clipboard = QApplication::clipboard();
   clipboard->setPixmap(p);
-}
-//----------------------------------------------------------------------------
-void SettingsWidget::onCalButtonClicked()
-{
-  DatePopup popup;
-
-  int result = popup.exec();
-  if (result == QDialog::Accepted) {
-    QDate date = popup.selectedDate();
-    QTime time = popup.selectedTime();
-    this->ui.startDateTime->setDateTime( QDateTime(date, time) );
-  }
 }
 //----------------------------------------------------------------------------
 QDateTime SettingsWidget::TimeLapseStart()

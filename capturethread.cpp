@@ -13,7 +13,7 @@ typedef boost::shared_ptr< ConcurrentCircularBuffer<cv::Mat> > ImageBuffer;
 // capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/videostream.cgi?req_fps=30&.mjpg");
 //
 //----------------------------------------------------------------------------
-CaptureThread::CaptureThread(ImageBuffer buffer, cv::Size &size, int device, QString &URL) : QThread()
+CaptureThread::CaptureThread(ImageBuffer buffer, cv::Size &size, int device, QString &URL) : QThread(), frameTimes(50)
 {
   this->abort             = false;
   this->captureActive     = false;
@@ -130,12 +130,9 @@ void CaptureThread::updateTimeLapse()
 }
 //----------------------------------------------------------------------------
 void CaptureThread::updateFPS(int time) {
-  frameTimes.enqueue(time);
-  if (frameTimes.size() > 30) {
-    frameTimes.dequeue();
-  }
+  frameTimes.push_back(time);
   if (frameTimes.size() > 1) {
-    fps = frameTimes.size()/((double)time-frameTimes.head())*1000.0;
+    fps = frameTimes.size()/((double)time-frameTimes.front())*1000.0;
     fps = (static_cast<int>(fps*10))/10.0;
   }
   else {
@@ -185,7 +182,7 @@ void CaptureThread::startTimeLapse(double fps)
   if (!this->TimeLapseAVI_Writer.isOpened()) {
     this->TimeLapseAVI_Writer.open(
       path.c_str(),
-      0,  
+      CV_FOURCC('X', 'V', 'I', 'D'),
       fps,
       this->getImageSize()
     );
@@ -213,11 +210,12 @@ void CaptureThread::saveAVI(const cv::Mat &image)
   //CV_FOURCC('M', 'P', '4', '2') = MPEG-4.2 codec
   //CV_FOURCC('D', 'I', 'V', '3') = MPEG-4.3 codec
   //CV_FOURCC('D', 'I', 'V', 'X') = MPEG-4 codec
+  //CV_FOURCC('X', 'V', 'I', 'D')  
   if (!this->MotionAVI_Writer.isOpened()) {
     std::string path = this->AVI_Directory + "/" + this->MotionAVI_Name + std::string(".avi");
     this->MotionAVI_Writer.open(
       path.c_str(),
-      0,  
+      CV_FOURCC('X', 'V', 'I', 'D'),  
       this->getFPS(),
       image.size()
     );

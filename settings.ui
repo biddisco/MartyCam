@@ -23,7 +23,7 @@
    <item>
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
-      <number>1</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="tab">
       <attribute name="title">
@@ -33,23 +33,23 @@
        <item>
         <widget class="QGroupBox" name="groupBox_2">
          <property name="title">
-          <string>Threshold</string>
+          <string>Filter Parameters</string>
          </property>
-         <layout class="QHBoxLayout" name="horizontalLayout">
-          <item>
+         <layout class="QGridLayout" name="gridLayout_6">
+          <item row="0" column="2" colspan="2">
            <widget class="QSlider" name="threshold">
             <property name="maximum">
              <number>255</number>
             </property>
             <property name="value">
-             <number>2</number>
+             <number>3</number>
             </property>
             <property name="orientation">
              <enum>Qt::Horizontal</enum>
             </property>
            </widget>
           </item>
-          <item>
+          <item row="0" column="4">
            <widget class="QLabel" name="t_label">
             <property name="minimumSize">
              <size>
@@ -65,16 +65,21 @@
             </property>
            </widget>
           </item>
-         </layout>
-        </widget>
-       </item>
-       <item>
-        <widget class="QGroupBox" name="groupBox_3">
-         <property name="title">
-          <string>Averaging</string>
-         </property>
-         <layout class="QHBoxLayout" name="horizontalLayout_2">
-          <item>
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_5">
+            <property name="text">
+             <string>Threshold</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_6">
+            <property name="text">
+             <string>Averaging</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="2" colspan="2">
            <widget class="QSlider" name="average">
             <property name="minimum">
              <number>1</number>
@@ -83,17 +88,17 @@
              <number>99</number>
             </property>
             <property name="value">
-             <number>1</number>
+             <number>20</number>
             </property>
             <property name="sliderPosition">
-             <number>1</number>
+             <number>20</number>
             </property>
             <property name="orientation">
              <enum>Qt::Horizontal</enum>
             </property>
            </widget>
           </item>
-          <item>
+          <item row="1" column="4">
            <widget class="QLabel" name="a_label">
             <property name="minimumSize">
              <size>
@@ -102,23 +107,14 @@
              </size>
             </property>
             <property name="text">
-             <string>0.01</string>
+             <string>0.20</string>
             </property>
             <property name="alignment">
              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
             </property>
            </widget>
           </item>
-         </layout>
-        </widget>
-       </item>
-       <item>
-        <widget class="QGroupBox" name="groupBox_4">
-         <property name="title">
-          <string>Erode - Dilate Iterations</string>
-         </property>
-         <layout class="QHBoxLayout" name="horizontalLayout_3">
-          <item>
+          <item row="4" column="2">
            <widget class="QSlider" name="erode">
             <property name="minimum">
              <number>0</number>
@@ -137,23 +133,7 @@
             </property>
            </widget>
           </item>
-          <item>
-           <widget class="QLabel" name="e_label">
-            <property name="minimumSize">
-             <size>
-              <width>24</width>
-              <height>0</height>
-             </size>
-            </property>
-            <property name="text">
-             <string>1</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
-            </property>
-           </widget>
-          </item>
-          <item>
+          <item row="5" column="2">
            <widget class="QSlider" name="dilate">
             <property name="minimum">
              <number>0</number>
@@ -172,7 +152,23 @@
             </property>
            </widget>
           </item>
-          <item>
+          <item row="4" column="4">
+           <widget class="QLabel" name="e_label">
+            <property name="minimumSize">
+             <size>
+              <width>24</width>
+              <height>0</height>
+             </size>
+            </property>
+            <property name="text">
+             <string>1</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="3" colspan="2">
            <widget class="QLabel" name="d_label">
             <property name="minimumSize">
              <size>
@@ -184,7 +180,57 @@
              <string>0</string>
             </property>
             <property name="alignment">
-             <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="0">
+           <widget class="QLabel" name="label_10">
+            <property name="text">
+             <string>Dilate</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0">
+           <widget class="QLabel" name="label_13">
+            <property name="text">
+             <string>Erode</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="label_14">
+            <property name="text">
+             <string>Median Kernel</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="4">
+           <widget class="QLabel" name="m_label">
+            <property name="minimumSize">
+             <size>
+              <width>32</width>
+              <height>0</height>
+             </size>
+            </property>
+            <property name="text">
+             <string>3</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="2">
+           <widget class="QSlider" name="median">
+            <property name="maximum">
+             <number>255</number>
+            </property>
+            <property name="value">
+             <number>3</number>
+            </property>
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
             </property>
            </widget>
           </item>
@@ -552,6 +598,13 @@
       </attribute>
       <layout class="QVBoxLayout" name="verticalLayout_3">
        <item>
+        <widget class="QCheckBox" name="timeLapseEnabled">
+         <property name="text">
+          <string>Time-Lapse enabled</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QGroupBox" name="groupBox_10">
          <property name="title">
           <string>Timing Information</string>
@@ -601,8 +654,8 @@
             <property name="dateTime">
              <datetime>
               <hour>0</hour>
-              <minute>1</minute>
-              <second>0</second>
+              <minute>0</minute>
+              <second>30</second>
               <year>2000</year>
               <month>1</month>
               <day>1</day>
@@ -611,8 +664,8 @@
             <property name="time">
              <time>
               <hour>0</hour>
-              <minute>1</minute>
-              <second>0</second>
+              <minute>0</minute>
+              <second>30</second>
              </time>
             </property>
            </widget>
@@ -644,7 +697,7 @@
              </time>
             </property>
             <property name="displayFormat">
-             <string>dd:HH:mm:ss</string>
+             <string>dd / HH:mm:ss</string>
             </property>
            </widget>
           </item>
@@ -682,7 +735,7 @@
           <item row="1" column="0" colspan="2">
            <widget class="QLabel" name="label_11">
             <property name="text">
-             <string>Duration (dd:hh:mm:ss)</string>
+             <string>Duration (dd / hh:mm:ss)</string>
             </property>
            </widget>
           </item>
@@ -690,45 +743,6 @@
            <widget class="QLabel" name="label_12">
             <property name="text">
              <string>Start</string>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="1" colspan="2">
-           <widget class="QDateTimeEdit" name="startDateTime">
-            <property name="dateTime">
-             <datetime>
-              <hour>0</hour>
-              <minute>0</minute>
-              <second>0</second>
-              <year>2013</year>
-              <month>2</month>
-              <day>21</day>
-             </datetime>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="3">
-           <widget class="QPushButton" name="calButton">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="minimumSize">
-             <size>
-              <width>16</width>
-              <height>0</height>
-             </size>
-            </property>
-            <property name="maximumSize">
-             <size>
-              <width>24</width>
-              <height>16777215</height>
-             </size>
-            </property>
-            <property name="text">
-             <string>...</string>
             </property>
            </widget>
           </item>
@@ -742,7 +756,24 @@
           <item row="2" column="2" colspan="2">
            <widget class="QDoubleSpinBox" name="timeLapseFPS">
             <property name="value">
-             <double>5.000000000000000</double>
+             <double>20.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="2" colspan="2">
+           <widget class="QDateTimeEdit" name="startDateTime">
+            <property name="dateTime">
+             <datetime>
+              <hour>0</hour>
+              <minute>0</minute>
+              <second>0</second>
+              <year>2013</year>
+              <month>2</month>
+              <day>21</day>
+             </datetime>
+            </property>
+            <property name="calendarPopup">
+             <bool>true</bool>
             </property>
            </widget>
           </item>

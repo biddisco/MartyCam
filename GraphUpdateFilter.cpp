@@ -7,14 +7,18 @@ GraphUpdateFilter::GraphUpdateFilter()
   thresholdTime  = intBuffer(2);
   thresholdLevel = doubleBuffer(2);
   //
-  movingAverage = new Plottable<int, double>( 0.0, 100.0, "Moving Average", &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
-  motionLevel   = new Plottable<int, double>( 0.0, 100.0, "Motion",         &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
-  psnr          = new Plottable<int, double>( 0.0, 100.0, "PSNR",           &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
-  events        = new Plottable<int, int>   ( 0.0, 100.0, "EventLevel",     &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
-  threshold     = new Plottable<int, double>( 0.0, 100.0, "Threshold",      &thresholdTime, &thresholdLevel, 2);
+  #define eps -0.000
   //
-  fastDecay     = new Plottable<int, double>( 0.0, 100.0, "Fast Decay",     &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
-  slowDecay     = new Plottable<int, double>( 0.0, 100.0, "Slow Decay",     &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
+  motionLevel   = new Plottable<int, double>( eps,  54.0, "Motion",         &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
+  psnr          = new Plottable<int, double>( eps, 100.0, "PSNR",           &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
+  normalized    = new Plottable<int, double>( eps, 100.0, "NM",             &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
+
+  movingAverage = new Plottable<int, double>( eps, 100.0, "Moving Average", &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
+  events        = new Plottable<int, int>   (   0, 100,   "EventLevel",     &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
+  threshold     = new Plottable<int, double>( eps, 100.0, "Threshold",      &thresholdTime, &thresholdLevel, 2);
+  //
+  fastDecay     = new Plottable<int, double>( eps, 100.0, "Fast Decay",     &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
+  slowDecay     = new Plottable<int, double>( eps, 100.0, "Slow Decay",     &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
   //
   thresholdTime.push_back(0);
   thresholdTime.push_back(CIRCULAR_BUFF_SIZE);
@@ -31,12 +35,13 @@ GraphUpdateFilter::~GraphUpdateFilter()
   delete psnr;         
   delete events;       
   delete threshold;    
+  delete normalized;
   //
   delete fastDecay;    
   delete slowDecay;    
 }
 //----------------------------------------------------------------------------
-void GraphUpdateFilter::process(double PSNR, double motion, double mean, int framenumber, double userlevel, double eventLevel)
+void GraphUpdateFilter::process(double PSNR, double motion, double norm, double mean, int framenumber, double userlevel, double eventLevel)
 {
   // x-axis is frame counter
   frameNumber.push_back(framenumber);
@@ -45,6 +50,8 @@ void GraphUpdateFilter::process(double PSNR, double motion, double mean, int fra
   motionLevel->yContainer->push_back(motion);
   movingAverage->yContainer->push_back(mean);
   psnr->yContainer->push_back(PSNR);
+  normalized->yContainer->push_back(norm);
+  //
   events->yContainer->push_back(eventLevel);
 
   // The threshold line is just two points, update them each time step
@@ -56,7 +63,6 @@ void GraphUpdateFilter::process(double PSNR, double motion, double mean, int fra
 //----------------------------------------------------------------------------
 void GraphUpdateFilter::initChart(Chart *chart)
 {
-
   /*
     Plottable<int, double> fastDecay(QPen(QColor(Qt::cyan)),     0.0, 100.0, "Fast Decay", &frameNumber, NULL);
     Plottable<int, double> slowDecay(QPen(QColor(Qt::darkCyan)), 0.0, 100.0, "Slow Decay", &frameNumber, NULL);
@@ -65,6 +71,8 @@ void GraphUpdateFilter::initChart(Chart *chart)
   Channel motion(motionLevel->minVal, motionLevel->maxVal, motionLevel->data, motionLevel->title.c_str(), QPen(QColor(Qt::green)));
   Channel mean(movingAverage->minVal, movingAverage->maxVal, movingAverage->data, movingAverage->title.c_str(), QPen(QColor(Qt::blue)));
   Channel PSNR(psnr->minVal, psnr->maxVal, psnr->data, psnr->title.c_str(), QPen(QColor(Qt::yellow)));
+  Channel norm(normalized->minVal, normalized->maxVal, normalized->data, normalized->title.c_str(), QPen(QColor(Qt::cyan)));
+
   Channel eventline(events->minVal, events->maxVal, events->data, events->title.c_str(), QPen(QColor(Qt::white)));
   Channel trigger(threshold->minVal, threshold->maxVal, threshold->data, threshold->title.c_str(), QPen(QColor(Qt::red)));
 
@@ -77,6 +85,9 @@ void GraphUpdateFilter::initChart(Chart *chart)
   PSNR.setShowLegend(false);
   PSNR.setShowScale(false);
 
+  norm.setShowScale(false); 
+  norm.setShowLegend(false);
+
   trigger.setShowLegend(false);
   trigger.setShowScale(false);
 
@@ -86,6 +97,7 @@ void GraphUpdateFilter::initChart(Chart *chart)
   chart->addChannel(motion);
   chart->addChannel(mean);
   chart->addChannel(PSNR);
+  chart->addChannel(norm);
   chart->addChannel(trigger);
   chart->addChannel(eventline);
   chart->setSize(CIRCULAR_BUFF_SIZE + GRAPH_EXTENSION);
@@ -111,6 +123,7 @@ void GraphUpdateFilter::clearChart()
   movingAverage->clear();
   motionLevel->clear();
   psnr->clear();
+  normalized->clear();
   events->clear();
   //
   fastDecay->clear();

@@ -16,6 +16,7 @@ public:
   //
   cv::Mat lastFrame;
   double   PSNR;
+  double   TotalNoise;
 
   double minClamp;
   double maxClamp;
