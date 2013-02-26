@@ -49,10 +49,12 @@ struct cross_alert
     if (is_golden_cross) {
       this->filter->goldenCross = true;
       this->filter->deathCross  = false;
+      std::cout << "Golden cross " << std::endl;
     }
     else {
       this->filter->goldenCross = false;
       this->filter->deathCross  = true;
+      std::cout << "Death cross " << std::endl;
     }
     return is_golden_cross;
   }
@@ -130,7 +132,7 @@ struct thisptr
 
 //----------------------------------------------------------------------------
 DecayFilter::DecayFilter() : 
-  mavg1(1), mavg10(10), 
+  mavg1(10), mavg10(200), 
   ts(streamulus::NewInputStream<TimeValue>("TS", true /* verbose */)),
   slow(engine.Subscribe(streamulus::Streamify(mavg1)(ts))), 
   fast(engine.Subscribe(streamulus::Streamify(mavg10)(ts)))

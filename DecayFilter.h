@@ -72,15 +72,15 @@ public:
   //
   virtual void process(const TimeValue &tv);
   //
+  // The moving averages are streamified from the function objects.
+  // thes must be declared before the subscription types to ensure correct intitialization order 
+  Mavg mavg1;
+  Mavg mavg10;
 
   streamulus::InputStream<TimeValue>::type ts;
   streamulus::Streamulus                   engine;
   streamulus::Subscription<double>::type   slow;
   streamulus::Subscription<double>::type   fast;
-
-  // The moving averages are streamified from the function objects.
-  Mavg mavg1;
-  Mavg mavg10;
 
   bool deathCross;
   bool goldenCross;
