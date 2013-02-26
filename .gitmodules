@@ -1,0 +1,3 @@
+[submodule "streamulus"]
+	path = streamulus
+	url = git@github.com:biddisco/streamulus.git
