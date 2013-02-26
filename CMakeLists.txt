@@ -108,7 +108,7 @@ SET(MartyCam_SRCS
   filter.cpp
   PSNRFilter.cpp
   MotionFilter.cpp
-#  DecayFilter.cpp
+  DecayFilter.cpp
   GraphUpdateFilter.cpp
   martycam.cpp
   main.cpp

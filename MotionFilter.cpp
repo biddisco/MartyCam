@@ -1,6 +1,7 @@
 #include "filter.h"
 #include "MotionFilter.h"
 #include "PSNRFilter.h"
+#include "DecayFilter.h"
 //
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -24,6 +25,7 @@ MotionFilter::MotionFilter()
   this->noiseImage        = NULL;
   //
   this->PSNR_Filter       = new PSNRFilter();
+  this->decayFilter       = new DecayFilter();
   this->renderer          = NULL;
   //
   this->triggerLevel      = 100.0;
@@ -40,11 +42,14 @@ MotionFilter::MotionFilter()
   this->normalizedMotion = 0.0;
   this->rollingMean      = 0.0;
   this->eventLevel       = 0.0;
+  //
+  this->frameCount = 0;
 }
 //----------------------------------------------------------------------------
 MotionFilter::~MotionFilter()
 {
   delete this->PSNR_Filter;
+  delete this->decayFilter;
   this->DeleteTemporaryStorage();
 }
 //----------------------------------------------------------------------------
@@ -174,6 +179,8 @@ void MotionFilter::process(const cv::Mat &image)
     }
     this->normalizedMotion = (this->normalizedMotion>100.0) ? 100.0 : this->normalizedMotion;
 
+    TimeValue tv(this->frameCount++, this->logMotion); 
+    this->decayFilter->process(tv);
 
     acc(this->normalizedMotion);
     this->rollingMean = boost::accumulators::rolling_mean(acc);

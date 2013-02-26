@@ -11,6 +11,8 @@
 #include <boost/accumulators/statistics/median.hpp>
 #include <boost/accumulators/statistics/weighted_median.hpp>
 
+#include "DecayFilter.h"
+
 class PSNRFilter;
 class Filter;
 
@@ -30,6 +32,7 @@ public:
 
   PSNRFilter  *PSNR_Filter;
   Filter      *renderer;
+  DecayFilter *decayFilter;
 
   //
   // output values
@@ -51,6 +54,7 @@ public:
   int          displayImage;
   double       blendRatio;
   double       noiseBlendRatio;
+  int          frameCount;
 
   //
   // Temporary images 
