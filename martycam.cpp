@@ -75,11 +75,11 @@ MartyCam::MartyCam() : QMainWindow(0)
       camerastring = "";
     }
   }
-  if (this->imageSize.width>0) {
+//  if (this->imageSize.width>0) {
     this->renderWidget->setFixedSize(this->imageSize.width, this->imageSize.height);
     this->processingThread = this->createProcessingThread(this->imageSize, NULL);
     this->processingThread->start();
-  }
+//  }
   //
   this->loadSettings();
   this->settingsWidget->loadSettings();
@@ -92,8 +92,8 @@ MartyCam::MartyCam() : QMainWindow(0)
 void MartyCam::closeEvent(QCloseEvent*) {
   this->saveSettings();
   this->settingsWidget->saveSettings();
-  this->deleteProcessingThread();
   this->deleteCaptureThread();
+  this->deleteProcessingThread();
 }
 //----------------------------------------------------------------------------
 void MartyCam::deleteCaptureThread()
@@ -102,7 +102,9 @@ void MartyCam::deleteCaptureThread()
   this->captureThread->setAbort(true);
   this->captureThread->wait();
   delete captureThread;
+  // we will push an empty image onto the image buffer to ensure that any waiting processing thread is freed
   this->imageBuffer->clear();
+  this->imageBuffer->send(cv::Mat());
 }
 //----------------------------------------------------------------------------
 void MartyCam::createCaptureThread(int FPS, cv::Size &size, int camera, QString &cameraname)
