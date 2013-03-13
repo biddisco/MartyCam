@@ -3,9 +3,10 @@
 
 #pragma comment(linker, "/NODEFAULTLIB:atlthunk.lib")
 
-int __stdcall WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+//int __stdcall WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+int __stdcall main(int argc, char **argv)
 {
-#ifdef WIN32
+#ifdef AAWIN32
   AllocConsole();
   freopen("conin$", "r", stdin);
   freopen("conout$", "w", stdout);
@@ -21,7 +22,8 @@ int __stdcall WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
   }  
 #endif
 
-  QApplication app(nCmdShow, NULL);
+//  QApplication app(nCmdShow, NULL);
+  QApplication app(argc, argv);
   QCoreApplication::setOrganizationName("MartyCam");
   QCoreApplication::setOrganizationDomain("MartyCam");
   QCoreApplication::setApplicationName("MartyCam");
