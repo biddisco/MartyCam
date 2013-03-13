@@ -58,6 +58,8 @@ void ProcessingThread::run() {
       this->motionFilter->logMotion,
       this->motionFilter->normalizedMotion,
       this->motionFilter->rollingMean,
+      this->motionFilter->decayFilter->mavg10.getLastResult(),
+      this->motionFilter->decayFilter->mavg1.getLastResult(),
       framenum++,
       this->motionFilter->triggerLevel,
       this->motionFilter->eventLevel);

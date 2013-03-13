@@ -1,4 +1,5 @@
 #include "DecayFilter.h"
+#include <functional>
 
 //----------------------------------------------------------------------------
 // Remove consecutive repetitions from a stream. 
@@ -28,38 +29,6 @@ public:
 private:
   bool mFirst; 
   T mPrev;
-};
-
-//----------------------------------------------------------------------------
-// Print an alert when a cross comes. Value indicates 
-// the type of the cross.
-struct cross_alert
-{
-  template<class Sig> 
-  struct result 
-  {
-    typedef bool type; 
-  };
-
-  cross_alert() : filter(NULL) {}; 
-  void setFilter(DecayFilter *f) { this->filter = f; }
-
-  bool operator()(const bool is_golden_cross) 
-  {
-    if (is_golden_cross) {
-      this->filter->goldenCross = true;
-      this->filter->deathCross  = false;
-      std::cout << "Golden cross " << std::endl;
-    }
-    else {
-      this->filter->goldenCross = false;
-      this->filter->deathCross  = true;
-      std::cout << "Death cross " << std::endl;
-    }
-    return is_golden_cross;
-  }
-  
-  DecayFilter *filter;
 };
 
 //----------------------------------------------------------------------------
@@ -129,23 +98,70 @@ struct thisptr
   }
 };
 
+//----------------------------------------------------------------------------
+bool cross_alert::operator()(const bool is_golden_cross) 
+{
+  if (is_golden_cross) {
+    this->filter->goldenCross = true;
+    this->filter->deathCross  = false;
+    std::cout << "Golden cross " << std::endl;
+  }
+  else {
+    this->filter->goldenCross = false;
+    this->filter->deathCross  = true;
+    std::cout << "Death cross " << std::endl;
+  }
+  return is_golden_cross;
+}
+//----------------------------------------------------------------------------
+double Mavg::operator()(const TimeValue& tick) 
+{
+  if (!mFirst)
+  {
+    double alpha = 1-1/exp(mDecayFactor*(tick.time-mPrevTime));
+    mMavg += alpha*(tick.value - mMavg);
+    mPrevTime = tick.time;
+  }
+  else
+  {
+    mMavg = tick.value;
+    mPrevTime = tick.time;
+    mFirst = false;
+  }
+  return mMavg;
+}
 
 //----------------------------------------------------------------------------
 DecayFilter::DecayFilter() : 
-  mavg1(10), mavg10(200), 
-  ts(streamulus::NewInputStream<TimeValue>("TS", true /* verbose */)),
-  slow(engine.Subscribe(streamulus::Streamify(mavg1)(ts))), 
-  fast(engine.Subscribe(streamulus::Streamify(mavg10)(ts)))
+  mavg1(0.01), mavg10(2), alert(this),
+  ts(streamulus::NewInputStream<TimeValue>("TS", true )),
+  slow(engine.Subscribe(streamulus::Streamify(streamulus_wrapper<Mavg>(mavg1))(ts))), 
+  fast(engine.Subscribe(streamulus::Streamify(streamulus_wrapper<Mavg>(mavg10))(ts)))
 {
   engine.Subscribe(streamulus::Streamify<print>(std::string("Slow Mavg = ") + streamulus::Streamify<as_string>(slow)));
   engine.Subscribe(streamulus::Streamify<print>(std::string("Fast Mavg = ") + streamulus::Streamify<as_string>(fast)));
 
+//  streamulus::Streamify<unique<bool> > tttt(slow < fast);
+
+//  engine.Subscribe(
+//    streamulus::Streamify<cross_alert>(( streamulus::Streamify<unique<bool> >(slow < fast) ))
+//  );
+
   // we'd never work out the correct type without the auto keyword
-  auto result = streamulus::Streamify<cross_alert>(streamulus::Streamify<unique<bool> >(slow < fast));
+//  cross_alert crossing(this);
+//  streamulus::Subscription<bool>::type cross_type
+ //   (
+ //   );
+
+//  auto result = streamulus::Streamify(crossing()();
+
+//  auto result = streamulus::Streamify(alert)(slow < fast);
+  // + (streamulus::Streamify<unique<bool> >(slow < fast) );
   // decode as follows ... streamify->unique->cross->filter
-  result.child0.child0.setFilter(this);
+//  result.child0.child0.setFilter(this);
   // The cross detection expression:
-  engine.Subscribe(result);
+  auto result2 = streamulus::Streamify(alert)(streamulus::Streamify<unique<bool> >(slow < fast) );
+  engine.Subscribe(result2);
 }
 //----------------------------------------------------------------------------
 void DecayFilter::process(const TimeValue &tv)

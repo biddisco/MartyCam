@@ -62,7 +62,7 @@ class GraphUpdateFilter {
     ~GraphUpdateFilter();
      GraphUpdateFilter();
     //
-    void process(double PSNR, double motion, double norm, double mean, int framenumber, double userlevel, double eventlLevel);
+    void process(double PSNR, double motion, double norm, double mean, double slow, double fast, int framenumber, double userlevel, double eventlLevel);
     //
     void initChart(Chart *chart);
     void updateChart(Chart *chart);

@@ -17,8 +17,8 @@ GraphUpdateFilter::GraphUpdateFilter()
   events        = new Plottable<int, int>   (   0, 100,   "EventLevel",     &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
   threshold     = new Plottable<int, double>( eps, 100.0, "Threshold",      &thresholdTime, &thresholdLevel, 2);
   //
-  fastDecay     = new Plottable<int, double>( eps, 100.0, "Fast Decay",     &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
   slowDecay     = new Plottable<int, double>( eps, 100.0, "Slow Decay",     &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
+  fastDecay     = new Plottable<int, double>( eps, 100.0, "Fast Decay",     &frameNumber, NULL, CIRCULAR_BUFF_SIZE);
   //
   thresholdTime.push_back(0);
   thresholdTime.push_back(CIRCULAR_BUFF_SIZE);
@@ -41,7 +41,7 @@ GraphUpdateFilter::~GraphUpdateFilter()
   delete slowDecay;    
 }
 //----------------------------------------------------------------------------
-void GraphUpdateFilter::process(double PSNR, double motion, double norm, double mean, int framenumber, double userlevel, double eventLevel)
+void GraphUpdateFilter::process(double PSNR, double motion, double norm, double mean, double slow, double fast, int framenumber, double userlevel, double eventLevel)
 {
   // x-axis is frame counter
   frameNumber.push_back(framenumber);
@@ -53,6 +53,9 @@ void GraphUpdateFilter::process(double PSNR, double motion, double norm, double 
   normalized->yContainer->push_back(norm);
   //
   events->yContainer->push_back(eventLevel);
+  //
+  fastDecay->yContainer->push_back(fast);
+  slowDecay->yContainer->push_back(slow);
 
   // The threshold line is just two points, update them each time step
   thresholdTime[0] = frameNumber.front();
@@ -63,11 +66,6 @@ void GraphUpdateFilter::process(double PSNR, double motion, double norm, double 
 //----------------------------------------------------------------------------
 void GraphUpdateFilter::initChart(Chart *chart)
 {
-  /*
-    Plottable<int, double> fastDecay(QPen(QColor(Qt::cyan)),     0.0, 100.0, "Fast Decay", &frameNumber, NULL);
-    Plottable<int, double> slowDecay(QPen(QColor(Qt::darkCyan)), 0.0, 100.0, "Slow Decay", &frameNumber, NULL);
-  */
-
   Channel motion(motionLevel->minVal, motionLevel->maxVal, motionLevel->data, motionLevel->title.c_str(), QPen(QColor(Qt::green)));
   Channel mean(movingAverage->minVal, movingAverage->maxVal, movingAverage->data, movingAverage->title.c_str(), QPen(QColor(Qt::blue)));
   Channel PSNR(psnr->minVal, psnr->maxVal, psnr->data, psnr->title.c_str(), QPen(QColor(Qt::yellow)));
@@ -75,6 +73,9 @@ void GraphUpdateFilter::initChart(Chart *chart)
 
   Channel eventline(events->minVal, events->maxVal, events->data, events->title.c_str(), QPen(QColor(Qt::white)));
   Channel trigger(threshold->minVal, threshold->maxVal, threshold->data, threshold->title.c_str(), QPen(QColor(Qt::red)));
+
+  Channel slow(slowDecay->minVal, slowDecay->maxVal, slowDecay->data, slowDecay->title.c_str(), QPen(QColor(Qt::darkMagenta)));
+  Channel fast(fastDecay->minVal, fastDecay->maxVal, fastDecay->data, fastDecay->title.c_str(), QPen(QColor(Qt::darkGreen)));
 
   motion.setShowScale(true); 
   motion.setShowLegend(true);
@@ -94,12 +95,22 @@ void GraphUpdateFilter::initChart(Chart *chart)
   eventline.setShowLegend(false);
   eventline.setShowScale(false);
 
+  slow.setShowLegend(false);
+  slow.setShowScale(false);
+
+  fast.setShowLegend(false);
+  fast.setShowScale(false);
+
   chart->addChannel(motion);
   chart->addChannel(mean);
+  chart->addChannel(slow);
+  chart->addChannel(fast);
+
   chart->addChannel(PSNR);
   chart->addChannel(norm);
   chart->addChannel(trigger);
   chart->addChannel(eventline);
+
   chart->setSize(CIRCULAR_BUFF_SIZE + GRAPH_EXTENSION);
   chart->setZoom(1.0);
 }

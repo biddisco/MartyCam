@@ -2,9 +2,12 @@
 #define DECAYFILTER_H
 //
 #include "streamulus.h"
+#include <boost/ref.hpp>
 //
 #include <iostream>
 //
+class DecayFilter;
+
 //----------------------------------------------------------------------------
 // time-value pair
 struct TimeValue
@@ -24,43 +27,78 @@ struct TimeValue
 
 //----------------------------------------------------------------------------
 // Exponentially decaying moving average
-class Mavg
+class Mavg : public boost::noncopyable
 {
 public:
 
-  Mavg(int decay_factor) : mFirst(true), mDecayFactor(decay_factor), mMavg(0)
+  template <class Sig> struct result { typedef double type; };
+  template <class Sig> struct arg    { typedef TimeValue type; };
+
+  Mavg(double decay_factor) : mFirst(true), mDecayFactor(decay_factor), mMavg(0)
   {
+    std::cout << "Mavg int " << std::endl;
   }
 
-  template<class Sig> 
-  struct result 
-  {
-    typedef double type; 
-  };
+  double operator()(const TimeValue& tick); 
 
-  double operator()(const TimeValue& tick) 
-  {
-    if (! mFirst)
-    {
-      double alpha = 1-1/exp(mDecayFactor*(tick.time-mPrevTime));
-      mMavg += alpha*(tick.value - mMavg);
-      mPrevTime = tick.time;
-    }
-    else
-    {
-      mMavg = tick.value;
-      mPrevTime = tick.time;
-      mFirst = false;
-    }
-    return mMavg;
-  }
+  inline double getLastResult() { return this->mMavg; }
 
 private:
   clock_t mPrevTime;    
-  bool mFirst;
-  int mDecayFactor;
-  double mMavg;  
+  bool    mFirst;
+  double  mDecayFactor;
+  double  mMavg;  
 };
+
+template <typename F>
+class streamulus_wrapper {
+public:
+  template <class Sig> struct result { typedef typename F::template result<F>::type type; };
+
+  inline typename F::template result<F>::type operator()(const typename F::template arg<F>::type &tick) 
+  { return mInternal.get().operator()(tick); }
+
+  inline streamulus_wrapper<F>(F &internal) : mInternal(internal) 
+  {
+    std::cout << "streamulus_wrapper(F)" << std::endl;
+  }
+
+  inline streamulus_wrapper<F>(const streamulus_wrapper<F> &other) : mInternal(other.mInternal) {
+    std::cout << "streamulus_wrapper(streamulus_wrapper(F))" << std::endl;
+  }; 
+
+private:
+  const boost::reference_wrapper<F> mInternal;
+};
+
+//----------------------------------------------------------------------------
+// Print an alert when a cross comes. Value indicates 
+// the type of the cross.
+struct cross_alert
+{
+  template<class Sig> 
+  struct result 
+  {
+    typedef bool type; 
+  };
+
+  cross_alert() : filter(NULL) {
+    std::cout << "Null constructor " << std::endl;
+  }; 
+  cross_alert(DecayFilter *f) : filter(f) {
+    std::cout << "Filter constructor, f=" << f << std::endl;
+  }; 
+  cross_alert(const cross_alert &that) : filter(that.filter) {
+    std::cout << "Copy constructor, that.f=" << that.filter << std::endl;
+  }; 
+  
+  void setFilter(DecayFilter *f) { this->filter = f; }
+
+  bool operator()(const bool is_golden_cross);
+
+  DecayFilter *filter;
+};
+
 
 //----------------------------------------------------------------------------
 //
@@ -74,13 +112,16 @@ public:
   //
   // The moving averages are streamified from the function objects.
   // thes must be declared before the subscription types to ensure correct intitialization order 
+  
+  cross_alert alert;
+  //
   Mavg mavg1;
   Mavg mavg10;
 
-  streamulus::InputStream<TimeValue>::type ts;
-  streamulus::Streamulus                   engine;
-  streamulus::Subscription<double>::type   slow;
-  streamulus::Subscription<double>::type   fast;
+  streamulus::InputStream<TimeValue>::type    ts;
+  streamulus::Streamulus                      engine;
+  streamulus::Subscription<double>::type      slow;
+  streamulus::Subscription<double>::type      fast;
 
   bool deathCross;
   bool goldenCross;
