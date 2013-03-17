@@ -25,8 +25,6 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   ui.setupUi(this);
   setMinimumWidth(150);
   //
-  connect(ui.res640Radio, SIGNAL(toggled(bool)), this, SLOT(on640ResToggled(bool)));
-  connect(ui.res320Radio, SIGNAL(toggled(bool)), this, SLOT(on320ResToggled(bool)));
   connect(ui.threshold, SIGNAL(valueChanged(int)), this, SLOT(onThresholdChanged(int)));
   connect(ui.average, SIGNAL(valueChanged(int)), this, SLOT(onAverageChanged(int)));
   connect(ui.erode, SIGNAL(valueChanged(int)), this, SLOT(onErodeChanged(int)));
@@ -41,6 +39,12 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   //
   connect(ui.snapButton, SIGNAL(clicked()), this, SLOT(onSnapClicked()));  
   connect(ui.startTimeLapse, SIGNAL(clicked()), this, SLOT(onStartTimeLapseClicked()));  
+
+  
+  ResolutionButtonGroup.addButton(ui.res720Radio,0);
+  ResolutionButtonGroup.addButton(ui.res640Radio,1);
+  ResolutionButtonGroup.addButton(ui.res320Radio,2);
+  connect(&ResolutionButtonGroup, SIGNAL(buttonClicked(int)), this, SLOT(onResolutionSelection(int)));
 
   ImageButtonGroup.addButton(ui.cameraImage,0);
   ImageButtonGroup.addButton(ui.movingAverage,1);
@@ -64,18 +68,6 @@ void SettingsWidget::setThreads(CaptureThread *capthread, ProcessingThread *proc
 {
   this->capturethread = capthread;
   this->processingthread = procthread;
-}
-//----------------------------------------------------------------------------
-void SettingsWidget::on640ResToggled(bool on) {
-  if(on) {
-    emit(resolutionSelected(cv::Size(640,480)));
-  }
-}
-//----------------------------------------------------------------------------
-void SettingsWidget::on320ResToggled(bool on) {
-  if(on) {
-    emit(resolutionSelected(cv::Size(320,240)));
-  }
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::onThresholdChanged(int value)
@@ -182,6 +174,9 @@ void SettingsWidget::onTimer()
 //----------------------------------------------------------------------------
 cv::Size SettingsWidget::getSelectedResolution() 
 {
+  if (ui.res720Radio->isChecked()) {
+    return cv::Size(720,576);
+  }  
   if (ui.res640Radio->isChecked()) {
     return cv::Size(640,480);
   }
@@ -239,6 +234,21 @@ void SettingsWidget::onImageSelection(int btn)
   this->processingthread->setDisplayImage(btn);
 }
 //----------------------------------------------------------------------------
+void SettingsWidget::onResolutionSelection(int btn)
+{
+  switch (btn) {
+    case 0: 
+      emit(resolutionSelected(cv::Size(720,576)));
+      break;
+    case 1: 
+      emit(resolutionSelected(cv::Size(640,480)));
+      break;
+    case 2: 
+      emit(resolutionSelected(cv::Size(320,240)));
+      break;
+  }
+}
+//----------------------------------------------------------------------------
 void SettingsWidget::onRotateSelection(int btn)
 {
   this->capturethread->setAbort(true);
@@ -248,10 +258,10 @@ void SettingsWidget::onRotateSelection(int btn)
   this->capturethread->start();
   //
   if (btn==0 || btn==3) {
-    this->renderWidget->setFixedSize(640, 480);
+    this->renderWidget->setCVSize(this->capturethread->getImageSize());
   }
   if (btn==1 || btn==2) {
-    this->renderWidget->setFixedSize(480, 640);
+    this->renderWidget->setCVSize(this->capturethread->getRotatedSize());
   }
 }
 //----------------------------------------------------------------------------
@@ -288,7 +298,7 @@ void SettingsWidget::saveSettings()
   settings.endGroup();
 
   settings.beginGroup("UserSettings");
-  settings.setValue("resolution_640",this->ui.res640Radio->isChecked()); 
+  settings.setValue("resolution",this->ResolutionButtonGroup.checkedId());
   settings.setValue("cameraIndex",this->ui.cameraSelect->currentIndex()); 
   settings.setValue("aviDirectory",this->ui.avi_directory->text()); 
   settings.setValue("rotation",this->RotateButtonGroup.checkedId());
@@ -327,8 +337,7 @@ void SettingsWidget::loadSettings()
   connect(ui.blendRatio, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));  
 */
   settings.beginGroup("UserSettings");
-  this->ui.res640Radio->setChecked( settings.value("resolution_640",true).toBool());
-  this->ui.res320Radio->setChecked(!settings.value("resolution_640",true).toBool());
+  this->ImageButtonGroup.button(settings.value("resolution",0).toInt())->click();
   this->ui.cameraSelect->setCurrentIndex(settings.value("cameraIndex",0).toInt());
   this->ui.avi_directory->setText(settings.value("aviDirectory","C:\\Wildlife").toString());
   //

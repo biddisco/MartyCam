@@ -75,11 +75,11 @@ MartyCam::MartyCam() : QMainWindow(0)
       camerastring = "";
     }
   }
-//  if (this->imageSize.width>0) {
-    this->renderWidget->setFixedSize(this->imageSize.width, this->imageSize.height);
+  if (this->imageSize.width>0) {
+    this->renderWidget->setCVSize(this->imageSize);
     this->processingThread = this->createProcessingThread(this->imageSize, NULL);
     this->processingThread->start();
-//  }
+  }
   //
   this->loadSettings();
   this->settingsWidget->loadSettings();
@@ -154,7 +154,11 @@ void MartyCam::onCameraIndexChanged(int index, QString URL)
   this->processingThread->start(QThread::IdlePriority);
 }
 //----------------------------------------------------------------------------
-void MartyCam::onResolutionSelected(cv::Size newSize) {
+void MartyCam::onResolutionSelected(cv::Size newSize) 
+{
+  if (newSize==this->imageSize) {
+    return;
+  }
   this->imageSize = newSize;
   ProcessingThread *temp = this->createProcessingThread(this->imageSize, this->processingThread);
   this->deleteProcessingThread();

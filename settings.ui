@@ -468,7 +468,7 @@
                 <string>640x480</string>
                </property>
                <property name="checked">
-                <bool>true</bool>
+                <bool>false</bool>
                </property>
               </widget>
              </item>
@@ -484,6 +484,16 @@
                 </size>
                </property>
               </spacer>
+             </item>
+             <item row="0" column="0">
+              <widget class="QRadioButton" name="res720Radio">
+               <property name="text">
+                <string>720x576</string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
              </item>
             </layout>
            </widget>

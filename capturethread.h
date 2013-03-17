@@ -65,6 +65,7 @@ public:
   void  captionImage(cv::Mat &image);
 
   cv::Size getImageSize() { return this->imageSize; }
+  cv::Size getRotatedSize() { return this->rotatedSize; }
 
 signals:
   void RecordingState(bool);

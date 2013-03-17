@@ -12,6 +12,35 @@ typedef boost::shared_ptr< ConcurrentCircularBuffer<cv::Mat> > ImageBuffer;
 // FOSCAM FI8904W running firmware 11.25.2.44
 // capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/videostream.cgi?req_fps=30&.mjpg");
 //
+// Image deinterlacing
+cv::Mat Deinterlace(cv::Mat &src)
+{
+  cv::Mat res = src; // src.clone();
+  uchar* linea;
+  uchar* lineb;
+  uchar* linec;
+
+  for (int i = 1; i < res.size().height-1; i+=2)
+  {
+    linea = (uchar*)res.data + ((i-1) * res.step[0]);
+    lineb = (uchar*)res.data + ((i) * res.step[0]);
+    linec = (uchar*)res.data + ((i+1) * res.step[0]);
+
+    for (int j = 0; j < res.size().width * res.channels(); j++)
+    {
+      lineb[j] = (uchar)((linea[j] + linec[j])/2);
+    }
+  }
+
+  if (res.size().height > 1 && res.size().height % 2 == 0)
+  {
+    linea = (uchar*)res.data + ((res.size().height-2) * res.step[0]);
+    lineb = (uchar*)res.data + ((res.size().height-1) * res.step[0]);
+    memcpy(lineb, linea, res.size().width);
+  }
+  return res;
+}
+
 //----------------------------------------------------------------------------
 CaptureThread::CaptureThread(ImageBuffer buffer, cv::Size &size, int device, QString &URL) : QThread(), frameTimes(50)
 {
@@ -60,8 +89,14 @@ CaptureThread::CaptureThread(ImageBuffer buffer, cv::Size &size, int device, QSt
   }
   int w = capture.get(CV_CAP_PROP_FRAME_WIDTH);
   int h = capture.get(CV_CAP_PROP_FRAME_HEIGHT);
-  this->imageSize         = cv::Size(w,h);
-  this->rotatedSize       = cv::Size(h,w);
+  if (w==720) {
+    this->imageSize         = cv::Size(720,576);
+    this->rotatedSize       = cv::Size(576,720);
+  }
+  else {
+    this->imageSize         = cv::Size(w,h);
+    this->rotatedSize       = cv::Size(h,w);
+  }
 }
 //----------------------------------------------------------------------------
 CaptureThread::~CaptureThread() 
@@ -96,6 +131,11 @@ void CaptureThread::run() {
       this->setAbort(true);
       std::cout << "Empty camera image, aborting capture " <<std::endl;
       continue;
+    }
+
+    if (frame.size().width==720) {
+      // de-interlace image
+      frame = Deinterlace(frame);
     }
 
     // rotate image if necessary, makes a copy which we can pass to queue

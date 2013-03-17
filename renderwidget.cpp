@@ -64,15 +64,20 @@ RenderWidget::RenderWidget(QWidget* parent) : QWidget(parent), Filter(), imageVa
 {
   setAttribute(Qt::WA_OpaquePaintEvent, true); // don't clear the area before the paintEvent
   setAttribute(Qt::WA_PaintOnScreen, true); // disable double buffering
-  setFixedSize(640, 480);
+//  setFixedSize(720, 576);
   connect(this, SIGNAL(frameSizeChanged(int, int)), this, SLOT(onFrameSizeChanged(int, int)));
   connect(this, SIGNAL(update_signal(bool, int)), this, SLOT(UpdateTrigger(bool, int)), Qt::QueuedConnection);
   //
   this->bufferImage = NULL;
 }
 //----------------------------------------------------------------------------
+void RenderWidget::setCVSize(const cv::Size &size)
+{
+  this->setFixedSize(size.width, size.height);
+}
+//----------------------------------------------------------------------------
 void RenderWidget::onFrameSizeChanged(int width, int height) {
-  setFixedSize(width, height);
+  this->setFixedSize(width, height);
 } 
 //----------------------------------------------------------------------------
 void RenderWidget::updatePixmap(const cv::Mat &frame) 

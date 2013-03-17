@@ -16,6 +16,9 @@ public:
 
   virtual void mouseDoubleClickEvent ( QMouseEvent * event );
 
+  // provide a convenience function for cv::Size
+  void setCVSize(const cv::Size &size);
+
 public slots:
   void onFrameSizeChanged(int width, int height);
   void UpdateTrigger(bool, int);

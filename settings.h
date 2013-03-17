@@ -29,8 +29,6 @@ public:
 
 
 public slots:
-  void on640ResToggled(bool on);
-  void on320ResToggled(bool on);
   void onThresholdChanged(int value);
   void onAverageChanged(int value);
   void onErodeChanged(int value);
@@ -41,6 +39,7 @@ public slots:
   void onTimer();
   void onImageSelection(int btn);
   void onRotateSelection(int btn);
+  void onResolutionSelection(int btn);
   void onBlendChanged(int value);
   void onCameraSelection(int index);
   //
@@ -68,6 +67,7 @@ protected:
   int                 SnapshotId;
   QButtonGroup        ImageButtonGroup;
   QButtonGroup        RotateButtonGroup;
+  QButtonGroup        ResolutionButtonGroup;
   RenderWidget       *renderWidget;
   IPCameraForm       *cameraForm;
   int                 NumDevices;
