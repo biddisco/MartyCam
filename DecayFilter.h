@@ -32,7 +32,6 @@ class Mavg : public boost::noncopyable
 public:
 
   template <class Sig> struct result { typedef double type; };
-  template <class Sig> struct arg    { typedef TimeValue type; };
 
   Mavg(double decay_factor) : mFirst(true), mDecayFactor(decay_factor), mMavg(0)
   {
@@ -48,27 +47,6 @@ private:
   bool    mFirst;
   double  mDecayFactor;
   double  mMavg;  
-};
-
-template <typename F>
-class streamulus_wrapper {
-public:
-  template <class Sig> struct result { typedef typename F::template result<F>::type type; };
-
-  inline typename F::template result<F>::type operator()(const typename F::template arg<F>::type &tick) 
-  { return mInternal.get().operator()(tick); }
-
-  inline streamulus_wrapper<F>(F &internal) : mInternal(internal) 
-  {
-    std::cout << "streamulus_wrapper(F)" << std::endl;
-  }
-
-  inline streamulus_wrapper<F>(const streamulus_wrapper<F> &other) : mInternal(other.mInternal) {
-    std::cout << "streamulus_wrapper(streamulus_wrapper(F))" << std::endl;
-  }; 
-
-private:
-  const boost::reference_wrapper<F> mInternal;
 };
 
 //----------------------------------------------------------------------------

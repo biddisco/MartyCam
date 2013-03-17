@@ -133,13 +133,13 @@ double Mavg::operator()(const TimeValue& tick)
 
 //----------------------------------------------------------------------------
 DecayFilter::DecayFilter() : 
-  mavg1(0.01), mavg10(2), alert(this),
-  ts(streamulus::NewInputStream<TimeValue>("TS", true )),
-  slow(engine.Subscribe(streamulus::Streamify(streamulus_wrapper<Mavg>(mavg1))(ts))), 
-  fast(engine.Subscribe(streamulus::Streamify(streamulus_wrapper<Mavg>(mavg10))(ts)))
+  mavg1(0.1), mavg10(2), alert(this),
+  ts(streamulus::NewInputStream<TimeValue>("TS", false )),
+  slow(engine.Subscribe(streamulus::Streamify(streamulus::reference<Mavg>(mavg1))(ts))), 
+  fast(engine.Subscribe(streamulus::Streamify(streamulus::reference<Mavg>(mavg10))(ts)))
 {
-  engine.Subscribe(streamulus::Streamify<print>(std::string("Slow Mavg = ") + streamulus::Streamify<as_string>(slow)));
-  engine.Subscribe(streamulus::Streamify<print>(std::string("Fast Mavg = ") + streamulus::Streamify<as_string>(fast)));
+//  engine.Subscribe(streamulus::Streamify<print>(std::string("Slow Mavg = ") + streamulus::Streamify<as_string>(slow)));
+//  engine.Subscribe(streamulus::Streamify<print>(std::string("Fast Mavg = ") + streamulus::Streamify<as_string>(fast)));
 
 //  streamulus::Streamify<unique<bool> > tttt(slow < fast);
 
