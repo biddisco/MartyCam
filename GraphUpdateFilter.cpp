@@ -47,12 +47,13 @@ void GraphUpdateFilter::process(double PSNR, double motion, double norm, double 
   frameNumber.push_back(framenumber);
 
   // update y-values of graphs
-  motionLevel->yContainer->push_back(motion);
   movingAverage->yContainer->push_back(mean);
+  motionLevel->yContainer->push_back(motion);
   psnr->yContainer->push_back(PSNR);
+  events->yContainer->push_back(eventLevel);
+  //
   normalized->yContainer->push_back(norm);
   //
-  events->yContainer->push_back(eventLevel);
   //
   fastDecay->yContainer->push_back(fast);
   slowDecay->yContainer->push_back(slow);
@@ -140,7 +141,7 @@ void GraphUpdateFilter::clearChart()
   fastDecay->clear();
   slowDecay->clear();
   //
-//  threshold.clear();
+///  threshold->clear();
 //  vint     thresholdTime(2);
 //  vdouble  thresholdLevel(2);
 }

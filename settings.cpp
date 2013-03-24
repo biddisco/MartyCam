@@ -39,11 +39,12 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   //
   connect(ui.snapButton, SIGNAL(clicked()), this, SLOT(onSnapClicked()));  
   connect(ui.startTimeLapse, SIGNAL(clicked()), this, SLOT(onStartTimeLapseClicked()));  
-
   
-  ResolutionButtonGroup.addButton(ui.res720Radio,0);
-  ResolutionButtonGroup.addButton(ui.res640Radio,1);
-  ResolutionButtonGroup.addButton(ui.res320Radio,2);
+  ResolutionButtonGroup.addButton(ui.res1600,4);
+  ResolutionButtonGroup.addButton(ui.res1280,3);
+  ResolutionButtonGroup.addButton(ui.res720,2);
+  ResolutionButtonGroup.addButton(ui.res640,1);
+  ResolutionButtonGroup.addButton(ui.res320,0);
   connect(&ResolutionButtonGroup, SIGNAL(buttonClicked(int)), this, SLOT(onResolutionSelection(int)));
 
   ImageButtonGroup.addButton(ui.cameraImage,0);
@@ -172,15 +173,18 @@ void SettingsWidget::onTimer()
   }
 }
 //----------------------------------------------------------------------------
-cv::Size SettingsWidget::getSelectedResolution() 
+int SettingsWidget::getCameraIndex(std::string &text) 
 {
-  if (ui.res720Radio->isChecked()) {
-    return cv::Size(720,576);
-  }  
-  if (ui.res640Radio->isChecked()) {
-    return cv::Size(640,480);
+  QString val = this->ui.cameraSelect->currentText();
+  int index = this->ui.cameraSelect->currentIndex();
+  // if this is not an autodetected webcam/internal camera, return the user name  
+  if (index>NumDevices) {
+    text = val.toStdString();
   }
-  return cv::Size(320,240);
+  else {
+    text = "";
+  }
+  return index;
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::SetupAVIStrings() 
@@ -234,35 +238,41 @@ void SettingsWidget::onImageSelection(int btn)
   this->processingthread->setDisplayImage(btn);
 }
 //----------------------------------------------------------------------------
-void SettingsWidget::onResolutionSelection(int btn)
+cv::Size SettingsWidget::getSelectedResolution() 
 {
-  switch (btn) {
-    case 0: 
-      emit(resolutionSelected(cv::Size(720,576)));
+  switch (this->ResolutionButtonGroup.checkedId()) {
+    case 4:
+      return cv::Size(1600,1200);
       break;
-    case 1: 
-      emit(resolutionSelected(cv::Size(640,480)));
+    case 3:
+      return cv::Size(1280,720);
       break;
-    case 2: 
-      emit(resolutionSelected(cv::Size(320,240)));
+    case 2:
+      return cv::Size(720,576);
+      break;
+    case 1:
+      return cv::Size(640,480);
+      break;
+    case 0:
+      return cv::Size(320,240);
       break;
   }
+  return cv::Size(320,240);
+}
+//----------------------------------------------------------------------------
+void SettingsWidget::onResolutionSelection(int btn)
+{
+  emit(resolutionSelected(getSelectedResolution()));
+}
+//----------------------------------------------------------------------------
+int SettingsWidget::getSelectedRotation()
+{
+  return this->RotateButtonGroup.checkedId();
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::onRotateSelection(int btn)
 {
-  this->capturethread->setAbort(true);
-  this->capturethread->wait();
-  this->capturethread->setRotation(btn);
-  this->capturethread->setAbort(false);
-  this->capturethread->start();
-  //
-  if (btn==0 || btn==3) {
-    this->renderWidget->setCVSize(this->capturethread->getImageSize());
-  }
-  if (btn==1 || btn==2) {
-    this->renderWidget->setCVSize(this->capturethread->getRotatedSize());
-  }
+  emit(rotationChanged(btn));
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::onBlendChanged(int value)
@@ -299,10 +309,10 @@ void SettingsWidget::saveSettings()
 
   settings.beginGroup("UserSettings");
   settings.setValue("resolution",this->ResolutionButtonGroup.checkedId());
-  settings.setValue("cameraIndex",this->ui.cameraSelect->currentIndex()); 
-  settings.setValue("aviDirectory",this->ui.avi_directory->text()); 
   settings.setValue("rotation",this->RotateButtonGroup.checkedId());
   settings.setValue("display",this->ImageButtonGroup.checkedId());
+  settings.setValue("cameraIndex",this->ui.cameraSelect->currentIndex()); 
+  settings.setValue("aviDirectory",this->ui.avi_directory->text()); 
   settings.setValue("blendImage",this->ui.blendRatio->value()); 
   settings.setValue("blendNoise",this->ui.noiseBlend->value());
   settings.endGroup();
@@ -325,41 +335,32 @@ void SettingsWidget::loadSettings()
   QSettings settings(settingsFileName, QSettings::IniFormat);
   //
   settings.beginGroup("MotionDetection");
-  this->ui.threshold->setValue(settings.value("threshold",3).toInt()); 
-  this->ui.average->setValue(settings.value("average",10).toInt()); 
-  this->ui.erode->setValue(settings.value("erode",1).toInt()); 
-  this->ui.dilate->setValue(settings.value("dilate",1).toInt()); 
+  SilentCall(this->ui.threshold)->setValue(settings.value("threshold",3).toInt()); 
+  SilentCall(this->ui.average)->setValue(settings.value("average",10).toInt()); 
+  SilentCall(this->ui.erode)->setValue(settings.value("erode",1).toInt()); 
+  SilentCall(this->ui.dilate)->setValue(settings.value("dilate",1).toInt()); 
   settings.endGroup();
-/*
-  connect(ui.browse, SIGNAL(clicked()), this, SLOT(onBrowseClicked()));
-  connect(ui.WriteMotionAVI, SIGNAL(toggled(bool)), this, SLOT(onWriteMotionAVIToggled(bool)));
-  connect(&this->clock, SIGNAL(timeout()), this, SLOT(onTimer()));
-  connect(ui.blendRatio, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));  
-*/
+
   settings.beginGroup("UserSettings");
-  this->ImageButtonGroup.button(settings.value("resolution",0).toInt())->click();
-  this->ui.cameraSelect->setCurrentIndex(settings.value("cameraIndex",0).toInt());
-  this->ui.avi_directory->setText(settings.value("aviDirectory","C:\\Wildlife").toString());
+  SilentCall(&this->ResolutionButtonGroup)->button(settings.value("resolution",0).toInt())->click();
+  SilentCall(&this->RotateButtonGroup)->button(settings.value("rotation",0).toInt())->click();
+  SilentCall(&this->ImageButtonGroup)->button(settings.value("display",0).toInt())->click();
+  SilentCall(this->ui.cameraSelect)->setCurrentIndex(settings.value("cameraIndex",0).toInt());
+  SilentCall(this->ui.avi_directory)->setText(settings.value("aviDirectory","C:\\Wildlife").toString());
   //
-  this->RotateButtonGroup.button(settings.value("rotation",0).toInt())->click();
-  this->ImageButtonGroup.button(settings.value("display",0).toInt())->click();
-  this->ui.blendRatio->setValue(settings.value("blendImage",0.5).toInt()); 
-  this->ui.noiseBlend->setValue(settings.value("blendNoise",0.5).toInt()); 
+  SilentCall(this->ui.blendRatio)->setValue(settings.value("blendImage",0.5).toInt()); 
+  SilentCall(this->ui.noiseBlend)->setValue(settings.value("blendNoise",0.5).toInt()); 
   settings.endGroup();
 
   settings.beginGroup("MotionAVI");
   this->SnapshotId = settings.value("snapshot",0).toInt();  
-  this->ui.AVI_Duration->setTime(settings.value("aviDuration", QTime(0,0,10)).toTime());
+  SilentCall(this->ui.AVI_Duration)->setTime(settings.value("aviDuration", QTime(0,0,10)).toTime());
   settings.endGroup();
 
   settings.beginGroup("TimeLapse");
-
-  this->ui.startDateTime->setDateTime(settings.value("startDateTime", QDateTime(QDate::currentDate(), QTime::currentTime())).toDateTime());
-  this->ui.interval->setTime(settings.value("interval", QTime(0,1,00)).toTime());
-  this->ui.duration->setTime(settings.value("duration", QDateTime(QDate(0,0,1), QTime(0,1,0))).toTime());
-
-  this->SnapshotId = settings.value("snapshot",0).toInt();  
-  this->ui.AVI_Duration->setTime(settings.value("aviDuration", QTime(0,0,10)).toTime());
+  SilentCall(this->ui.startDateTime)->setDateTime(settings.value("startDateTime", QDateTime(QDate::currentDate(), QTime::currentTime())).toDateTime());
+  SilentCall(this->ui.interval)->setTime(settings.value("interval", QTime(0,1,00)).toTime());
+  SilentCall(this->ui.duration)->setTime(settings.value("duration", QDateTime(QDate(0,0,1), QTime(0,1,0))).toTime());
   settings.endGroup();
 }
 //----------------------------------------------------------------------------

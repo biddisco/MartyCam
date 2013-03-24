@@ -12,7 +12,8 @@ typedef boost::shared_ptr< ConcurrentCircularBuffer<cv::Mat> > ImageBuffer;
 // FOSCAM FI8904W running firmware 11.25.2.44
 // capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/videostream.cgi?req_fps=30&.mjpg");
 //
-// Image deinterlacing
+
+// Image deinterlacing function for DV camera
 cv::Mat Deinterlace(cv::Mat &src)
 {
   cv::Mat res = src; // src.clone();
@@ -42,53 +43,37 @@ cv::Mat Deinterlace(cv::Mat &src)
 }
 
 //----------------------------------------------------------------------------
-CaptureThread::CaptureThread(ImageBuffer buffer, cv::Size &size, int device, QString &URL) : QThread(), frameTimes(50)
+CaptureThread::CaptureThread(ImageBuffer buffer, const cv::Size &size, int device, const std::string &URL) : QThread(), frameTimes(50)
 {
-  this->abort             = false;
-  this->captureActive     = false;
-  this->fps               = 0.0 ;
-  this->FrameCounter      = 0;
-  this->deviceIndex       = -1;
-  this->MotionAVI_Writing = false;
+  this->abort                = false;
+  this->captureActive        = false;
+  this->deInterlace          = false;
+  this->requestedFPS         = 15;
+  this->fps                  = 0.0 ;
+  this->FrameCounter         = 0;
+  this->deviceIndex          =-1;
+  this->MotionAVI_Writing    = false;
   this->TimeLapseAVI_Writing = false;
-  this->capture           = NULL;
-  this->imageBuffer       = buffer;
-  this->deviceIndex       = device;
-  this->rotation          = 0;
-  this->rotatedImage      = NULL;
+  this->capture              = NULL;
+  this->imageBuffer          = buffer;
+  this->deviceIndex          = device;
+  this->rotation             = 0;
+  this->rotatedImage         = NULL;
+  this->CameraURL            = URL;
   // initialize font and precompute text size
   QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
   this->text_size = cv::getTextSize( timestring.toAscii().data(), CV_FONT_HERSHEY_PLAIN, 1.0, 1, NULL);
-
   //
-  // start capture device driver
-  //
-  capture.release();
-  if (URL=="NO_CAMERA") {
-    capture.release();
-  }
-  else {
-    if (URL.size()>0) {
-      std::cout << "Attempting IP camera connection " << URL.toAscii().data() << std::endl;
-      // using an IP camera, assume default string to access martycam
-      // capture = cvCaptureFromFile("http://192.168.1.21/videostream.asf?user=admin&pwd=1234");
-      // capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/videostream.cgi?req_fps=30&.mjpg");
-      capture.open(URL.toStdString());
-    }
-    else {
-      capture.open(CV_CAP_DSHOW + this->deviceIndex );
-    }
-    if (!capture.isOpened()) {
-      std::cout << "Camera connection failed" << std::endl;
-      return;
-    }
-  }
+  this->imageSize = size;
   if (size.width>0 && size.height>0) {
-    capture.set(CV_CAP_PROP_FRAME_WIDTH,  size.width);
-    capture.set(CV_CAP_PROP_FRAME_HEIGHT, size.height);
+    this->capture.set(CV_CAP_PROP_FRAME_WIDTH,  size.width);
+    this->capture.set(CV_CAP_PROP_FRAME_HEIGHT, size.height);
   }
-  int w = capture.get(CV_CAP_PROP_FRAME_WIDTH);
-  int h = capture.get(CV_CAP_PROP_FRAME_HEIGHT);
+  //
+  this->connectCamera(this->deviceIndex, this->CameraURL);
+  //
+  int w = this->capture.get(CV_CAP_PROP_FRAME_WIDTH);
+  int h = this->capture.get(CV_CAP_PROP_FRAME_HEIGHT);
   if (w==720) {
     this->imageSize         = cv::Size(720,576);
     this->rotatedSize       = cv::Size(576,720);
@@ -102,19 +87,81 @@ CaptureThread::CaptureThread(ImageBuffer buffer, cv::Size &size, int device, QSt
 CaptureThread::~CaptureThread() 
 {  
   this->closeAVI();
-  // free memory
-  this->setRotation(0); 
   // Release our stream capture object, not necessary with openCV 2
-  capture.release();
+  this->capture.release();
 }
 //----------------------------------------------------------------------------
-void CaptureThread::run() {  
+bool CaptureThread::connectCamera(int index, const std::string &URL)
+{
+  bool wasActive = this->stopCapture();
+  if (this->capture.isOpened()) {
+    this->capture.release();
+  }
+
+  //
+  // start this->capture device driver
+  //
+  if (URL=="NULL") {
+    // null camera, dummy
+  }
+  else {
+    if (URL.size()>0) {
+      this->CameraURL = URL;
+      std::cout << "Attempting IP camera connection " << this->CameraURL.c_str() << std::endl;
+      // using an IP camera, assume default string to access martycam
+      // this->capture = cvCaptureFromFile("http://192.168.1.21/videostream.asf?user=admin&pwd=1234");
+      // this->capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/videostream.cgi?req_fps=30&.mjpg");
+      this->capture.open(URL);
+    }
+    else {
+      this->capture.open(CV_CAP_DSHOW + index );
+    }
+    if (!this->capture.isOpened()) {
+      std::cout << "Camera connection failed" << std::endl;
+      return false;
+    }
+  }
+  if (wasActive) {
+    return this->startCapture();
+  }
+  return true;
+}
+//----------------------------------------------------------------------------
+void CaptureThread::setResolution(const cv::Size &res)
+{
+  if (this->imageSize==res) {
+    return;
+  }
+  bool wasActive = this->stopCapture();
+  this->imageBuffer->clear();
+  this->imageSize = res;
+  this->rotatedSize = cv::Size(this->imageSize.height, this->imageSize.width);
+  if (wasActive) this->startCapture(); 
+}
+//----------------------------------------------------------------------------
+void CaptureThread::setRotation(int value) 
+{ 
+  if (this->rotation==value) {
+    return;
+  }
+  bool wasActive = this->stopCapture();
+  this->rotation = value; 
+  if (this->rotation==1 || this->rotation==2) {
+    cv::Size workingSize = cv::Size(this->imageSize.height, this->imageSize.width);
+    this->rotatedImage = cv::Mat( workingSize, CV_8UC3);
+  }
+  if (wasActive) this->startCapture(); 
+}
+//----------------------------------------------------------------------------
+void CaptureThread::run() 
+{  
   QTime time;
   time.start();
 
   while (!this->abort) {
     if (!captureActive) {
       captureLock.lock();
+      this->stopWait.wakeAll();
       fps = 0;
       frameTimes.clear();
       captureWait.wait(&captureLock);
@@ -125,15 +172,15 @@ void CaptureThread::run() {
 
     // get latest frame from webcam
     cv::Mat frame;
-    capture >> frame;
+    this->capture >> frame;
 
     if (frame.empty()) {
       this->setAbort(true);
-      std::cout << "Empty camera image, aborting capture " <<std::endl;
+      std::cout << "Empty camera image, aborting this->capture " <<std::endl;
       continue;
     }
 
-    if (frame.size().width==720) {
+    if (this->deInterlace) {
       // de-interlace image
       frame = Deinterlace(frame);
     }
@@ -154,10 +201,49 @@ void CaptureThread::run() {
     //
     imageBuffer->send(this->rotatedImage);
     this->FrameCounter++;
-      //
-//      std::cout << "Calling Emit " << std::endl;
-     updateFPS(time.elapsed());
+      
+    updateFPS(time.elapsed());
   }
+}
+//----------------------------------------------------------------------------
+bool CaptureThread::startCapture() 
+{
+  if (!captureActive) {
+    if (this->imageSize.width>0) {
+      this->capture.set(CV_CAP_PROP_FRAME_WIDTH, this->imageSize.width);
+      this->capture.set(CV_CAP_PROP_FRAME_HEIGHT, this->imageSize.height);
+    }
+    else {
+      this->capture.set(CV_CAP_PROP_FRAME_WIDTH, 2048);
+      this->capture.set(CV_CAP_PROP_FRAME_HEIGHT, 2048);
+    }
+    this->capture.set(CV_CAP_PROP_FPS, this->requestedFPS);
+    std::ostringstream output;
+    output << "CV_CAP_PROP_FRAME_WIDTH\t"   << this->capture.get(CV_CAP_PROP_FRAME_WIDTH) << std::endl;
+    output << "CV_CAP_PROP_FRAME_HEIGHT\t"  << this->capture.get(CV_CAP_PROP_FRAME_HEIGHT) << std::endl;
+    output << "CV_CAP_PROP_FPS\t"           << this->capture.get(CV_CAP_PROP_FPS) << std::endl;
+    output << "CV_CAP_PROP_FOURCC\t"        << this->capture.get(CV_CAP_PROP_FOURCC) << std::endl;
+    output << "CV_CAP_PROP_BRIGHTNESS\t"    << this->capture.get(CV_CAP_PROP_BRIGHTNESS) << std::endl;
+    output << "CV_CAP_PROP_CONTRAST\t"      << this->capture.get(CV_CAP_PROP_CONTRAST) << std::endl;
+    output << "CV_CAP_PROP_SATURATION\t"    << this->capture.get(CV_CAP_PROP_SATURATION) << std::endl;
+    output << "CV_CAP_PROP_HUE\t"           << this->capture.get(CV_CAP_PROP_HUE) << std::endl;
+    captureActive = true;
+    captureWait.wakeAll();
+    this->CaptureStatus += output.str();
+    return true;
+  }
+  return false;
+}
+//----------------------------------------------------------------------------
+bool CaptureThread::stopCapture() {
+  bool wasActive = this->captureActive;
+  if (wasActive) {
+    this->stopLock.lock();
+    captureActive = false;
+    this->stopWait.wait(&this->stopLock);
+    this->stopLock.unlock();
+  }
+  return wasActive;
 }
 //----------------------------------------------------------------------------
 void CaptureThread::updateTimeLapse() 
@@ -178,32 +264,6 @@ void CaptureThread::updateFPS(int time) {
   else {
     fps = 0;
   }
-}
-//----------------------------------------------------------------------------
-bool CaptureThread::startCapture(int framerate) {
-  if (!captureActive) {
-    capture.set(CV_CAP_PROP_FRAME_WIDTH, this->imageSize.width);
-    capture.set(CV_CAP_PROP_FRAME_HEIGHT, this->imageSize.height);
-    capture.set(CV_CAP_PROP_FPS, framerate);
-    std::ostringstream output;
-    output << "CV_CAP_PROP_FRAME_WIDTH\t"   << capture.get(CV_CAP_PROP_FRAME_WIDTH) << std::endl;
-    output << "CV_CAP_PROP_FRAME_HEIGHT\t"  << capture.get(CV_CAP_PROP_FRAME_HEIGHT) << std::endl;
-    output << "CV_CAP_PROP_FPS\t"           << capture.get(CV_CAP_PROP_FPS) << std::endl;
-    output << "CV_CAP_PROP_FOURCC\t"        << capture.get(CV_CAP_PROP_FOURCC) << std::endl;
-    output << "CV_CAP_PROP_BRIGHTNESS\t"    << capture.get(CV_CAP_PROP_BRIGHTNESS) << std::endl;
-    output << "CV_CAP_PROP_CONTRAST\t"      << capture.get(CV_CAP_PROP_CONTRAST) << std::endl;
-    output << "CV_CAP_PROP_SATURATION\t"    << capture.get(CV_CAP_PROP_SATURATION) << std::endl;
-    output << "CV_CAP_PROP_HUE\t"           << capture.get(CV_CAP_PROP_HUE) << std::endl;
-    captureActive = true;
-    captureWait.wakeAll();
-    this->CaptureStatus += output.str();
-    return true;
-  }
-  return false;
-}
-//----------------------------------------------------------------------------
-void CaptureThread::stopCapture() {
-  captureActive = false;
 }
 //----------------------------------------------------------------------------
 void CaptureThread::saveTimeLapseAVI(const cv::Mat &image) 
@@ -293,17 +353,6 @@ void CaptureThread::setWriteMotionAVIName(const char *name)
 void CaptureThread::setWriteTimeLapseAVIName(const char *name)
 {
   this->TimeLapseAVI_Name = name;
-}
-//----------------------------------------------------------------------------
-void CaptureThread::setRotation(int value) { 
-  if (this->rotation==value) {
-    return;
-  }
-  this->rotation = value; 
-  if (this->rotation==1 || this->rotation==2) {
-    cv::Size workingSize = cv::Size(this->imageSize.height, this->imageSize.width);
-    this->rotatedImage = cv::Mat( workingSize, CV_8UC3);
-  }
 }
 //----------------------------------------------------------------------------
 void CaptureThread::rotateImage(const cv::Mat &source, cv::Mat &rotated)
