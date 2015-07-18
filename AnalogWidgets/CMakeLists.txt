@@ -126,7 +126,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 ADD_DEFINITIONS(-DWTR_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 
-ADD_EXECUTABLE(test
+ADD_EXECUTABLE(test_analogue
   ${test_UIS_H}
   ${test_RSRCS}
   ${test_MOC_FILES}
@@ -135,7 +135,7 @@ ADD_EXECUTABLE(test
   test/widgettester.cpp
 )
 
-target_link_libraries(test
+target_link_libraries(test_analogue
   analogue
   ${QT_LIBRARIES} 
   ${QT_QTSVG_LIBRARY}

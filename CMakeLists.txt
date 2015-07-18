@@ -27,7 +27,8 @@ include(${QT_USE_FILE})
 # Find Boost
 #-----------------------------------------------------------------------------
 option(Boost_USE_STATIC "Use static Boost libraries" ON)
-find_package(Boost 1.49 REQUIRED thread NO_MODULE) 
+#find_package(Boost 1.49 REQUIRED thread NO_MODULE) 
+find_package(Boost 1.49 REQUIRED thread) 
 link_directories(${Boost_LIBRARY_DIRS})
 include_directories(${Boost_INCLUDE_DIR})
 

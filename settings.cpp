@@ -12,8 +12,8 @@
 //
 // we need these to get access to videoInput
 // Caution: including cpp file here as routines are not exported from openCV
-#include "../../highgui/src/precomp.hpp"
-#include "../../highgui/src/cap_dshow.cpp"
+//#include "../../highgui/src/precomp.hpp"
+//#include "../../highgui/src/cap_dshow.cpp"
 
 //----------------------------------------------------------------------------
 SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent) 
@@ -124,11 +124,16 @@ void SettingsWidget::setupCameraList()
   this->ui.cameraSelect->blockSignals(true);
   this->ui.cameraSelect->clear();
   //
+#ifdef _WIN32
   // use videoInput object to enumerate devices
   this->NumDevices = videoInput::listDevices(true);
   for (int i=0; i<this->NumDevices; i++) {
     this->ui.cameraSelect->addItem(videoInput::getDeviceName(i));
   }
+#else
+  this->NumDevices = 1;
+  this->ui.cameraSelect->addItem("standard camera");
+#endif
   //
   stringpairlist &cameras = this->cameraForm->getList();
   for (stringpairlist::iterator it=cameras.begin(); it!=cameras.end(); ++it) {

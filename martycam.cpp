@@ -164,7 +164,8 @@ void MartyCam::onResolutionSelected(cv::Size newSize)
   this->deleteProcessingThread();
   this->deleteCaptureThread();
   this->processingThread = temp;
-  this->createCaptureThread(15, this->imageSize, this->cameraIndex, QString());
+  QString temp2;
+  this->createCaptureThread(15, this->imageSize, this->cameraIndex, temp2);
   //
   this->clearGraphs();
   this->processingThread->start(QThread::IdlePriority);

@@ -16,13 +16,13 @@ boost::accumulators::accumulator_set<int, boost::accumulators::stats<boost::accu
 MotionFilter::MotionFilter()
 {
   this->imageSize         = cv::Size(-1,-1);
-  this->floatImage        = NULL;
-  this->difference        = NULL;
-  this->blendImage        = NULL;
-  this->greyScaleImage    = NULL;
-  this->thresholdImage    = NULL;
-  this->movingAverage     = NULL;
-  this->noiseImage        = NULL;
+//  this->floatImage        = NULL;
+//  this->difference        = NULL;
+//  this->blendImage        = NULL;
+//  this->greyScaleImage    = NULL;
+//  this->thresholdImage    = NULL;
+//  this->movingAverage     = NULL;
+//  this->noiseImage        = NULL;
   //
   this->PSNR_Filter       = new PSNRFilter();
   this->decayFilter       = new DecayFilter();

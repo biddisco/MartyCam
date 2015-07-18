@@ -1,4 +1,4 @@
-#include <windows.h>
+//#include <windows.h>
 #include "martycam.h"
 
 #pragma comment(linker, "/NODEFAULTLIB:atlthunk.lib")

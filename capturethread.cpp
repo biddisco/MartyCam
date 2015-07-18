@@ -55,7 +55,7 @@ CaptureThread::CaptureThread(ImageBuffer buffer, cv::Size &size, int device, QSt
   this->imageBuffer       = buffer;
   this->deviceIndex       = device;
   this->rotation          = 0;
-  this->rotatedImage      = NULL;
+//  this->rotatedImage      = (cv::Mat)(NULL);
   // initialize font and precompute text size
   QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
   this->text_size = cv::getTextSize( timestring.toAscii().data(), CV_FONT_HERSHEY_PLAIN, 1.0, 1, NULL);
@@ -76,7 +76,13 @@ CaptureThread::CaptureThread(ImageBuffer buffer, cv::Size &size, int device, QSt
       capture.open(URL.toStdString());
     }
     else {
+      std::cout << "opening device " << this->deviceIndex << std::endl;
+#ifdef _WIN32
       capture.open(CV_CAP_DSHOW + this->deviceIndex );
+#else
+//      CvCapture* camera = cvCaptureFromCAM(CV_CAP_ANY);
+      capture.open(this->deviceIndex );
+#endif
     }
     if (!capture.isOpened()) {
       std::cout << "Camera connection failed" << std::endl;

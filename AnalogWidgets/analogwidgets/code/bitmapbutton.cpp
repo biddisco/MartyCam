@@ -41,12 +41,13 @@ void BitmapButton::setDownIcon(const QIcon & icon)
 void BitmapButton::paintEvent ( QPaintEvent * event )
 {
   QPainter painter(this);
-   QIcon * p_icon = NULL;  
+  QIcon temp; 
+  QIcon * p_icon = &temp;  
    if( isDown() || isChecked())
      	p_icon = &m_downIcon;
    	//m_downIcon.paint(&painter,0,0,width(),height());
-     else 
-        p_icon = &icon();
+//     else
+//        p_icon = &temp;
         // icon().paint(&painter,0,0,width(),height());
    
 	QSize aSize = p_icon->actualSize(size()); 
