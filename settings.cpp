@@ -7,13 +7,14 @@
 #include "renderwidget.h"
 #include "IPCameraForm.h"
 //
+#include "videoInput.h"
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/highgui/highgui_c.h>
 //
 // we need these to get access to videoInput
 // Caution: including cpp file here as routines are not exported from openCV
-#include "../../highgui/src/precomp.hpp"
-#include "../../highgui/src/cap_dshow.cpp"
+//#include "../../highgui/src/precomp.hpp"
+//#include "../../highgui/src/cap_dshow.cpp"
 
 //----------------------------------------------------------------------------
 SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent) 
@@ -128,7 +129,7 @@ void SettingsWidget::setupCameraList()
   // use videoInput object to enumerate devices
   this->NumDevices = videoInput::listDevices(true);
   for (int i=0; i<this->NumDevices; i++) {
-    this->ui.cameraSelect->addItem(videoInput::getDeviceName(i));
+    this->ui.cameraSelect->addItem(QString(videoInput::getDeviceName(i)));
   }
   //
   stringpairlist &cameras = this->cameraForm->getList();

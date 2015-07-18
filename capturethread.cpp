@@ -4,6 +4,8 @@
 #include <iostream>
 #include <iomanip>
 //
+#include "opencv2/imgproc.hpp"
+
 #include "capturethread.h"
 typedef boost::shared_ptr< ConcurrentCircularBuffer<cv::Mat> > ImageBuffer;
 
