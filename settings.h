@@ -11,22 +11,49 @@
 class RenderWidget;
 class IPCameraForm;
 
+template<class T>
+class QSignalBlocker
+{
+  T* const o;
+public:
+  explicit QSignalBlocker( T * oo ) : o(oo) {}
+  T* operator->() 
+  {
+    if (o) o->blockSignals( true );
+    return o;
+  }
+  ~QSignalBlocker() 
+  {
+    if (o) o->blockSignals(false);
+  }
+};
+
+template<class T>
+QSignalBlocker<T> SilentCall(T* o)
+{
+  return QSignalBlocker<T>(o);
+}
+
 class SettingsWidget : public QWidget {
 Q_OBJECT;
 public:
   SettingsWidget(QWidget* parent);
-  cv::Size getSelectedResolution();
-  void RecordMotionAVI(bool state);
+
+  cv::Size  getSelectedResolution();
+  int       getSelectedRotation();
+
+  void      RecordMotionAVI(bool state);
 
   void setThreads(CaptureThread *capthread, ProcessingThread *procthread);
   void setRenderWidget(RenderWidget *rw) { this->renderWidget = rw; }
   
   QDateTime TimeLapseStart();
   QDateTime TimeLapseEnd();
-  QTime TimeLapseInterval() { return this->ui.interval->time(); }
-  double  TimeLapseFPS() { return this->ui.timeLapseFPS->value(); }
-  bool  TimeLapseEnabled() { return this->ui.timeLapseEnabled->isChecked(); }
+  QTime     TimeLapseInterval() { return this->ui.interval->time(); }
+  double    TimeLapseFPS() { return this->ui.timeLapseFPS->value(); }
+  bool      TimeLapseEnabled() { return this->ui.timeLapseEnabled->isChecked(); }
 
+  int getCameraIndex(std::string &text);
 
 public slots:
   void onThresholdChanged(int value);

@@ -29,6 +29,7 @@ public:
 public slots:
   void updateGUI();
   void onResolutionSelected(cv::Size newSize);
+  void onRotationChanged(int rotation);
   void onCameraIndexChanged(int index, QString URL);
   void onUserTrackChanged(int value);
   void onRecordingStateChanged(bool state);
@@ -38,7 +39,7 @@ public slots:
 protected:
   void closeEvent(QCloseEvent*);
   void deleteCaptureThread();
-  void createCaptureThread(int FPS, cv::Size &size, int camera, QString &cameraname);
+  void createCaptureThread(int FPS, cv::Size &size, int camera, const std::string &cameraname);
   void deleteProcessingThread();
   ProcessingThread *createProcessingThread(cv::Size &size, ProcessingThread *oldThread);
   
