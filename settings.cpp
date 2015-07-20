@@ -7,7 +7,9 @@
 #include "renderwidget.h"
 #include "IPCameraForm.h"
 //
-#include "videoInput.h"
+#ifdef WIN32
+ #include "videoInput.h"
+#endif
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/highgui/highgui_c.h>
 //

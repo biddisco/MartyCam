@@ -74,7 +74,8 @@ MartyCam::MartyCam() : QMainWindow(0)
   int index = this->settingsWidget->getCameraIndex(camerastring);
   //
   while (this->imageSize.width==0 && this->cameraIndex>=0) {
-    this->createCaptureThread(15, this->settingsWidget->getSelectedResolution(), this->cameraIndex, camerastring);
+    cv::Size res = this->settingsWidget->getSelectedResolution();
+    this->createCaptureThread(15, res, this->cameraIndex, camerastring);
     this->imageSize = this->captureThread->getImageSize();
     if (this->imageSize.width==0) {
       this->cameraIndex -=1;
@@ -292,3 +293,4 @@ void MartyCam::onMouseDoubleClickEvent(const QPoint&)
 {
   this->renderWidget->showFullScreen();
 }
+

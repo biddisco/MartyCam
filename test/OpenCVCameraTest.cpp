@@ -1,7 +1,7 @@
 #include <stdio.h>
-#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/highgui.hpp>
 
-int main(){
+int main(int argc, char **argv){
 
 //    CvCapture *camera=cvCaptureFromFile("http://username:pass@cam_address/axis-cgi/mjpg/video.cgi?resolution=640x480&req_fps=30&.mjpg");
 //    CvCapture *camera=cvCaptureFromFile("http://192.168.1.21/videostream.asf?user=admin&pwd=1234&req_fps=30&.mjpg");
