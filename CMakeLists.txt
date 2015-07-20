@@ -12,9 +12,28 @@ SET(CMAKE_MODULE_PATH ${CMAKE_CURRECT_SOURCE_DIR}/cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/CMake/GitExternal.cmake)
 
 #-----------------------------------------------------------------------------
+# Include Subproject for building other cmake projects as subdirs
+#-----------------------------------------------------------------------------
+include(${CMAKE_CURRENT_SOURCE_DIR}/CMake/SubProject.cmake)
+
+#--------------------------------------------------
+# Setup Output directories
+#--------------------------------------------------
+SET (CMAKE_RUNTIME_OUTPUT_DIRECTORY
+    ${PROJECT_BINARY_DIR}/bin CACHE PATH "Single Directory for all Executables."
+)
+SET (CMAKE_LIBRARY_OUTPUT_DIRECTORY
+    ${PROJECT_BINARY_DIR}/bin CACHE PATH "Single Directory for all Libraries"
+)
+SET (CMAKE_ARCHIVE_OUTPUT_DIRECTORY
+    ${PROJECT_BINARY_DIR}/bin CACHE PATH "Single Directory for all static libraries."
+)
+
+set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-std=c++11")
+#-----------------------------------------------------------------------------
 # Find OpenCV
 #-----------------------------------------------------------------------------
-find_package(OpenCV REQUIRED)
+#find_package(OpenCV REQUIRED)
 
 #-----------------------------------------------------------------------------
 # Find Qt
@@ -36,6 +55,89 @@ find_package(Boost 1.49 REQUIRED thread system)
 link_directories(${Boost_LIBRARY_DIRS})
 include_directories(${Boost_INCLUDE_DIR})
 message("Boost link dir is ${Boost_LIBRARY_DIRS}")
+
+#-----------------------------------------------------------------------------
+# Clone OpenCV locally
+#-----------------------------------------------------------------------------
+git_external(
+  ${CMAKE_CURRENT_SOURCE_DIR}/OpenCV
+  https://github.com/Itseez/opencv.git
+  master
+  VERBOSE
+  SHALLOW
+)
+
+set(BUILD_DOCS                       ON)
+set(BUILD_EXAMPLES                   ON)
+set(BUILD_JASPER                     OFF)
+set(BUILD_JPEG                       ON)
+set(BUILD_OPENEXR                    OFF)
+set(BUILD_PACKAGE                    OFF)
+set(BUILD_PERF_TESTS                 OFF)
+set(BUILD_PNG                        ON)
+set(BUILD_SHARED_LIBS                ON)
+set(BUILD_TBB                        OFF)
+set(BUILD_TESTS                      OFF)
+set(BUILD_TIFF                       ON)
+set(BUILD_WITH_DEBUG_INFO            ON)
+set(BUILD_WITH_DYNAMIC_IPP           OFF)
+set(BUILD_ZLIB                       ON)
+set(BUILD_opencv_apps                OFF)
+set(BUILD_opencv_calib3d             OFF)
+set(BUILD_opencv_core                ON)
+set(BUILD_opencv_features2d          ON)
+set(BUILD_opencv_flann               ON)
+set(BUILD_opencv_hal                 ON)
+set(BUILD_opencv_highgui             ON)
+set(BUILD_opencv_imgcodecs           ON)
+set(BUILD_opencv_imgproc             ON)
+set(BUILD_opencv_ml                  ON)
+set(BUILD_opencv_objdetect           ON)
+set(BUILD_opencv_photo               OFF)
+set(BUILD_opencv_python2             OFF)
+set(BUILD_opencv_shape               ON)
+set(BUILD_opencv_stitching           ON)
+set(BUILD_opencv_superres            ON)
+option(WITH_CUDA                        OFF)
+option(WITH_CUFFT                       OFF)
+option(WITH_EIGEN                       ON)
+option(WITH_FFMPEG                      ON)
+option(WITH_GDAL                        OFF)
+option(WITH_GIGEAPI                     OFF)
+option(WITH_GPHOTO2                     OFF)
+option(WITH_GSTREAMER                   OFF)
+option(WITH_GSTREAMER_0_10              OFF)
+option(WITH_IPP                         OFF)
+option(WITH_IPP_A                       OFF)
+option(WITH_JASPER                      OFF)
+option(WITH_JPEG                        ON)
+option(WITH_LIBV4L                      ON)
+option(WITH_OPENCL                      ON)
+option(WITH_OPENCLAMDBLAS               OFF)
+option(WITH_OPENCLAMDFFT                OFF)
+option(WITH_OPENCL_SVM                  OFF)
+option(WITH_OPENEXR                     OFF)
+option(WITH_OPENGL                      OFF)
+option(WITH_OPENMP                      OFF)
+option(WITH_OPENNI                      OFF)
+option(WITH_OPENNI2                     OFF)
+option(WITH_PNG                         ON)
+option(WITH_PTHREADS_PF                 ON)
+option(WITH_PVAPI                       ON)
+option(WITH_QT                          OFF)
+option(WITH_QUICKTIME                   OFF)
+option(WITH_TBB                         OFF)
+option(WITH_TIFF                        ON)
+option(WITH_V4L                         ON)
+option(WITH_VTK                         OFF)
+option(WITH_WEBP                        OFF)
+option(WITH_XIMEA                       OFF)
+
+add_subproject(OpenCV)
+
+find_package(OpenCV)
+message("include_directories(${OpenCV_INCLUDE_DIRS})")
+include_directories(${OpenCV_INCLUDE_DIRS})
 
 #-----------------------------------------------------------------------------
 # Clone videoInput locally for easy webcam integration
@@ -71,12 +173,12 @@ include_directories(
 # MSVC specifics
 #-----------------------------------------------------------------------------
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-#set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "/Zc:wchar_t-")
+#option(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "/Zc:wchar_t-")
 
 #-----------------------------------------------------------------------------
 # Qt resource files
 #-----------------------------------------------------------------------------
-SET(MartyCam_QT_RCCS 
+set(MartyCam_QT_RCCS 
   resources.qrc
 )
 
@@ -152,10 +254,16 @@ SET(MartyCam_SRCS
   renderwidget.cpp
   settings.cpp
   IPCameraForm.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/videoInput/videoInputSrcAndDemos/libs/videoInput/videoInput.cpp
   MartyCam.rc
 )
+if (WIN32)
+  set(MartyCam_SRCS
+    ${MartyCam_SRCS}
+    ${CMAKE_CURRENT_SOURCE_DIR}/videoInput/videoInputSrcAndDemos/libs/videoInput/videoInput.cpp
+  )
+endif()
 
+message("MartyCam_SRCS are ${MartyCam_SRCS}")
 #-----------------------------------------------------------------------------
 # Target executable
 #-----------------------------------------------------------------------------
