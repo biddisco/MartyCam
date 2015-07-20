@@ -87,8 +87,12 @@ MartyCam::MartyCam() : QMainWindow(0)
     this->renderWidget->setCVSize(this->imageSize);
     this->processingThread = this->createProcessingThread(this->imageSize, NULL);
     this->processingThread->start();
+    //  
+    this->initChart();
   }
-  this->initChart();
+  else {
+    //abort if no camera devices connected
+  }
   // 
   restoreState(settings.value("mainWindowState").toByteArray());
 }
