@@ -1,10 +1,9 @@
 #--------------------------------------------------
 # analogue library
 #--------------------------------------------------
-
 INCLUDE_DIRECTORIES(
-  "${QT_QTSVG_INCLUDE_DIR}"
-  "${QT_QTSCRIPT_INCLUDE_DIR}"
+    #  "${QT_QTSVG_INCLUDE_DIR}"
+    #  "${QT_QTSCRIPT_INCLUDE_DIR}"
   "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets"
   "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/analogwidgets"
 )
@@ -17,7 +16,7 @@ SET(CPP_SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/code/led.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/code/manometer.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/code/potentiometer.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/code/scriptwidget.cpp"
+#  "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/code/scriptwidget.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/code/thermometer.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/code/wallclock.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/code/widgetwithbackground.cpp"
@@ -38,7 +37,7 @@ SET(QOBJECT_HDRS
   "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/analogwidgets/led.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/analogwidgets/manometer.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/analogwidgets/potentiometer.h"
-  "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/analogwidgets/scriptwidget.h"
+#  "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/analogwidgets/scriptwidget.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/analogwidgets/thermometer.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/analogwidgets/wallclock.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/analogwidgets/widgetwithbackground.h"
@@ -53,7 +52,7 @@ QT_WRAP_CPP(
   ${QOBJECT_HDRS}
 )
 
-QT4_ADD_RESOURCES(
+QT5_ADD_RESOURCES(
   analogue_RSRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/resources/resources.qrc"
   "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/code/analogwidgets.qrc"
@@ -65,12 +64,14 @@ ADD_LIBRARY(analogue STATIC
   ${CPP_SRCS}
 )
 
+qt5_use_modules(analogue Core Widgets Gui Svg OpenGL Concurrent)
+
 #--------------------------------------------------
 # ScriptTool
 #--------------------------------------------------
 
 IF (QT_QTSCRIPT_LIBRARY)
-  QT4_WRAP_UI( 
+  QT5_WRAP_UI( 
     scripttool_UIS_H
     scripttool/scripttool.ui
   )
@@ -105,7 +106,7 @@ ENDIF (QT_QTSCRIPT_LIBRARY)
 # Testing
 #--------------------------------------------------
 
-QT4_WRAP_UI( 
+QT5_WRAP_UI( 
   test_UIS_H
   test/testform.ui
 )
@@ -117,7 +118,7 @@ QT_WRAP_CPP(
   test/widgettester.h
 )
 
-QT4_ADD_RESOURCES(
+QT5_ADD_RESOURCES(
   test_RSRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/test/test.qrc"
 )

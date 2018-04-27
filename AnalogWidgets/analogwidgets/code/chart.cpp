@@ -657,7 +657,7 @@ void Chart::paintCursorPosition(QPainter & painter)
     pen.setWidthF(1.5); 
     painter.setPen(pen);
    // painter.drawRect(vert); 
-    QRect intersect = vert.intersect(horiz); 
+    QRect intersect = vert.intersected(horiz); 
     painter.drawRect(intersect); 	 	
   }	 	
 }// paintCursorPositon 
