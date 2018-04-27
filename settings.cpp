@@ -2,7 +2,7 @@
 #include <QDebug>
 #include <QFileDialog>
 #include <QSettings>
-#include <QClipboard.h>
+#include <QClipboard>
 //
 #include "renderwidget.h"
 #include "IPCameraForm.h"
@@ -199,10 +199,10 @@ void SettingsWidget::SetupAVIStrings()
 {
   QString filePath = this->ui.avi_directory->text();
   QString fileName = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
-  this->capturethread->setWriteMotionAVIName(fileName.toAscii().constData());
-  this->capturethread->setWriteMotionAVIDir(filePath.toAscii().constData());
+  this->capturethread->setWriteMotionAVIName(fileName.toLatin1().constData());
+  this->capturethread->setWriteMotionAVIDir(filePath.toLatin1().constData());
   QString fileName2 = "TimeLapse" + QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
-  this->capturethread->setWriteTimeLapseAVIName(fileName2.toAscii().constData());
+  this->capturethread->setWriteTimeLapseAVIName(fileName2.toLatin1().constData());
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::RecordMotionAVI(bool state) 
@@ -211,8 +211,8 @@ void SettingsWidget::RecordMotionAVI(bool state)
   //
   QString filePath = this->ui.avi_directory->text();
   QString fileName = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
-  this->capturethread->setWriteMotionAVIName(fileName.toAscii().constData());
-  this->capturethread->setWriteMotionAVIDir(filePath.toAscii().constData());
+  this->capturethread->setWriteMotionAVIName(fileName.toLatin1().constData());
+  this->capturethread->setWriteMotionAVIDir(filePath.toLatin1().constData());
 
   //
   // add duration to end time even if already running
@@ -294,7 +294,7 @@ void SettingsWidget::onCameraSelection(int index)
   // if index is a user supplied IP camera, get the URL from the map
   if (index>=this->NumDevices) {
     stringpairlist &cameras = this->cameraForm->getList();
-    val = cameras[val.toAscii().data()].c_str();
+    val = cameras[val.toLatin1().data()].c_str();
   }
   else {
     val = "";
@@ -343,32 +343,33 @@ void SettingsWidget::loadSettings()
   QSettings settings(settingsFileName, QSettings::IniFormat);
   //
   settings.beginGroup("MotionDetection");
-  SilentCall(this->ui.threshold)->setValue(settings.value("threshold",3).toInt()); 
-  SilentCall(this->ui.average)->setValue(settings.value("average",10).toInt()); 
-  SilentCall(this->ui.erode)->setValue(settings.value("erode",1).toInt()); 
-  SilentCall(this->ui.dilate)->setValue(settings.value("dilate",1).toInt()); 
+  const QSignalBlocker blocker(this);
+  this->ui.threshold->setValue(settings.value("threshold",3).toInt()); 
+  this->ui.average->setValue(settings.value("average",10).toInt()); 
+  this->ui.erode->setValue(settings.value("erode",1).toInt()); 
+  this->ui.dilate->setValue(settings.value("dilate",1).toInt()); 
   settings.endGroup();
 
   settings.beginGroup("UserSettings");
-  SilentCall(&this->ResolutionButtonGroup)->button(settings.value("resolution",0).toInt())->click();
-  SilentCall(&this->RotateButtonGroup)->button(settings.value("rotation",0).toInt())->click();
-  SilentCall(&this->ImageButtonGroup)->button(settings.value("display",0).toInt())->click();
-  SilentCall(this->ui.cameraSelect)->setCurrentIndex(settings.value("cameraIndex",0).toInt());
-  SilentCall(this->ui.avi_directory)->setText(settings.value("aviDirectory","C:\\Wildlife").toString());
+  this->ResolutionButtonGroup.button(settings.value("resolution",0).toInt())->click();
+  this->RotateButtonGroup.button(settings.value("rotation",0).toInt())->click();
+  this->ImageButtonGroup.button(settings.value("display",0).toInt())->click();
+  this->ui.cameraSelect->setCurrentIndex(settings.value("cameraIndex",0).toInt());
+  this->ui.avi_directory->setText(settings.value("aviDirectory","C:\\Wildlife").toString());
   //
-  SilentCall(this->ui.blendRatio)->setValue(settings.value("blendImage",0.5).toInt()); 
-  SilentCall(this->ui.noiseBlend)->setValue(settings.value("blendNoise",0.5).toInt()); 
+  this->ui.blendRatio->setValue(settings.value("blendImage",0.5).toInt()); 
+  this->ui.noiseBlend->setValue(settings.value("blendNoise",0.5).toInt()); 
   settings.endGroup();
 
   settings.beginGroup("MotionAVI");
   this->SnapshotId = settings.value("snapshot",0).toInt();  
-  SilentCall(this->ui.AVI_Duration)->setTime(settings.value("aviDuration", QTime(0,0,10)).toTime());
+  this->ui.AVI_Duration->setTime(settings.value("aviDuration", QTime(0,0,10)).toTime());
   settings.endGroup();
 
   settings.beginGroup("TimeLapse");
-  SilentCall(this->ui.startDateTime)->setDateTime(settings.value("startDateTime", QDateTime(QDate::currentDate(), QTime::currentTime())).toDateTime());
-  SilentCall(this->ui.interval)->setTime(settings.value("interval", QTime(0,1,00)).toTime());
-  SilentCall(this->ui.duration)->setTime(settings.value("duration", QDateTime(QDate(0,0,1), QTime(0,1,0))).toTime());
+  this->ui.startDateTime->setDateTime(settings.value("startDateTime", QDateTime(QDate::currentDate(), QTime::currentTime())).toDateTime());
+  this->ui.interval->setTime(settings.value("interval", QTime(0,1,00)).toTime());
+  this->ui.duration->setTime(settings.value("duration", QDateTime(QDate(0,0,1), QTime(0,1,0))).toTime());
   settings.endGroup();
 }
 //----------------------------------------------------------------------------

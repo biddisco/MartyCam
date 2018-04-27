@@ -95,7 +95,7 @@ void MotionFilter::process(const cv::Mat &image)
 
       // initialize font and precompute text size
       QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
-      this->text_size = cv::getTextSize( timestring.toAscii().data(), CV_FONT_HERSHEY_PLAIN, 1.0, 1, NULL);
+      this->text_size = cv::getTextSize( timestring.toLatin1().data(), CV_FONT_HERSHEY_PLAIN, 1.0, 1, NULL);
     }
 
     cv::Mat shownImage;
@@ -191,7 +191,7 @@ void MotionFilter::process(const cv::Mat &image)
     // Add time and data to image
     //
     QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
-    cv::putText(shownImage, timestring.toAscii().data(), 
+    cv::putText(shownImage, timestring.toLatin1().data(),
       cvPoint(shownImage.size().width - text_size.width - 4, text_size.height+4), 
       CV_FONT_HERSHEY_PLAIN, 1.0, cv::Scalar(255, 255, 255, 0), 1);
     //

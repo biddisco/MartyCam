@@ -7,7 +7,7 @@
 #pragma comment(linker, "/NODEFAULTLIB:atlthunk.lib")
 
 //int __stdcall WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
-int __stdcall main(int argc, char **argv)
+int main(int argc, char **argv)
 {
 #ifdef AAWIN32
   AllocConsole();

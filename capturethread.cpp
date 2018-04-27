@@ -63,7 +63,7 @@ CaptureThread::CaptureThread(ImageBuffer buffer, const cv::Size &size, int devic
   this->rotatedImage      = NULL;
   // initialize font and precompute text size
   QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
-  this->text_size = cv::getTextSize( timestring.toAscii().data(), CV_FONT_HERSHEY_PLAIN, 1.0, 1, NULL);
+  this->text_size = cv::getTextSize( timestring.toUtf8().constData(), CV_FONT_HERSHEY_PLAIN, 1.0, 1, NULL);
   //
   this->imageSize = size;
   if (size.width>0 && size.height>0) {
@@ -386,7 +386,7 @@ void CaptureThread::rotateImage(const cv::Mat &source, cv::Mat &rotated)
 void CaptureThread::captionImage(cv::Mat &image)
 {
   QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
-  cv::putText(image, timestring.toAscii().data(), 
+  cv::putText(image, timestring.toLatin1().data(),
     cvPoint(image.size().width - text_size.width - 4, text_size.height+4), 
     CV_FONT_HERSHEY_PLAIN, 1.0, cv::Scalar(255, 255, 255, 0), 1);
 }

@@ -11,29 +11,6 @@
 class RenderWidget;
 class IPCameraForm;
 
-template<class T>
-class QSignalBlocker
-{
-  T* const o;
-public:
-  explicit QSignalBlocker( T * oo ) : o(oo) {}
-  T* operator->() 
-  {
-    if (o) o->blockSignals( true );
-    return o;
-  }
-  ~QSignalBlocker() 
-  {
-    if (o) o->blockSignals(false);
-  }
-};
-
-template<class T>
-QSignalBlocker<T> SilentCall(T* o)
-{
-  return QSignalBlocker<T>(o);
-}
-
 class SettingsWidget : public QWidget {
 Q_OBJECT;
 public:
