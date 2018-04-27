@@ -12,26 +12,26 @@ class RenderWidget;
 class IPCameraForm;
 
 template<class T>
-class QSignalBlocker
+class QMySignalBlocker
 {
   T* const o;
 public:
-  explicit QSignalBlocker( T * oo ) : o(oo) {}
-  T* operator->() 
+  explicit QMySignalBlocker( T * oo ) : o(oo) {}
+  T* operator->()
   {
     if (o) o->blockSignals( true );
     return o;
   }
-  ~QSignalBlocker() 
+  ~QMySignalBlocker()
   {
     if (o) o->blockSignals(false);
   }
 };
 
 template<class T>
-QSignalBlocker<T> SilentCall(T* o)
+QMySignalBlocker<T> SilentCall(T* o)
 {
-  return QSignalBlocker<T>(o);
+  return QMySignalBlocker<T>(o);
 }
 
 class SettingsWidget : public QWidget {
@@ -46,7 +46,7 @@ public:
 
   void setThreads(CaptureThread *capthread, ProcessingThread *procthread);
   void setRenderWidget(RenderWidget *rw) { this->renderWidget = rw; }
-  
+
   QDateTime TimeLapseStart();
   QDateTime TimeLapseEnd();
   QTime     TimeLapseInterval() { return this->ui.interval->time(); }
@@ -59,7 +59,7 @@ public slots:
   void onThresholdChanged(int value);
   void onAverageChanged(int value);
   void onErodeChanged(int value);
-  void onDilateChanged(int value);  
+  void onDilateChanged(int value);
   void onBrowseClicked();
   void onAddCameraClicked();
   void onWriteMotionAVIToggled(bool state);

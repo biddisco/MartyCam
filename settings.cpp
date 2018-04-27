@@ -2,7 +2,7 @@
 #include <QDebug>
 #include <QFileDialog>
 #include <QSettings>
-#include <QClipboard.h>
+#include <QClipboard>
 //
 #include "renderwidget.h"
 #include "IPCameraForm.h"
@@ -19,7 +19,7 @@
 //#include "../../highgui/src/cap_dshow.cpp"
 
 //----------------------------------------------------------------------------
-SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent) 
+SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
 {
   this->processingthread = NULL;
   this->capturethread    = NULL;
@@ -34,15 +34,15 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   connect(ui.dilate, SIGNAL(valueChanged(int)), this, SLOT(onDilateChanged(int)));
   connect(ui.browse, SIGNAL(clicked()), this, SLOT(onBrowseClicked()));
   connect(ui.add_camera, SIGNAL(clicked()), this, SLOT(onAddCameraClicked()));
-  
+
   connect(ui.WriteMotionAVI, SIGNAL(toggled(bool)), this, SLOT(onWriteMotionAVIToggled(bool)));
   connect(&this->clock, SIGNAL(timeout()), this, SLOT(onTimer()));
-  connect(ui.blendRatio, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));  
-  connect(ui.noiseBlend, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));  
+  connect(ui.blendRatio, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));
+  connect(ui.noiseBlend, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));
   //
-  connect(ui.snapButton, SIGNAL(clicked()), this, SLOT(onSnapClicked()));  
-  connect(ui.startTimeLapse, SIGNAL(clicked()), this, SLOT(onStartTimeLapseClicked()));  
-  
+  connect(ui.snapButton, SIGNAL(clicked()), this, SLOT(onSnapClicked()));
+  connect(ui.startTimeLapse, SIGNAL(clicked()), this, SLOT(onStartTimeLapseClicked()));
+
   ResolutionButtonGroup.addButton(ui.res1600,4);
   ResolutionButtonGroup.addButton(ui.res1280,3);
   ResolutionButtonGroup.addButton(ui.res720,2);
@@ -153,12 +153,12 @@ void SettingsWidget::setupCameraList()
   }
 }
 //----------------------------------------------------------------------------
-void SettingsWidget::onWriteMotionAVIToggled(bool state) 
+void SettingsWidget::onWriteMotionAVIToggled(bool state)
 {
   this->RecordMotionAVI(state);
 }
 //----------------------------------------------------------------------------
-void SettingsWidget::onTimer() 
+void SettingsWidget::onTimer()
 {
   QTime now = QTime::currentTime().addMSecs(500);
   int el = this->AVI_StartTime.elapsed();
@@ -181,11 +181,11 @@ void SettingsWidget::onTimer()
   }
 }
 //----------------------------------------------------------------------------
-int SettingsWidget::getCameraIndex(std::string &text) 
+int SettingsWidget::getCameraIndex(std::string &text)
 {
   QString val = this->ui.cameraSelect->currentText();
   int index = this->ui.cameraSelect->currentIndex();
-  // if this is not an autodetected webcam/internal camera, return the user name  
+  // if this is not an autodetected webcam/internal camera, return the user name
   if (index>NumDevices) {
     text = val.toStdString();
   }
@@ -195,24 +195,24 @@ int SettingsWidget::getCameraIndex(std::string &text)
   return index;
 }
 //----------------------------------------------------------------------------
-void SettingsWidget::SetupAVIStrings() 
+void SettingsWidget::SetupAVIStrings()
 {
   QString filePath = this->ui.avi_directory->text();
   QString fileName = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
-  this->capturethread->setWriteMotionAVIName(fileName.toAscii().constData());
-  this->capturethread->setWriteMotionAVIDir(filePath.toAscii().constData());
+  this->capturethread->setWriteMotionAVIName(fileName.toLatin1().constData());
+  this->capturethread->setWriteMotionAVIDir(filePath.toLatin1().constData());
   QString fileName2 = "TimeLapse" + QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
-  this->capturethread->setWriteTimeLapseAVIName(fileName2.toAscii().constData());
+  this->capturethread->setWriteTimeLapseAVIName(fileName2.toLatin1().constData());
 }
 //----------------------------------------------------------------------------
-void SettingsWidget::RecordMotionAVI(bool state) 
+void SettingsWidget::RecordMotionAVI(bool state)
 {
   this->ui.WriteMotionAVI->setChecked(state);
   //
   QString filePath = this->ui.avi_directory->text();
   QString fileName = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
-  this->capturethread->setWriteMotionAVIName(fileName.toAscii().constData());
-  this->capturethread->setWriteMotionAVIDir(filePath.toAscii().constData());
+  this->capturethread->setWriteMotionAVIName(fileName.toLatin1().constData());
+  this->capturethread->setWriteMotionAVIDir(filePath.toLatin1().constData());
 
   //
   // add duration to end time even if already running
@@ -223,7 +223,7 @@ void SettingsWidget::RecordMotionAVI(bool state)
   int hrs  = duration.hour();
   this->AVI_EndTime = QTime::currentTime().addSecs(secs+mins*60+hrs*60*60).addMSecs(500);
   //
-  if (!state) {    
+  if (!state) {
     this->capturethread->setWriteMotionAVI(state);
     this->ui.WriteMotionAVI->setText("Write AVI");
     this->capturethread->closeAVI();
@@ -246,7 +246,7 @@ void SettingsWidget::onImageSelection(int btn)
   this->processingthread->setDisplayImage(btn);
 }
 //----------------------------------------------------------------------------
-cv::Size SettingsWidget::getSelectedResolution() 
+cv::Size SettingsWidget::getSelectedResolution()
 {
   switch (this->ResolutionButtonGroup.checkedId()) {
     case 4:
@@ -294,7 +294,7 @@ void SettingsWidget::onCameraSelection(int index)
   // if index is a user supplied IP camera, get the URL from the map
   if (index>=this->NumDevices) {
     stringpairlist &cameras = this->cameraForm->getList();
-    val = cameras[val.toAscii().data()].c_str();
+    val = cameras[val.toLatin1().data()].c_str();
   }
   else {
     val = "";
@@ -309,19 +309,19 @@ void SettingsWidget::saveSettings()
   QSettings settings(settingsFileName, QSettings::IniFormat);
   //
   settings.beginGroup("MotionDetection");
-  settings.setValue("threshold",this->ui.threshold->value()); 
-  settings.setValue("average",this->ui.average->value()); 
-  settings.setValue("erode",this->ui.erode->value()); 
-  settings.setValue("dilate",this->ui.dilate->value()); 
+  settings.setValue("threshold",this->ui.threshold->value());
+  settings.setValue("average",this->ui.average->value());
+  settings.setValue("erode",this->ui.erode->value());
+  settings.setValue("dilate",this->ui.dilate->value());
   settings.endGroup();
 
   settings.beginGroup("UserSettings");
   settings.setValue("resolution",this->ResolutionButtonGroup.checkedId());
   settings.setValue("rotation",this->RotateButtonGroup.checkedId());
   settings.setValue("display",this->ImageButtonGroup.checkedId());
-  settings.setValue("cameraIndex",this->ui.cameraSelect->currentIndex()); 
-  settings.setValue("aviDirectory",this->ui.avi_directory->text()); 
-  settings.setValue("blendImage",this->ui.blendRatio->value()); 
+  settings.setValue("cameraIndex",this->ui.cameraSelect->currentIndex());
+  settings.setValue("aviDirectory",this->ui.avi_directory->text());
+  settings.setValue("blendImage",this->ui.blendRatio->value());
   settings.setValue("blendNoise",this->ui.noiseBlend->value());
   settings.endGroup();
 
@@ -361,7 +361,7 @@ void SettingsWidget::loadSettings()
   settings.endGroup();
 
   settings.beginGroup("MotionAVI");
-  this->SnapshotId = settings.value("snapshot",0).toInt();  
+  this->SnapshotId = settings.value("snapshot",0).toInt();
   SilentCall(this->ui.AVI_Duration)->setTime(settings.value("aviDuration", QTime(0,0,10)).toTime());
   settings.endGroup();
 

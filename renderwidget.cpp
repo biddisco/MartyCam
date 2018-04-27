@@ -26,7 +26,7 @@ cv::Mat QImage2IplImage(QImage *qimg)
 // this->movingAverage  = cvCreateImage( imageSize, IPL_DEPTH_32F, 3);
 // this->thresholdImage = cvCreateImage( imageSize, IPL_DEPTH_8U, 1);
 //----------------------------------------------------------------------------
-template <typename T> 
+template <typename T>
 QImage *cvMat2QImage(const cv::Mat &mat)
 {
   int h = mat.size().height;
@@ -60,10 +60,10 @@ QImage *cvMat2QImage(const cv::Mat &mat)
   return qimg;
 }
 //----------------------------------------------------------------------------
-RenderWidget::RenderWidget(QWidget* parent) : QWidget(parent), Filter(), imageValid(1) 
+RenderWidget::RenderWidget(QWidget* parent) : QWidget(parent), Filter(), imageValid(1)
 {
   setAttribute(Qt::WA_OpaquePaintEvent, true); // don't clear the area before the paintEvent
-  setAttribute(Qt::WA_PaintOnScreen, true); // disable double buffering
+//  setAttribute(Qt::WA_PaintOnScreen, true); // disable double buffering
 //  setFixedSize(720, 576);
   connect(this, SIGNAL(frameSizeChanged(int, int)), this, SLOT(onFrameSizeChanged(int, int)));
   connect(this, SIGNAL(update_signal(bool, int)), this, SLOT(UpdateTrigger(bool, int)), Qt::QueuedConnection);
@@ -78,9 +78,9 @@ void RenderWidget::setCVSize(const cv::Size &size)
 //----------------------------------------------------------------------------
 void RenderWidget::onFrameSizeChanged(int width, int height) {
   this->setFixedSize(width, height);
-} 
+}
 //----------------------------------------------------------------------------
-void RenderWidget::updatePixmap(const cv::Mat &frame) 
+void RenderWidget::updatePixmap(const cv::Mat &frame)
 {
   QImage *temp = this->bufferImage;
   imageValid.acquire();
@@ -93,13 +93,13 @@ void RenderWidget::updatePixmap(const cv::Mat &frame)
   }
   else if (bytes_per_channel==2) {
     this->bufferImage = cvMat2QImage<short>(frame);
-  } 
+  }
   else if (bytes_per_channel==4) {
     this->bufferImage = cvMat2QImage<float>(frame);
-  } 
+  }
   else if (bytes_per_channel==8) {
     this->bufferImage = cvMat2QImage<double>(frame);
-  } 
+  }
   imageValid.release();
   delete temp;
 }

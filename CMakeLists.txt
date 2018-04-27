@@ -4,17 +4,20 @@ project(MartyCam)
 # CMake directives
 #-----------------------------------------------------------------------------
 cmake_minimum_required(VERSION 2.8)
-SET(CMAKE_MODULE_PATH ${CMAKE_CURRECT_SOURCE_DIR}/cmake)
+cmake_policy(SET CMP0059 NEW)
+
+
+SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 #-----------------------------------------------------------------------------
 # Include GitExternal for cloning other repos internally
 #-----------------------------------------------------------------------------
-include(${CMAKE_CURRENT_SOURCE_DIR}/CMake/GitExternal.cmake)
+include(GitExternal)
 
 #-----------------------------------------------------------------------------
 # Include Subproject for building other cmake projects as subdirs
 #-----------------------------------------------------------------------------
-include(${CMAKE_CURRENT_SOURCE_DIR}/CMake/SubProject.cmake)
+include(SubProject)
 
 #--------------------------------------------------
 # Setup Output directories
@@ -29,23 +32,18 @@ SET (CMAKE_ARCHIVE_OUTPUT_DIRECTORY
     ${PROJECT_BINARY_DIR}/bin CACHE PATH "Single Directory for all static libraries."
 )
 
-set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-std=c++11")
+set (CMAKE_CXX_STANDARD 11)
 #-----------------------------------------------------------------------------
 # Find OpenCV
 #-----------------------------------------------------------------------------
-#find_package(OpenCV REQUIRED)
-
+find_package(OpenCV REQUIRED)
+message("opencv libs are " ${OpenCV_LIBS})
 #-----------------------------------------------------------------------------
 # Find Qt
 #-----------------------------------------------------------------------------
-# by default only QtCore and QtGui modules are enabled
-set(QT_USE_QTCORE   TRUE)   
-set(QT_USE_QTGUI    TRUE)   
-set(QT_USE_QTSVG    TRUE)   
-set(QT_USE_QTSCRIPT FALSE)
+find_package(Qt5 COMPONENTS Core Widgets Gui Svg OpenGL Concurrent)
 
-find_package(Qt4 4.7 REQUIRED)
-include(${QT_USE_FILE})
+#include(${QT5_USE_FILE})
 
 #-----------------------------------------------------------------------------
 # Find Boost
@@ -55,89 +53,6 @@ find_package(Boost 1.49 REQUIRED thread system)
 link_directories(${Boost_LIBRARY_DIRS})
 include_directories(${Boost_INCLUDE_DIR})
 message("Boost link dir is ${Boost_LIBRARY_DIRS}")
-
-#-----------------------------------------------------------------------------
-# Clone OpenCV locally
-#-----------------------------------------------------------------------------
-git_external(
-  ${CMAKE_CURRENT_SOURCE_DIR}/OpenCV
-  https://github.com/Itseez/opencv.git
-  master
-  VERBOSE
-  SHALLOW
-)
-
-set(BUILD_DOCS                       ON)
-set(BUILD_EXAMPLES                   ON)
-set(BUILD_JASPER                     OFF)
-set(BUILD_JPEG                       ON)
-set(BUILD_OPENEXR                    OFF)
-set(BUILD_PACKAGE                    OFF)
-set(BUILD_PERF_TESTS                 OFF)
-set(BUILD_PNG                        ON)
-set(BUILD_SHARED_LIBS                ON)
-set(BUILD_TBB                        OFF)
-set(BUILD_TESTS                      OFF)
-set(BUILD_TIFF                       ON)
-set(BUILD_WITH_DEBUG_INFO            ON)
-set(BUILD_WITH_DYNAMIC_IPP           OFF)
-set(BUILD_ZLIB                       ON)
-set(BUILD_opencv_apps                OFF)
-set(BUILD_opencv_calib3d             OFF)
-set(BUILD_opencv_core                ON)
-set(BUILD_opencv_features2d          ON)
-set(BUILD_opencv_flann               ON)
-set(BUILD_opencv_hal                 ON)
-set(BUILD_opencv_highgui             ON)
-set(BUILD_opencv_imgcodecs           ON)
-set(BUILD_opencv_imgproc             ON)
-set(BUILD_opencv_ml                  ON)
-set(BUILD_opencv_objdetect           ON)
-set(BUILD_opencv_photo               OFF)
-set(BUILD_opencv_python2             OFF)
-set(BUILD_opencv_shape               ON)
-set(BUILD_opencv_stitching           OFF)
-set(BUILD_opencv_superres            ON)
-option(WITH_CUDA                        OFF)
-option(WITH_CUFFT                       OFF)
-option(WITH_EIGEN                       ON)
-option(WITH_FFMPEG                      ON)
-option(WITH_GDAL                        OFF)
-option(WITH_GIGEAPI                     OFF)
-option(WITH_GPHOTO2                     OFF)
-option(WITH_GSTREAMER                   OFF)
-option(WITH_GSTREAMER_0_10              OFF)
-option(WITH_IPP                         OFF)
-option(WITH_IPP_A                       OFF)
-option(WITH_JASPER                      OFF)
-option(WITH_JPEG                        ON)
-option(WITH_LIBV4L                      ON)
-option(WITH_OPENCL                      ON)
-option(WITH_OPENCLAMDBLAS               OFF)
-option(WITH_OPENCLAMDFFT                OFF)
-option(WITH_OPENCL_SVM                  OFF)
-option(WITH_OPENEXR                     OFF)
-option(WITH_OPENGL                      OFF)
-option(WITH_OPENMP                      OFF)
-option(WITH_OPENNI                      OFF)
-option(WITH_OPENNI2                     OFF)
-option(WITH_PNG                         ON)
-option(WITH_PTHREADS_PF                 ON)
-option(WITH_PVAPI                       ON)
-option(WITH_QT                          OFF)
-option(WITH_QUICKTIME                   OFF)
-option(WITH_TBB                         OFF)
-option(WITH_TIFF                        ON)
-option(WITH_V4L                         ON)
-option(WITH_VTK                         OFF)
-option(WITH_WEBP                        OFF)
-option(WITH_XIMEA                       OFF)
-
-add_subproject(OpenCV)
-
-find_package(OpenCV)
-message("include_directories(${OpenCV_INCLUDE_DIRS})")
-include_directories(${OpenCV_INCLUDE_DIRS})
 
 #-----------------------------------------------------------------------------
 # Clone videoInput locally for easy webcam integration
@@ -208,12 +123,12 @@ set(MartyCam_QT_MOC_HDRS
 #-----------------------------------------------------------------------------
 
 # generate rules that will run rcc on the resource files
-QT4_ADD_RESOURCES(MartyCam_RCC_SRCS 
+QT5_ADD_RESOURCES(MartyCam_RCC_SRCS 
   ${MartyCam_QT_RCCS}
 )
 
 # generate rules that will run uic on .ui files:
-QT4_WRAP_UI(MartyCam_QT_UIS_H 
+QT5_WRAP_UI(MartyCam_QT_UIS_H 
   ${MartyCam_QT_UIS}
 )
 
@@ -235,7 +150,6 @@ include_directories(
   "${CMAKE_CURRENT_BINARY_DIR}"
   "${CMAKE_CURRENT_SOURCE_DIR}/AnalogWidgets/analogwidgets"
   "${CMAKE_CURRENT_SOURCE_DIR}/AnalogWidgets/analogwidgets/analogwidgets"
-  "${QT_INCLUDE_DIR}"
 )
 
 #-----------------------------------------------------------------------------
@@ -274,9 +188,10 @@ ADD_EXECUTABLE(MartyCam
   ${MartyCam_MOC_SRCS}
 )
 
+qt5_use_modules(MartyCam Core Widgets Gui Svg OpenGL Concurrent)
+
 target_link_libraries(MartyCam 
   analogue
-  ${QT_LIBRARIES} 
   ${OpenCV_LIBS} 
   ${Boost_LIBRARIES}
 )
@@ -289,5 +204,6 @@ ADD_EXECUTABLE(OpenCVCameraTest
 )
 
 target_link_libraries(OpenCVCameraTest
-  ${OpenCV_LIBS} 
+  ${OpenCV_LIBS}
 )
+

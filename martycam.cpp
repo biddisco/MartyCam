@@ -289,7 +289,10 @@ void MartyCam::loadSettings()
   QSettings settings(settingsFileName, QSettings::IniFormat);
   //
   settings.beginGroup("Trigger");
-  SilentCall(this->ui.user_trackval)->setValue(settings.value("trackval",50).toInt()); 
+  {
+    const QSignalBlocker blocker(this->ui.user_trackval);
+    this->ui.user_trackval->setValue(settings.value("trackval",50).toInt()); 
+  }
   settings.endGroup();
 }
 //----------------------------------------------------------------------------

@@ -74,8 +74,8 @@ void IPCameraForm::loadSettings()
   for (int i=0; i<size; ++i) {
     settings.setArrayIndex(i);
     stringpair camera;
-    camera.first = settings.value("CameraName").toString().toAscii().data();
-    camera.second = settings.value("URL").toString().toAscii().data();
+    camera.first = settings.value("CameraName").toString().toLatin1().data();
+    camera.second = settings.value("URL").toString().toLatin1().data();
     this->CameraList[camera.first] = camera.second;
   }
   settings.endArray();
