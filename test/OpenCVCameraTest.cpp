@@ -1,28 +1,60 @@
-#include <stdio.h>
-#include <opencv2/highgui.hpp>
+//Uncomment the following line if you are compiling this code in Visual Studio
+//#include "stdafx.h"
 
-int main(int argc, char **argv){
+#include <opencv2/opencv.hpp>
+#include <iostream>
 
-//    CvCapture *camera=cvCaptureFromFile("http://username:pass@cam_address/axis-cgi/mjpg/video.cgi?resolution=640x480&req_fps=30&.mjpg");
-//    CvCapture *camera=cvCaptureFromFile("http://192.168.1.21/videostream.asf?user=admin&pwd=1234&req_fps=30&.mjpg");
-//    CvCapture *camera=cvCaptureFromFile("http://admin:1234@192.168.1.21/videostream.cgi?req_fps=30&.mjpg");
+using namespace cv;
+using namespace std;
 
-    printf("Reading from any camera\n");
+int main(int argc, char* argv[])
+{
+ //Open the default video camera
+ VideoCapture cap(0);
 
-    CvCapture* camera = cvCaptureFromCAM(CV_CAP_ANY); //Capture using any camera connected to your system
-    if (camera==NULL)
-        printf("camera is null\n");
-    else
-        printf("camera is not null");
+ // if not success, exit program
+ if (cap.isOpened() == false)  
+ {
+  cout << "Cannot open the video camera" << endl;
+  cin.get(); //wait for any key press
+  return -1;
+ } 
 
-    cvNamedWindow("img");
-    while (cvWaitKey(10)!=atoi("q")){
-        double t1=(double)cvGetTickCount();
-        IplImage *img=cvQueryFrame(camera);
-        double t2=(double)cvGetTickCount();
-        printf("time: %gms  fps: %.2g\n",(t2-t1)/(cvGetTickFrequency()*1000.), 1000./((t2-t1)/(cvGetTickFrequency()*1000.)));
-        cvShowImage("img",img);
-    }
-    cvReleaseCapture(&camera);
+ double dWidth = cap.get(CAP_PROP_FRAME_WIDTH); //get the width of frames of the video
+ double dHeight = cap.get(CAP_PROP_FRAME_HEIGHT); //get the height of frames of the video
+
+ cout << "Resolution of the video : " << dWidth << " x " << dHeight << endl;
+
+ string window_name = "My Camera Feed";
+ namedWindow(window_name); //create a window called "My Camera Feed"
+ 
+ while (true)
+ {
+  Mat frame;
+  bool bSuccess = cap.read(frame); // read a new frame from video 
+
+  //Breaking the while loop if the frames cannot be captured
+  if (bSuccess == false) 
+  {
+   cout << "Video camera is disconnected" << endl;
+   cin.get(); //Wait for any key press
+   break;
+  }
+
+  //show the frame in the created window
+  imshow(window_name, frame);
+
+  //wait for for 10 ms until any key is pressed.  
+  //If the 'Esc' key is pressed, break the while loop.
+  //If the any other key is pressed, continue the loop 
+  //If any key is not pressed withing 10 ms, continue the loop 
+  if (waitKey(10) == 27)
+  {
+   cout << "Esc key is pressed by user. Stoppig the video" << endl;
+   break;
+  }
+ }
+
+ return 0;
+
 }
-
