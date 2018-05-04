@@ -56,21 +56,6 @@ include_directories(${Boost_INCLUDE_DIR})
 message("Boost link dir is ${Boost_LIBRARY_DIRS}")
 
 #-----------------------------------------------------------------------------
-# Clone videoInput locally for easy webcam integration
-#-----------------------------------------------------------------------------
-git_external(
-  ${CMAKE_CURRENT_SOURCE_DIR}/videoInput
-  git@github.com:ofTheo/videoInput.git
-  master
-  VERBOSE
-  SHALLOW
-)
-
-include_directories(
-  "${CMAKE_CURRENT_SOURCE_DIR}/streamulus/src"
-)
-
-#-----------------------------------------------------------------------------
 # Clone Streamulus locally : used for experimental processing of data stream
 #-----------------------------------------------------------------------------
 git_external(
@@ -82,7 +67,7 @@ git_external(
 )
 
 include_directories(
-  "${CMAKE_CURRENT_SOURCE_DIR}/videoInput/videoInputSrcAndDemos/libs/videoInput"
+  "${CMAKE_CURRENT_SOURCE_DIR}/streamulus/src"
 )
 
 #-----------------------------------------------------------------------------
