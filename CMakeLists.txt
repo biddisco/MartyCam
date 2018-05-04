@@ -38,6 +38,7 @@ set (CMAKE_CXX_STANDARD 11)
 #-----------------------------------------------------------------------------
 find_package(OpenCV REQUIRED)
 message("opencv libs are " ${OpenCV_LIBS})
+
 #-----------------------------------------------------------------------------
 # Find Qt
 #-----------------------------------------------------------------------------
@@ -206,4 +207,13 @@ ADD_EXECUTABLE(OpenCVCameraTest
 target_link_libraries(OpenCVCameraTest
   ${OpenCV_LIBS}
 )
+
+ADD_EXECUTABLE(OpenCVCameraTest2
+  test/OpenCVCameraTest2.cpp
+)
+
+target_link_libraries(OpenCVCameraTest2
+  ${OpenCV_LIBS}
+)
+
 
