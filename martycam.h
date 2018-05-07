@@ -16,7 +16,7 @@ class RenderWidget;
 class QToolBar;
 class QDockWidget;
 class SettingsWidget;
-    
+
 class MartyCam : public QMainWindow {
 Q_OBJECT
 public:
@@ -32,9 +32,6 @@ public slots:
   void onRotationChanged(int rotation);
   void onCameraIndexChanged(int index, QString URL);
   void onUserTrackChanged(int value);
-  void onRecordingStateChanged(bool state);
-  //
-  void onMouseDoubleClickEvent(const QPoint&);
 
 protected:
   void closeEvent(QCloseEvent*);
@@ -42,7 +39,7 @@ protected:
   void createCaptureThread(int FPS, cv::Size &size, int camera, const std::string &cameraname);
   void deleteProcessingThread();
   ProcessingThread *createProcessingThread(cv::Size &size, ProcessingThread *oldThread);
-  
+
   void resetChart();
   void initChart();
 

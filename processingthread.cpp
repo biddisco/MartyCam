@@ -9,21 +9,17 @@
 #include "processingthread.h"
 //
 #include "filter.h"
-#include "PSNRFilter.h"
-#include "GraphUpdateFilter.h"
 //
 //----------------------------------------------------------------------------
 ProcessingThread::ProcessingThread(ImageBuffer buffer, cv::Size &size) : QThread()
 {
   this->imageBuffer       = buffer;
-  this->graphFilter       = new GraphUpdateFilter();
   this->motionFilter      = new MotionFilter();
   this->abort             = false;
 }
 //----------------------------------------------------------------------------
 ProcessingThread::~ProcessingThread()
 {
-  delete this->graphFilter;
   delete this->motionFilter;
 }
 //----------------------------------------------------------------------------
@@ -36,7 +32,6 @@ void ProcessingThread::CopySettings(ProcessingThread *thread)
   this->motionFilter->dilateIterations =  thread->motionFilter->dilateIterations;
   this->motionFilter->displayImage =  thread->motionFilter->displayImage;
   this->motionFilter->blendRatio =  thread->motionFilter->blendRatio;
-  this->motionFilter->noiseBlendRatio =  thread->motionFilter->noiseBlendRatio;
 }
 //----------------------------------------------------------------------------
 void ProcessingThread::run() {
@@ -52,18 +47,7 @@ void ProcessingThread::run() {
     cv::Mat cameracopy = cameraImage.clone();
     //
     this->motionFilter->process(cameracopy);
-    this->graphFilter->process(
-      this->motionFilter->PSNR_Filter->PSNR, 
-      this->motionFilter->logMotion,
-      this->motionFilter->normalizedMotion,
-      this->motionFilter->rollingMean,
-      this->motionFilter->decayFilter->mavg10.getLastResult(),
-      this->motionFilter->decayFilter->mavg1.getLastResult(),
-      framenum++,
-      this->motionFilter->triggerLevel,
-      this->motionFilter->eventLevel);
-
-     emit (NewData());
+    emit (NewData());
   }
   this->abort = 0;
 }

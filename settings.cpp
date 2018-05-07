@@ -5,7 +5,6 @@
 #include <QClipboard>
 //
 #include "renderwidget.h"
-#include "IPCameraForm.h"
 //
 #ifdef WIN32
  #include "videoInput.h"
@@ -38,7 +37,6 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   connect(ui.WriteMotionAVI, SIGNAL(toggled(bool)), this, SLOT(onWriteMotionAVIToggled(bool)));
   connect(&this->clock, SIGNAL(timeout()), this, SLOT(onTimer()));
   connect(ui.blendRatio, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));
-  connect(ui.noiseBlend, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));
   //
   connect(ui.snapButton, SIGNAL(clicked()), this, SLOT(onSnapClicked()));
   connect(ui.startTimeLapse, SIGNAL(clicked()), this, SLOT(onStartTimeLapseClicked()));
@@ -55,7 +53,6 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   ImageButtonGroup.addButton(ui.differenceImage,2);
   ImageButtonGroup.addButton(ui.blendedImage,3);
   ImageButtonGroup.addButton(ui.maskImage,4);
-  ImageButtonGroup.addButton(ui.noiseImage,5);
   connect(&ImageButtonGroup, SIGNAL(buttonClicked(int)), this, SLOT(onImageSelection(int)));
 
   RotateButtonGroup.addButton(ui.rotate0,0);
@@ -64,7 +61,6 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   RotateButtonGroup.addButton(ui.rotate180,3);
   connect(&RotateButtonGroup, SIGNAL(buttonClicked(int)), this, SLOT(onRotateSelection(int)));
   //
-  this->cameraForm = new IPCameraForm(this);
   this->setupCameraList();
 }
 //----------------------------------------------------------------------------
@@ -114,16 +110,10 @@ void SettingsWidget::onBrowseClicked()
 //----------------------------------------------------------------------------
 void SettingsWidget::onAddCameraClicked()
 {
-  this->cameraForm->seupModelView();
-  if(this->cameraForm->exec()) {
-    this->cameraForm->saveSettings();
-    this->setupCameraList();
-  }
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::setupCameraList()
 {
-  disconnect(this->ui.cameraSelect, SIGNAL(currentIndexChanged(int)), this, SLOT(onCameraSelection(int)));
   int index = this->ui.cameraSelect->currentIndex();
   this->ui.cameraSelect->blockSignals(true);
   this->ui.cameraSelect->clear();
@@ -138,19 +128,6 @@ void SettingsWidget::setupCameraList()
   this->NumDevices = 1;
   this->ui.cameraSelect->addItem("standard camera");
 #endif
-  //
-  stringpairlist &cameras = this->cameraForm->getList();
-  for (stringpairlist::iterator it=cameras.begin(); it!=cameras.end(); ++it) {
-    this->ui.cameraSelect->addItem(it->first.c_str());
-  }
-  this->ui.cameraSelect->blockSignals(false);
-  connect(this->ui.cameraSelect, SIGNAL(currentIndexChanged(int)), this, SLOT(onCameraSelection(int)));
-  if (index>=0 && index<this->ui.cameraSelect->count()) {
-    this->ui.cameraSelect->setCurrentIndex(index);
-  }
-  else {
-    this->ui.cameraSelect->setCurrentIndex(0);
-  }
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::onWriteMotionAVIToggled(bool state)
@@ -285,22 +262,7 @@ void SettingsWidget::onRotateSelection(int btn)
 //----------------------------------------------------------------------------
 void SettingsWidget::onBlendChanged(int value)
 {
-  this->processingthread->setBlendRatios(this->ui.blendRatio->value()/100.0, this->ui.noiseBlend->value()/100.0);
-}
-//----------------------------------------------------------------------------
-void SettingsWidget::onCameraSelection(int index)
-{
-  QString val = this->ui.cameraSelect->currentText();
-  // if index is a user supplied IP camera, get the URL from the map
-  if (index>=this->NumDevices) {
-    stringpairlist &cameras = this->cameraForm->getList();
-    val = cameras[val.toLatin1().data()].c_str();
-  }
-  else {
-    val = "";
-  }
-  //
-  emit(CameraIndexChanged(index, val));
+  this->processingthread->setBlendRatios(this->ui.blendRatio->value()/100.0);
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::saveSettings()
@@ -322,7 +284,6 @@ void SettingsWidget::saveSettings()
   settings.setValue("cameraIndex",this->ui.cameraSelect->currentIndex());
   settings.setValue("aviDirectory",this->ui.avi_directory->text());
   settings.setValue("blendImage",this->ui.blendRatio->value());
-  settings.setValue("blendNoise",this->ui.noiseBlend->value());
   settings.endGroup();
 
   settings.beginGroup("MotionAVI");
@@ -343,10 +304,10 @@ void SettingsWidget::loadSettings()
   QSettings settings(settingsFileName, QSettings::IniFormat);
   //
   settings.beginGroup("MotionDetection");
-  SilentCall(this->ui.threshold)->setValue(settings.value("threshold",3).toInt()); 
-  SilentCall(this->ui.average)->setValue(settings.value("average",10).toInt()); 
-  SilentCall(this->ui.erode)->setValue(settings.value("erode",1).toInt()); 
-  SilentCall(this->ui.dilate)->setValue(settings.value("dilate",1).toInt()); 
+  SilentCall(this->ui.threshold)->setValue(settings.value("threshold",3).toInt());
+  SilentCall(this->ui.average)->setValue(settings.value("average",10).toInt());
+  SilentCall(this->ui.erode)->setValue(settings.value("erode",1).toInt());
+  SilentCall(this->ui.dilate)->setValue(settings.value("dilate",1).toInt());
   settings.endGroup();
 
   settings.beginGroup("UserSettings");
@@ -354,10 +315,9 @@ void SettingsWidget::loadSettings()
   SilentCall(&this->RotateButtonGroup)->button(settings.value("rotation",0).toInt())->click();
   SilentCall(&this->ImageButtonGroup)->button(settings.value("display",0).toInt())->click();
   SilentCall(this->ui.cameraSelect)->setCurrentIndex(settings.value("cameraIndex",0).toInt());
-  SilentCall(this->ui.avi_directory)->setText(settings.value("aviDirectory","C:\\Wildlife").toString());
+  SilentCall(this->ui.avi_directory)->setText(settings.value("aviDirectory","$HOME/wildlife").toString());
   //
-  SilentCall(this->ui.blendRatio)->setValue(settings.value("blendImage",0.5).toInt()); 
-  SilentCall(this->ui.noiseBlend)->setValue(settings.value("blendNoise",0.5).toInt()); 
+  SilentCall(this->ui.blendRatio)->setValue(settings.value("blendImage",0.5).toInt());
   settings.endGroup();
 
   settings.beginGroup("MotionAVI");

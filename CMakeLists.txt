@@ -50,25 +50,10 @@ find_package(Qt5 COMPONENTS Core Widgets Gui Svg OpenGL Concurrent)
 # Find Boost
 #-----------------------------------------------------------------------------
 option(Boost_USE_STATIC "Use static Boost libraries" ON)
-find_package(Boost 1.49 REQUIRED thread system) 
+find_package(Boost 1.49 REQUIRED thread system)
 link_directories(${Boost_LIBRARY_DIRS})
 include_directories(${Boost_INCLUDE_DIR})
 message("Boost link dir is ${Boost_LIBRARY_DIRS}")
-
-#-----------------------------------------------------------------------------
-# Clone Streamulus locally : used for experimental processing of data stream
-#-----------------------------------------------------------------------------
-git_external(
-  ${CMAKE_CURRENT_SOURCE_DIR}/streamulus
-  git@github.com:biddisco/streamulus.git
-  master
-  VERBOSE
-  SHALLOW
-)
-
-include_directories(
-  "${CMAKE_CURRENT_SOURCE_DIR}/streamulus/src"
-)
 
 #-----------------------------------------------------------------------------
 # MSVC specifics
@@ -79,7 +64,7 @@ add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 #-----------------------------------------------------------------------------
 # Qt resource files
 #-----------------------------------------------------------------------------
-set(MartyCam_QT_RCCS 
+set(MartyCam_QT_RCCS
   resources.qrc
 )
 
@@ -89,7 +74,6 @@ set(MartyCam_QT_RCCS
 set(MartyCam_QT_UIS
   settings.ui
   martycam.ui
-  IPCameraForm.ui
 )
 
 #-----------------------------------------------------------------------------
@@ -97,7 +81,6 @@ set(MartyCam_QT_UIS
 #-----------------------------------------------------------------------------
 set(MartyCam_QT_MOC_HDRS
   martycam.h
-  IPCameraForm.h
   settings.h
   renderwidget.h
   capturethread.h
@@ -109,24 +92,19 @@ set(MartyCam_QT_MOC_HDRS
 #-----------------------------------------------------------------------------
 
 # generate rules that will run rcc on the resource files
-QT5_ADD_RESOURCES(MartyCam_RCC_SRCS 
+QT5_ADD_RESOURCES(MartyCam_RCC_SRCS
   ${MartyCam_QT_RCCS}
 )
 
 # generate rules that will run uic on .ui files:
-QT5_WRAP_UI(MartyCam_QT_UIS_H 
+QT5_WRAP_UI(MartyCam_QT_UIS_H
   ${MartyCam_QT_UIS}
 )
 
 # generate rules that will run moc on QObject header files
-QT_WRAP_CPP(MartyCam MartyCam_MOC_SRCS 
+QT_WRAP_CPP(MartyCam MartyCam_MOC_SRCS
   ${MartyCam_QT_MOC_HDRS}
 )
-
-#-----------------------------------------------------------------------------
-# Analogue widgets library used for graph plotting
-#-----------------------------------------------------------------------------
-ADD_SUBDIRECTORY(AnalogWidgets)
 
 #-----------------------------------------------------------------------------
 # Include directories
@@ -134,26 +112,20 @@ ADD_SUBDIRECTORY(AnalogWidgets)
 include_directories(
   "${CMAKE_CURRENT_SOURCE_DIR}"
   "${CMAKE_CURRENT_BINARY_DIR}"
-  "${CMAKE_CURRENT_SOURCE_DIR}/AnalogWidgets/analogwidgets"
-  "${CMAKE_CURRENT_SOURCE_DIR}/AnalogWidgets/analogwidgets/analogwidgets"
 )
 
 #-----------------------------------------------------------------------------
-# Main source files 
+# Main source files
 #-----------------------------------------------------------------------------
 SET(MartyCam_SRCS
   capturethread.cpp
   filter.cpp
-  PSNRFilter.cpp
   MotionFilter.cpp
-  DecayFilter.cpp
-  GraphUpdateFilter.cpp
   martycam.cpp
   main.cpp
   processingthread.cpp
   renderwidget.cpp
   settings.cpp
-  IPCameraForm.cpp
   MartyCam.rc
 )
 if (WIN32)
@@ -167,8 +139,8 @@ message("MartyCam_SRCS are ${MartyCam_SRCS}")
 #-----------------------------------------------------------------------------
 # Target executable
 #-----------------------------------------------------------------------------
-ADD_EXECUTABLE(MartyCam 
-  ${MartyCam_SRCS} 
+ADD_EXECUTABLE(MartyCam
+  ${MartyCam_SRCS}
   ${MartyCam_RCC_SRCS}
   ${MartyCam_QT_UIS_H}
   ${MartyCam_MOC_SRCS}
@@ -176,16 +148,15 @@ ADD_EXECUTABLE(MartyCam
 
 qt5_use_modules(MartyCam Core Widgets Gui Svg OpenGL Concurrent)
 
-target_link_libraries(MartyCam 
-  analogue
-  ${OpenCV_LIBS} 
+target_link_libraries(MartyCam
+  ${OpenCV_LIBS}
   ${Boost_LIBRARIES}
 )
 
 #-----------------------------------------------------------------------------
 # Testing
 #-----------------------------------------------------------------------------
-ADD_EXECUTABLE(OpenCVCameraTest 
+ADD_EXECUTABLE(OpenCVCameraTest
   test/OpenCVCameraTest.cpp
 )
 

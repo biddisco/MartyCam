@@ -19,13 +19,13 @@ class GraphUpdateFilter;
 
 class ProcessingThread : public QThread {
 Q_OBJECT;
-public: 
+public:
    ProcessingThread(ImageBuffer buffer, cv::Size &size);
   ~ProcessingThread();
   //
   void CopySettings(ProcessingThread *thread);
   void DeleteTemporaryStorage();
-  // 
+  //
   double getmotionEstimate() { return this->motionFilter->motionEstimate; }
   //
   void setRootFilter(Filter* filter) {   this->motionFilter->renderer = filter; }
@@ -34,9 +34,8 @@ public:
   void setErodeIterations(int val) { this->motionFilter->erodeIterations = val; }
   void setDilateIterations(int val) { this->motionFilter->dilateIterations = val; }
   void setDisplayImage(int image) { this->motionFilter->displayImage = image; }
-  void setBlendRatios(double ratio1, double ratio2) { 
+  void setBlendRatios(double ratio1) {
     this->motionFilter->blendRatio = ratio1;
-    this->motionFilter->noiseBlendRatio = ratio2; 
   }
 
   void run();

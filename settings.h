@@ -68,7 +68,6 @@ public slots:
   void onRotateSelection(int btn);
   void onResolutionSelection(int btn);
   void onBlendChanged(int value);
-  void onCameraSelection(int index);
   //
   void onSnapClicked();
   void onStartTimeLapseClicked();
