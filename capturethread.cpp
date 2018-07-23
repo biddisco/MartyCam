@@ -5,8 +5,11 @@
 #include <iomanip>
 //
 #include "opencv2/imgproc.hpp"
+#include "opencv2/videoio/videoio_c.h"
+#include "opencv2/imgproc/imgproc_c.h"
 
 #include "capturethread.h"
+
 typedef boost::shared_ptr< ConcurrentCircularBuffer<cv::Mat> > ImageBuffer;
 
 //
