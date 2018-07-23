@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 2.8)
 cmake_policy(SET CMP0059 NEW)
 
 
-SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake;5.9.6/gcc_64/lib/cmake/Qt5/)
 
 #-----------------------------------------------------------------------------
 # Include GitExternal for cloning other repos internally
@@ -49,11 +49,12 @@ find_package(Qt5 COMPONENTS Core Widgets Gui Svg OpenGL Concurrent)
 #-----------------------------------------------------------------------------
 # Find Boost
 #-----------------------------------------------------------------------------
-option(Boost_USE_STATIC "Use static Boost libraries" ON)
+#option(Boost_USE_STATIC "Use static Boost libraries" ON)
 find_package(Boost 1.49 REQUIRED thread system)
 link_directories(${Boost_LIBRARY_DIRS})
 include_directories(${Boost_INCLUDE_DIR})
-message("Boost link dir is ${Boost_LIBRARY_DIRS}")
+message("Boost library dir is ${Boost_LIBRARY_DIRS}")
+message("Boost include dir is ${Boost_INCLUDE_DIRS}")
 
 #-----------------------------------------------------------------------------
 # MSVC specifics
