@@ -1,2 +1,10 @@
 streamulus
 OpenCV
+build
+*.creator
+*.files
+*.includes
+*.config
+*.autosave
+*.user
+*.idea
