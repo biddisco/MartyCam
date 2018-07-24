@@ -9,6 +9,8 @@
 #include <QSettings>
 //
 //----------------------------------------------------------------------------
+const int MartyCam::IMAGE_BUFF_CAPACITY = 5;
+
 MartyCam::MartyCam() : QMainWindow(0)
 {
   this->ui.setupUi(this);
@@ -28,7 +30,7 @@ MartyCam::MartyCam() : QMainWindow(0)
   this->EventRecordCounter      = 0;
   this->insideMotionEvent       = 0;
   this->imageSize               = cv::Size(0,0);
-  this->imageBuffer             = ImageBuffer(new ConcurrentCircularBuffer<cv::Mat>(5));
+  this->imageBuffer             = ImageBuffer(new ConcurrentCircularBuffer<cv::Mat>(IMAGE_BUFF_CAPACITY));
   this->cameraIndex             = 1;
 
   //
@@ -170,10 +172,10 @@ void MartyCam::updateGUI() {
   //
   if (!this->processingThread) return;
 
-  statusBar()->showMessage(QString("FPS : %1, Counter : %2, Buffer : %3").
+  statusBar()->showMessage(QString("FPS : %1, Frame Counter : %2, Image Buffer Occupancy : %3\%").
     arg(this->captureThread->getFPS(), 5, 'f', 2).
     arg(captureThread->GetFrameCounter(), 5).
-    arg(this->imageBuffer->size(), 5));
+    arg((float)this->imageBuffer->size()/IMAGE_BUFF_CAPACITY, 4));
 
   QDateTime now = QDateTime::currentDateTime();
   QDateTime start = this->settingsWidget->TimeLapseStart();

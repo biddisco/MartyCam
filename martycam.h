@@ -44,6 +44,7 @@ protected:
   void initChart();
 
 private:
+  static const int IMAGE_BUFF_CAPACITY;
   Ui::MartyCam ui;
   RenderWidget            *renderWidget;
   QDockWidget             *progressToolbar;
