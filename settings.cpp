@@ -3,6 +3,7 @@
 #include <QFileDialog>
 #include <QSettings>
 #include <QClipboard>
+#include <QMessageBox>
 //
 #include "renderwidget.h"
 //
@@ -110,6 +111,11 @@ void SettingsWidget::onBrowseClicked()
 //----------------------------------------------------------------------------
 void SettingsWidget::onAddCameraClicked()
 {
+    //TODO implement this or delete the GUI element
+    QMessageBox::warning(
+        this,
+        tr("Not implemented warning."),
+        tr("Switching camera from the default is not currently available.") );
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::setupCameraList()
