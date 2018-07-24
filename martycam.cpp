@@ -152,7 +152,7 @@ void MartyCam::onResolutionSelected(cv::Size newSize)
   }
   this->imageSize = newSize;
   this->captureThread->setResolution(this->imageSize);
-  this->clearGraphs();
+  this->onRotationChanged(this->settingsWidget->getSelectedRotation());
 }
 //----------------------------------------------------------------------------
 void MartyCam::onRotationChanged(int rotation)
