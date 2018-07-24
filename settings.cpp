@@ -340,8 +340,8 @@ void SettingsWidget::loadSettings()
 //----------------------------------------------------------------------------
 void SettingsWidget::onSnapClicked()
 {
-  QPixmap p = QPixmap::grabWidget(this->renderWidget);
-  QString filename = QString("%1/MartySnap-%2").arg(this->ui.avi_directory->text()).arg(SnapshotId, 3, 10, QChar('0')) + QString(".png");
+  QPixmap p = this->renderWidget->grab();
+  QString filename = QString("%1/MartySnap-%2").arg(this->ui.avi_directory->text()).arg(SnapshotId++, 3, 10, QChar('0')) + QString(".png");
   p.save(filename);
   QClipboard *clipboard = QApplication::clipboard();
   clipboard->setPixmap(p);
@@ -349,8 +349,8 @@ void SettingsWidget::onSnapClicked()
 //----------------------------------------------------------------------------
 void SettingsWidget::onStartTimeLapseClicked()
 {
-  QPixmap p = QPixmap::grabWidget(this->renderWidget);
-  QString filename = QString("%1/MartySnap-%2").arg(this->ui.avi_directory->text()).arg(SnapshotId, 3, 10, QChar('0')) + QString(".png");
+  QPixmap p = this->renderWidget->grab();
+  QString filename = QString("%1/MartySnap-%2").arg(this->ui.avi_directory->text()).arg(SnapshotId++, 3, 10, QChar('0')) + QString(".png");
   p.save(filename);
   QClipboard *clipboard = QApplication::clipboard();
   clipboard->setPixmap(p);
