@@ -2,4 +2,4 @@
 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$HOME/apps/opencv -DWITH_CUDA=OFF -DWITH_QT=5 -DWITH_GSTREAMER=OFF -DCMAKE_MODULE_PREFIX=/usr/lib/cmake ~/src/opencv/
 
 # MartyCam build on linux
-cmake -DOpenCV_DIR=$HOME/apps/opencv/share/OpenCV/ ~/src/martycam/
+cmake -DCMAKE_BUILD_TYPE=[..] -DHPX_DIR=[..] -DOpenCV_DIR=[..] -DQt5_DIR=[..] -DBOOST_ROOT=[..] ~/src/martycam/
