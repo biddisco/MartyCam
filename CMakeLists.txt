@@ -116,6 +116,7 @@ add_hpx_executable(MartyCam
                            ${MartyCam_RCC_SRCS}
                            ${MartyCam_QT_UIS_H}
                            ${MartyCam_MOC_SRCS}
+                   COMPONENT_DEPENDENCIES iostreams
 )
 
 
