@@ -1,50 +1,25 @@
-project(MartyCam)
+cmake_minimum_required(VERSION 3.5.1 FATAL_ERROR)
+
+project(MartyCam CXX)
+
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 #-----------------------------------------------------------------------------
-# CMake directives
+# Find Qt5
 #-----------------------------------------------------------------------------
-cmake_minimum_required(VERSION 2.8)
-cmake_policy(SET CMP0059 NEW)
-
-
-SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake;5.9.6/gcc_64/lib/cmake/Qt5/)
+find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Svg OpenGL Concurrent)
 
 #-----------------------------------------------------------------------------
-# Include GitExternal for cloning other repos internally
+# Find HPX
 #-----------------------------------------------------------------------------
-include(GitExternal)
+find_package(HPX REQUIRED)
+message("HPX libs are " ${HPX_LIBRARIES})
 
-#-----------------------------------------------------------------------------
-# Include Subproject for building other cmake projects as subdirs
-#-----------------------------------------------------------------------------
-include(SubProject)
-
-#--------------------------------------------------
-# Setup Output directories
-#--------------------------------------------------
-SET (CMAKE_RUNTIME_OUTPUT_DIRECTORY
-    ${PROJECT_BINARY_DIR}/bin CACHE PATH "Single Directory for all Executables."
-)
-SET (CMAKE_LIBRARY_OUTPUT_DIRECTORY
-    ${PROJECT_BINARY_DIR}/bin CACHE PATH "Single Directory for all Libraries"
-)
-SET (CMAKE_ARCHIVE_OUTPUT_DIRECTORY
-    ${PROJECT_BINARY_DIR}/bin CACHE PATH "Single Directory for all static libraries."
-)
-
-set (CMAKE_CXX_STANDARD 11)
 #-----------------------------------------------------------------------------
 # Find OpenCV
 #-----------------------------------------------------------------------------
 find_package(OpenCV REQUIRED)
 message("opencv libs are " ${OpenCV_LIBS})
-
-#-----------------------------------------------------------------------------
-# Find Qt
-#-----------------------------------------------------------------------------
-find_package(Qt5 COMPONENTS Core Widgets Gui Svg OpenGL Concurrent)
-
-#include(${QT5_USE_FILE})
 
 #-----------------------------------------------------------------------------
 # Find Boost
@@ -55,12 +30,6 @@ link_directories(${Boost_LIBRARY_DIRS})
 include_directories(${Boost_INCLUDE_DIR})
 message("Boost library dir is ${Boost_LIBRARY_DIRS}")
 message("Boost include dir is ${Boost_INCLUDE_DIRS}")
-
-#-----------------------------------------------------------------------------
-# MSVC specifics
-#-----------------------------------------------------------------------------
-add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-#option(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "/Zc:wchar_t-")
 
 #-----------------------------------------------------------------------------
 # Qt resource files
@@ -140,37 +109,27 @@ message("MartyCam_SRCS are ${MartyCam_SRCS}")
 #-----------------------------------------------------------------------------
 # Target executable
 #-----------------------------------------------------------------------------
-ADD_EXECUTABLE(MartyCam
-  ${MartyCam_SRCS}
-  ${MartyCam_RCC_SRCS}
-  ${MartyCam_QT_UIS_H}
-  ${MartyCam_MOC_SRCS}
+add_hpx_executable(MartyCam
+                   MODULE MartyCam
+                   DEPENDENCIES ${OpenCV_LIBS}
+                   SOURCES ${MartyCam_SRCS}
+                           ${MartyCam_RCC_SRCS}
+                           ${MartyCam_QT_UIS_H}
+                           ${MartyCam_MOC_SRCS}
 )
 
-qt5_use_modules(MartyCam Core Widgets Gui Svg OpenGL Concurrent)
 
-target_link_libraries(MartyCam
+
+qt5_use_modules(MartyCam_exe Core Widgets Gui Svg OpenGL Concurrent)
+
+target_link_libraries(MartyCam_exe
   ${OpenCV_LIBS}
+  ${HPX_TLL_PUBLIC}
   ${Boost_LIBRARIES}
-)
-
-#-----------------------------------------------------------------------------
-# Testing
-#-----------------------------------------------------------------------------
-ADD_EXECUTABLE(OpenCVCameraTest
-  test/OpenCVCameraTest.cpp
-)
-
-target_link_libraries(OpenCVCameraTest
-  ${OpenCV_LIBS}
-)
-
-ADD_EXECUTABLE(OpenCVCameraTest2
-  test/OpenCVCameraTest2.cpp
-)
-
-target_link_libraries(OpenCVCameraTest2
-  ${OpenCV_LIBS}
-)
-
-
+  Qt5::Core
+  Qt5::Widgets
+  Qt5::Gui
+  Qt5::Svg
+  Qt5::OpenGL
+  Qt5::Concurrent
+) 
