@@ -63,7 +63,11 @@ void qt_main(int argc, char ** argv) {
   //
   //
   //
-  MartyCam *tracker = new MartyCam();
+  hpx::threads::executors::pool_executor defaultExecutor("default");
+  hpx::threads::executors::pool_executor blockingExecutor("blocking");
+  hpx::cout << "[hpx_main] Created default and " << "blocking"
+            << " pool_executors \n";
+  MartyCam *tracker = new MartyCam(defaultExecutor, blockingExecutor);
   tracker->show();
   app.exec();
   //
@@ -82,13 +86,9 @@ int hpx_main(int argc, char ** argv)
 
     print_system_params();
 
-    hpx::threads::executors::pool_executor def_executor("default");
-    hpx::threads::executors::pool_executor blocking_executor("blocking");
-    hpx::cout << "[hpx_main] Created default and " << "blocking"
-              << " pool_executors \n";
-
+    hpx::threads::executors::pool_executor blockingExecutor("blocking");
     hpx::future<void> qt_application
-            = hpx::async(blocking_executor, qt_main, argc, argv);
+            = hpx::async(blockingExecutor, qt_main, argc, argv);
 
   {
 //    // Get a reference to one of the main thread

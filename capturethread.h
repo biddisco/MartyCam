@@ -16,7 +16,7 @@
 #endif
 //
 
-class CaptureThread : public QThread {
+class CaptureThread : public QObject {
 Q_OBJECT;
 public: 
    CaptureThread(ImageBuffer buffer, const cv::Size &size, int device, const std::string &URL);

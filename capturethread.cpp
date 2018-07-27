@@ -48,7 +48,7 @@ cv::Mat Deinterlace(cv::Mat &src)
 }
 
 //----------------------------------------------------------------------------
-CaptureThread::CaptureThread(ImageBuffer buffer, const cv::Size &size, int device, const std::string &URL) : QThread(), frameTimes(50)
+CaptureThread::CaptureThread(ImageBuffer buffer, const cv::Size &size, int device, const std::string &URL) : frameTimes(50)
 {
   this->abort                = false;
   this->captureActive        = false;

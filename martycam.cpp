@@ -1,3 +1,7 @@
+#include <hpx/config.hpp>
+#include <hpx/lcos/future.hpp>
+#include <hpx/parallel/execution.hpp>
+//
 #include "martycam.h"
 #include "renderwidget.h"
 #include "settings.h"
@@ -8,14 +12,20 @@
 #include <QSplitter>
 #include <QSettings>
 //
+
+//
 //----------------------------------------------------------------------------
 const int MartyCam::IMAGE_BUFF_CAPACITY = 5;
 
-MartyCam::MartyCam() : QMainWindow(0)
+MartyCam::MartyCam(hpx::threads::executors::pool_executor defaultExec,
+                   hpx::threads::executors::pool_executor blockingExec) : QMainWindow(0)
 {
   this->ui.setupUi(this);
   this->processingThread = NULL;
   this->captureThread = NULL;
+  //
+  this->defaultExecutor = defaultExec;
+  this->blockingExecutor = blockingExec;
   //
   QString settingsFileName = QCoreApplication::applicationDirPath() + "/MartyCam.ini";
   QSettings settings(settingsFileName, QSettings::IniFormat);
@@ -64,7 +74,7 @@ MartyCam::MartyCam() : QMainWindow(0)
   //
   while (this->imageSize.width==0 && this->cameraIndex>=0) {
     cv::Size res = this->settingsWidget->getSelectedResolution();
-    this->createCaptureThread(15, res, this->cameraIndex, camerastring);
+    this->createCaptureThread(15, res, this->cameraIndex, camerastring, blockingExecutor);
     this->imageSize = this->captureThread->getImageSize();
     if (this->imageSize.width==0) {
       this->cameraIndex -=1;
@@ -93,11 +103,14 @@ void MartyCam::closeEvent(QCloseEvent*) {
   this->deleteProcessingThread();
 }
 //----------------------------------------------------------------------------
-void MartyCam::createCaptureThread(int FPS, cv::Size &size, int camera, const std::string &cameraname)
+void MartyCam::createCaptureThread(int FPS, cv::Size &size, int camera, const std::string &cameraname,
+                                   hpx::threads::executors::pool_executor exec)
 {
   this->captureThread = new CaptureThread(imageBuffer, size, camera, cameraname);
   this->captureThread->setRotation(this->settingsWidget->getSelectedRotation());
-  this->captureThread->start(QThread::IdlePriority);
+  hpx::future<void> captureThreadFinished =
+    hpx::async<>(exec, [this]() { captureThread->run(); });
+//  this->captureThread->start(QThread::IdlePriority);
   this->captureThread->startCapture();
   this->settingsWidget->setThreads(this->captureThread, this->processingThread);
 }
@@ -105,7 +118,7 @@ void MartyCam::createCaptureThread(int FPS, cv::Size &size, int camera, const st
 void MartyCam::deleteCaptureThread()
 {
   this->captureThread->setAbort(true);
-  this->captureThread->wait();
+//  this->captureThread->wait();
   this->imageBuffer->clear();
   delete captureThread;
   // we will push an empty image onto the image buffer to ensure that any waiting processing thread is freed
