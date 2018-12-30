@@ -13,8 +13,20 @@
 
 #include "DecayFilter.h"
 
+class MotionFilter;
+typedef std::shared_ptr<MotionFilter> MotionFilter_SP;
+
 class PSNRFilter;
 class Filter;
+
+struct MotionFilterParams {
+    int          threshold;
+    double       average;
+    int          erodeIterations;
+    int          dilateIterations;
+    double       blendRatio;
+    int          displayImage;
+};
 
 //
 // Filter which computes some motion estimates
@@ -22,6 +34,7 @@ class Filter;
 class MotionFilter {
 public:
    MotionFilter();
+   MotionFilter(MotionFilterParams motionFilterParams);
   ~MotionFilter();
   //
   virtual void process(const cv::Mat &image);
@@ -44,20 +57,26 @@ public:
   double       eventLevel;
 
   //
-  // input variables
+  // GUI tunable parameters:
   //
-  double       triggerLevel;
+  MotionFilterParams mfp;
+
   int          threshold;
   double       average;
   int          erodeIterations;
   int          dilateIterations;
-  int          displayImage;
   double       blendRatio;
   double       noiseBlendRatio;
+  int          displayImage;
+
+  //
+  // GUI non-tunable params
+  //
+  double       triggerLevel;
   int          frameCount;
 
   //
-  // Temporary images 
+  // Temporary images
   //
   cv::Size  imageSize;
   cv::Mat   greyScaleImage;

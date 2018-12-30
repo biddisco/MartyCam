@@ -12,19 +12,31 @@
 #include "PSNRFilter.h"
 #include "GraphUpdateFilter.h"
 //
-//----------------------------------------------------------------------------
-ProcessingThread::ProcessingThread(ImageBuffer buffer, cv::Size &size) : QThread()
+#include <hpx/lcos/future.hpp>
+#include <hpx/include/async.hpp>
+#include <utility> //----------------------------------------------------------------------------
+ProcessingThread::ProcessingThread(ImageBuffer buffer,
+                                   hpx::threads::executors::pool_executor exec,
+                                   ProcessingType processingType,
+                                   MotionFilterParams mfp,
+                                   FaceRecogFilterParams frfp)
+        : imageBuffer(std::move(buffer)),
+          executor(std::move(exec)),
+          processingActive(false),
+          motionFilter(new MotionFilter(mfp)),
+          faceRecogFilter(new FaceRecogFilter(frfp)),
+          abort(false),
+          processingType(processingType),
+          processingTimes(15),
+          processingTime_ms(0),
+          QObject(nullptr)
 {
-  this->imageBuffer       = buffer;
   this->graphFilter       = new GraphUpdateFilter();
-  this->motionFilter      = new MotionFilter();
-  this->abort             = false;
 }
 //----------------------------------------------------------------------------
 ProcessingThread::~ProcessingThread()
 {
   delete this->graphFilter;
-  delete this->motionFilter;
 }
 //----------------------------------------------------------------------------
 void ProcessingThread::CopySettings(ProcessingThread *thread)
@@ -39,21 +51,35 @@ void ProcessingThread::CopySettings(ProcessingThread *thread)
   this->motionFilter->noiseBlendRatio =  thread->motionFilter->noiseBlendRatio;
 }
 //----------------------------------------------------------------------------
+void ProcessingThread::setMotionDetectionProcessing(){
+  this->processingType = ProcessingType::motionDetection;
+}
+void ProcessingThread::setFaceRecognitionProcessing(){
+  this->processingType = ProcessingType::faceRecognition;
+}
+//----------------------------------------------------------------------------
 void ProcessingThread::run() {
   int framenum = 0;
+  QTime processingTime;
+  processingTime.start();
+
   while (!this->abort) {
     // blocking : waits until next image is available if necessary
     cv::Mat cameraImage = imageBuffer->receive();
     // if camera not working or disconnected, abort
     if (cameraImage.empty()) {
-      msleep(100);
+      boost::this_thread::sleep(boost::posix_time::milliseconds(100));
       continue;
     }
     cv::Mat cameracopy = cameraImage.clone();
-    //
-    this->motionFilter->process(cameracopy);
+
+    processingTime.restart();
+    switch(this->processingType){
+        case ProcessingType::motionDetection :
+          this->motionFilter->process(cameracopy);
+
     this->graphFilter->process(
-      this->motionFilter->PSNR_Filter->PSNR, 
+      this->motionFilter->PSNR_Filter->PSNR,
       this->motionFilter->logMotion,
       this->motionFilter->normalizedMotion,
       this->motionFilter->rollingMean,
@@ -63,10 +89,51 @@ void ProcessingThread::run() {
       this->motionFilter->triggerLevel,
       this->motionFilter->eventLevel);
 
-     emit (NewData());
+          break;
+        case ProcessingType ::faceRecognition :
+          this->faceRecogFilter->process(cameracopy);
+          break;
+    }
+    updateProcessingTime(processingTime.elapsed());
+    emit (NewData());
   }
-  this->abort = 0;
+
+  this->abort = false;
+  this->stopWait.wakeAll();
 }
+//----------------------------------------------------------------------------
+bool ProcessingThread::startProcessing()
+{
+  if (!processingActive) {
+    processingActive = true;
+    abort = false;
+
+    hpx::async(this->executor, &ProcessingThread::run, this);
+
+    return true;
+  }
+  return false;
+}
+//----------------------------------------------------------------------------
+bool ProcessingThread::stopProcessing() {
+  bool wasActive = this->processingActive;
+  if (wasActive) {
+    this->stopLock.lock();
+    processingActive = false;
+    abort = true;
+    this->stopWait.wait(&this->stopLock);
+    this->stopLock.unlock();
+  }
+  return wasActive;
+}
+//----------------------------------------------------------------------------
+void ProcessingThread::updateProcessingTime(int time_ms) {
+  processingTimes.push_back(time_ms);
+
+  processingTime_ms = static_cast<int>(std::accumulate(processingTimes.begin(),
+          processingTimes.end(), 0) / processingTimes.size());
+}
+
 //----------------------------------------------------------------------------
 cv::Scalar ProcessingThread::getMSSIM(const cv::Mat& i1, const cv::Mat& i2)
 {

@@ -1,13 +1,19 @@
-#include <QDebug>
+#include "capturethread.h"
+
 #include <QTime>
 //
 #include <iostream>
 #include <iomanip>
 //
 #include "opencv2/imgproc.hpp"
+#include "opencv2/videoio/videoio_c.h"
+#include "opencv2/imgproc/imgproc_c.h"
 
-#include "capturethread.h"
-typedef boost::shared_ptr< ConcurrentCircularBuffer<cv::Mat> > ImageBuffer;
+#include <hpx/lcos/future.hpp>
+#include <hpx/include/async.hpp>
+#include <utility>
+
+typedef std::shared_ptr< ConcurrentCircularBuffer<cv::Mat> > ImageBuffer;
 
 //
 // May 2012.
@@ -45,48 +51,45 @@ cv::Mat Deinterlace(cv::Mat &src)
 }
 
 //----------------------------------------------------------------------------
-CaptureThread::CaptureThread(ImageBuffer buffer, const cv::Size &size, int device, const std::string &URL) : QThread(), frameTimes(50)
+CaptureThread::CaptureThread(ImageBuffer imageBuffer,
+                             const cv::Size& size,
+                             int rotation,
+                             int device,
+                             const std::string &URL,
+                             hpx::threads::executors::pool_executor exec,
+                             int requestedFps)
+        : imageBuffer(std::move(imageBuffer)),
+          imageSize(cv::Size(0,0)),
+          rotation(rotation),
+          deviceIndex(device),
+          executor(std::move(exec)),
+          requestedFps(requestedFps),
+          requestedSizeCorrect(false),
+          actualFps(0.0),
+          FrameCounter(0),
+          frameTimes(50),
+          captureTimes(15),
+          abort(false),
+          captureActive(false),
+          deInterlace(false),
+          MotionAVI_Writing(false),
+          capture(),
+          rotatedImage(),
+          rotatedSize(cv::Size(0,0))
 {
-  this->abort                = false;
-  this->captureActive        = false;
-  this->deInterlace          = false;
-  this->requestedFPS         = 15;
-  this->fps                  = 0.0 ;
-  this->FrameCounter         = 0;
-  this->deviceIndex          =-1;
-  this->MotionAVI_Writing    = false;
-  this->TimeLapseAVI_Writing = false;
-  this->capture           = NULL;
-  this->imageBuffer       = buffer;
-  this->deviceIndex       = device;
-  this->rotation          = 0;
-  this->rotatedImage      = NULL;
   // initialize font and precompute text size
   QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
   this->text_size = cv::getTextSize( timestring.toUtf8().constData(), CV_FONT_HERSHEY_PLAIN, 1.0, 1, NULL);
-  //
-  this->imageSize = size;
-  if (size.width>0 && size.height>0) {
-    this->capture.set(CV_CAP_PROP_FRAME_WIDTH,  size.width);
-    this->capture.set(CV_CAP_PROP_FRAME_HEIGHT, size.height);
-  }
-  //
+
+  // Connect to camera and use its default resolution
   this->connectCamera(this->deviceIndex, this->CameraURL);
-  //
-  int w = this->capture.get(CV_CAP_PROP_FRAME_WIDTH);
-  int h = this->capture.get(CV_CAP_PROP_FRAME_HEIGHT);
-  if (w==720) {
-    this->imageSize         = cv::Size(720,576);
-    this->rotatedSize       = cv::Size(576,720);
-  }
-  else {
-    this->imageSize         = cv::Size(w,h);
-    this->rotatedSize       = cv::Size(h,w);
-  }
+  // Overwrite the default camera settings
+  this->requestedSizeCorrect = this->setResolution(size);
+  this->setRotation(rotation);
 }
 //----------------------------------------------------------------------------
-CaptureThread::~CaptureThread() 
-{  
+CaptureThread::~CaptureThread()
+{
   this->closeAVI();
   // Release our stream capture object, not necessary with openCV 2
   this->capture.release();
@@ -120,7 +123,15 @@ bool CaptureThread::connectCamera(int index, const std::string &URL)
       this->capture.open(CV_CAP_DSHOW + index );
 #else
 //      CvCapture* camera = cvCaptureFromCAM(CV_CAP_ANY);
-      capture.open(index );
+      if (index==0) {
+        std::cout << "Opening capture" << std::endl;
+//        capture.open(CV_CAP_ANY);
+        capture.open("/dev/video0");
+        std::cout << "Done opening capture" << std::endl;
+      }
+      else {
+        capture.open(index);
+      }
 #endif
     }
     if (!this->capture.isOpened()) {
@@ -134,52 +145,75 @@ bool CaptureThread::connectCamera(int index, const std::string &URL)
   return true;
 }
 //----------------------------------------------------------------------------
-void CaptureThread::setResolution(const cv::Size &res)
+//Returns true if the resolution was actually changed and false if not.
+bool CaptureThread::setResolution(const cv::Size &res)
 {
   if (this->imageSize==res) {
-    return;
+    return true;
   }
+
   bool wasActive = this->stopCapture();
   this->imageBuffer->clear();
-  this->imageSize = res;
-  this->rotatedSize = cv::Size(this->imageSize.height, this->imageSize.width);
-  if (wasActive) this->startCapture(); 
+
+  bool resolutionUpdated = this->tryResolutionUpdate(res);
+  if (resolutionUpdated){
+    this->imageSize = res;
+    this->rotatedSize = cv::Size(this->imageSize.height, this->imageSize.width);
+  }
+
+  if (wasActive) this->startCapture();
+
+  return resolutionUpdated;
 }
 //----------------------------------------------------------------------------
-void CaptureThread::setRotation(int value) 
-{ 
+void CaptureThread::setRotation(int value)
+{
   if (this->rotation==value) {
     return;
   }
   bool wasActive = this->stopCapture();
-  this->rotation = value; 
+  this->rotation = value;
   if (this->rotation==1 || this->rotation==2) {
     cv::Size workingSize = cv::Size(this->imageSize.height, this->imageSize.width);
     this->rotatedImage = cv::Mat( workingSize, CV_8UC3);
   }
-  if (wasActive) this->startCapture(); 
+  if (wasActive) this->startCapture();
 }
 //----------------------------------------------------------------------------
-void CaptureThread::run() 
-{  
-  QTime time;
-  time.start();
+void CaptureThread::run()
+{
+  // Clear the frameTimes circular buffer to ensure actualFps is computed correctly from the first frame
+  this->frameTimes.clear();
+
+  QTime actualFpsTime;
+  actualFpsTime.start();
+
+  QTime requestedFpsTime;
+  requestedFpsTime.start();
+
+  QTime captureWaitTime;
+  captureWaitTime.start();
 
   while (!this->abort) {
     if (!captureActive) {
-      captureLock.lock();
-      this->stopWait.wakeAll();
-      fps = 0;
-      frameTimes.clear();
-      captureWait.wait(&captureLock);
-      time.restart();
-      updateFPS(time.elapsed());
-      captureLock.unlock();
+      std::cout << "WARN: CaptureThread::run() still running even though captureActive=false";
+      continue;
+    }
+
+    int frameProcessingTime_ms = requestedFpsTime.elapsed();
+    int requestedFrameTime_ms = 1000 / this->requestedFps;
+
+    this->sleepTime_ms = requestedFrameTime_ms - frameProcessingTime_ms;
+
+    if(sleepTime_ms > 0){
+        boost::this_thread::sleep(boost::posix_time::milliseconds(sleepTime_ms));
     }
 
     // get latest frame from webcam
     cv::Mat frame;
+    captureWaitTime.restart();
     this->capture >> frame;
+    updateCaptureTime(captureWaitTime.elapsed());
 
     if (frame.empty()) {
       this->setAbort(true);
@@ -204,16 +238,23 @@ void CaptureThread::run()
 
     this->currentFrame = frame;
 
-    // add to queue if space is available, 
-    //
+    // add to buffer if space is available,
     imageBuffer->send(this->rotatedImage);
+
+
     this->FrameCounter++;
-      
-    updateFPS(time.elapsed());
+
+    updateActualFps(actualFpsTime.elapsed());
+
+    requestedFpsTime.restart();
   }
+
+  // The run() task is exiting -> wake the threads waiting for that.
+  this->stopWait.wakeAll();
+
 }
 //----------------------------------------------------------------------------
-bool CaptureThread::startCapture() 
+bool CaptureThread::startCapture()
 {
   if (!captureActive) {
     if (this->imageSize.width>0) {
@@ -224,7 +265,7 @@ bool CaptureThread::startCapture()
       this->capture.set(CV_CAP_PROP_FRAME_WIDTH, 2048);
       this->capture.set(CV_CAP_PROP_FRAME_HEIGHT, 2048);
     }
-    this->capture.set(CV_CAP_PROP_FPS, this->requestedFPS);
+    this->capture.set(CV_CAP_PROP_FPS, this->requestedFps);
     std::ostringstream output;
     output << "CV_CAP_PROP_FRAME_WIDTH\t"   << this->capture.get(CV_CAP_PROP_FRAME_WIDTH) << std::endl;
     output << "CV_CAP_PROP_FRAME_HEIGHT\t"  << this->capture.get(CV_CAP_PROP_FRAME_HEIGHT) << std::endl;
@@ -234,9 +275,14 @@ bool CaptureThread::startCapture()
     output << "CV_CAP_PROP_CONTRAST\t"      << this->capture.get(CV_CAP_PROP_CONTRAST) << std::endl;
     output << "CV_CAP_PROP_SATURATION\t"    << this->capture.get(CV_CAP_PROP_SATURATION) << std::endl;
     output << "CV_CAP_PROP_HUE\t"           << this->capture.get(CV_CAP_PROP_HUE) << std::endl;
+
     captureActive = true;
-    captureWait.wakeAll();
+    abort = false;
+
+    hpx::async(this->executor, &CaptureThread::run, this);
+
     this->CaptureStatus += output.str();
+
     return true;
   }
   return false;
@@ -247,13 +293,14 @@ bool CaptureThread::stopCapture() {
   if (wasActive) {
     this->stopLock.lock();
     captureActive = false;
+    abort = true;
     this->stopWait.wait(&this->stopLock);
     this->stopLock.unlock();
   }
   return wasActive;
 }
 //----------------------------------------------------------------------------
-void CaptureThread::updateTimeLapse() 
+void CaptureThread::updateTimeLapse()
 {
   // always write the frame out if saving movie or in the process of closing AVI
   if (this->TimeLapseAVI_Writer.isOpened()) {
@@ -262,18 +309,7 @@ void CaptureThread::updateTimeLapse()
   }
 }
 //----------------------------------------------------------------------------
-void CaptureThread::updateFPS(int time) {
-  frameTimes.push_back(time);
-  if (frameTimes.size() > 1) {
-    fps = frameTimes.size()/((double)time-frameTimes.front())*1000.0;
-    fps = (static_cast<int>(fps*10))/10.0;
-  }
-  else {
-    fps = 0;
-  }
-}
-//----------------------------------------------------------------------------
-void CaptureThread::saveTimeLapseAVI(const cv::Mat &image) 
+void CaptureThread::saveTimeLapseAVI(const cv::Mat &image)
 {
   if (!this->TimeLapseAVI_Writing) {
     this->TimeLapseAVI_Writer.release();
@@ -283,7 +319,7 @@ void CaptureThread::saveTimeLapseAVI(const cv::Mat &image)
   }
 }
 //----------------------------------------------------------------------------
-void CaptureThread::startTimeLapse(double fps) 
+void CaptureThread::startTimeLapse(double fps)
 {
   std::string path = this->AVI_Directory + "/" + this->TimeLapseAVI_Name + std::string(".avi");
   if (!this->TimeLapseAVI_Writer.isOpened()) {
@@ -305,35 +341,58 @@ void CaptureThread::startTimeLapse(double fps)
   }
 }
 //----------------------------------------------------------------------------
-void CaptureThread::stopTimeLapse() 
+void CaptureThread::stopTimeLapse()
 {
   this->TimeLapseAVI_Writing = false;
 //    emit(RecordingState(true));
 }
 //----------------------------------------------------------------------------
-void CaptureThread::saveAVI(const cv::Mat &image) 
+void CaptureThread::setRequestedFps(int value){
+  this->requestedFps = value;
+  this->frameTimes.clear();
+}
+//----------------------------------------------------------------------------
+void CaptureThread::updateActualFps(int time) {
+  frameTimes.push_back(time);
+  if (frameTimes.size() > 1) {
+    actualFps = frameTimes.size()/((double)time-frameTimes.front())*1000.0;
+    actualFps = (static_cast<int>(actualFps*10))/10.0;
+  }
+  else {
+    actualFps = 0;
+  }
+}
+//----------------------------------------------------------------------------
+void CaptureThread::updateCaptureTime(int time_ms) {
+  captureTimes.push_back(time_ms);
+
+  captureTime_ms = static_cast<int>(std::accumulate(captureTimes.begin(),
+          captureTimes.end(), 0) / captureTimes.size());
+}
+//----------------------------------------------------------------------------
+void CaptureThread::saveAVI(const cv::Mat &image)
 {
   //CV_FOURCC('M', 'J', 'P', 'G'),
   //CV_FOURCC('M', 'P', '4', '2') = MPEG-4.2 codec
   //CV_FOURCC('D', 'I', 'V', '3') = MPEG-4.3 codec
   //CV_FOURCC('D', 'I', 'V', 'X') = MPEG-4 codec
-  //CV_FOURCC('X', 'V', 'I', 'D')  
+  //CV_FOURCC('X', 'V', 'I', 'D')
   if (!this->MotionAVI_Writer.isOpened()) {
     std::string path = this->AVI_Directory + "/" + this->MotionAVI_Name + std::string(".avi");
     this->MotionAVI_Writer.open(
       path.c_str(),
-      CV_FOURCC('X', 'V', 'I', 'D'),  
-      this->getFPS(),
+      CV_FOURCC('X', 'V', 'I', 'D'),
+      this->getActualFps(),
       image.size()
     );
-    emit(RecordingState(true));
+    // emit(RecordingState(true));
   }
   if (this->MotionAVI_Writer.isOpened()) {
     this->MotionAVI_Writer.write(image);
     // if CloseAvi has been called, stop writing.
     if (!this->MotionAVI_Writing) {
       this->MotionAVI_Writer.release();
-      emit(RecordingState(false));
+      // emit(RecordingState(false));
     }
   }
   else {
@@ -342,7 +401,7 @@ void CaptureThread::saveAVI(const cv::Mat &image)
   }
 }
 //----------------------------------------------------------------------------
-void CaptureThread::closeAVI() 
+void CaptureThread::closeAVI()
 {
   this->MotionAVI_Writing = false;
 }
@@ -387,7 +446,19 @@ void CaptureThread::captionImage(cv::Mat &image)
 {
   QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
   cv::putText(image, timestring.toLatin1().data(),
-    cvPoint(image.size().width - text_size.width - 4, text_size.height+4), 
+    cvPoint(image.size().width - text_size.width - 4, text_size.height+4),
     CV_FONT_HERSHEY_PLAIN, 1.0, cv::Scalar(255, 255, 255, 0), 1);
+}
+//----------------------------------------------------------------------------
+// If the requested resolution is available switches to it and returns true.
+// Otherwise leaves the current resolution and returns false
+bool CaptureThread::tryResolutionUpdate(cv::Size requestedResolution)
+{
+  this->capture.set(CV_CAP_PROP_FRAME_WIDTH, requestedResolution.width);
+  this->capture.set(CV_CAP_PROP_FRAME_HEIGHT, requestedResolution.height);
+  auto width = static_cast<int>(capture.get(CV_CAP_PROP_FRAME_WIDTH));
+  auto height = static_cast<int>(capture.get(CV_CAP_PROP_FRAME_HEIGHT));
+
+  return width == requestedResolution.width && height == requestedResolution.height;
 }
 //----------------------------------------------------------------------------

@@ -64,7 +64,7 @@ RenderWidget::RenderWidget(QWidget* parent) : QWidget(parent), Filter(), imageVa
 {
   setAttribute(Qt::WA_OpaquePaintEvent, true); // don't clear the area before the paintEvent
 //  setAttribute(Qt::WA_PaintOnScreen, true); // disable double buffering
-//  setFixedSize(720, 576);
+  setFixedSize(720, 576);
   connect(this, SIGNAL(frameSizeChanged(int, int)), this, SLOT(onFrameSizeChanged(int, int)));
   connect(this, SIGNAL(update_signal(bool, int)), this, SLOT(UpdateTrigger(bool, int)), Qt::QueuedConnection);
   //
@@ -125,7 +125,6 @@ void RenderWidget::paintEvent(QPaintEvent*) {
 //----------------------------------------------------------------------------
 void RenderWidget::UpdateTrigger(bool, int) {
   this->repaint();
-//  std::cout << "Rendered frame " << std::endl;
 }
 //----------------------------------------------------------------------------
 void RenderWidget::mouseDoubleClickEvent ( QMouseEvent * event )

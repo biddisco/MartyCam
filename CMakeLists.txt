@@ -1,23 +1,12 @@
-project(MartyCam)
+cmake_minimum_required (VERSION 3.5.1)
 
-#-----------------------------------------------------------------------------
-# CMake directives
-#-----------------------------------------------------------------------------
-cmake_minimum_required(VERSION 2.8)
-cmake_policy(SET CMP0059 NEW)
+project(MartyCam CXX)
 
-
-SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-
-#-----------------------------------------------------------------------------
-# Include GitExternal for cloning other repos internally
-#-----------------------------------------------------------------------------
-include(GitExternal)
-
-#-----------------------------------------------------------------------------
-# Include Subproject for building other cmake projects as subdirs
-#-----------------------------------------------------------------------------
-include(SubProject)
+#--------------------------------------------------
+# CXX standard
+#--------------------------------------------------
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 #--------------------------------------------------
 # Setup Output directories
@@ -32,7 +21,18 @@ SET (CMAKE_ARCHIVE_OUTPUT_DIRECTORY
     ${PROJECT_BINARY_DIR}/bin CACHE PATH "Single Directory for all static libraries."
 )
 
-set (CMAKE_CXX_STANDARD 11)
+SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+
+#-----------------------------------------------------------------------------
+# Include GitExternal for cloning other repos internally
+#-----------------------------------------------------------------------------
+include(GitExternal)
+
+#-----------------------------------------------------------------------------
+# Include Subproject for building other cmake projects as subdirs
+#-----------------------------------------------------------------------------
+include(SubProject)
+
 #-----------------------------------------------------------------------------
 # Find OpenCV
 #-----------------------------------------------------------------------------
@@ -42,17 +42,21 @@ message("opencv libs are " ${OpenCV_LIBS})
 #-----------------------------------------------------------------------------
 # Find Qt
 #-----------------------------------------------------------------------------
-find_package(Qt5 COMPONENTS Core Widgets Gui Svg OpenGL Concurrent)
+find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Svg OpenGL Concurrent)
 
-#include(${QT5_USE_FILE})
+#-----------------------------------------------------------------------------
+# Find HPX
+#-----------------------------------------------------------------------------
+find_package(HPX REQUIRED)
+message("HPX libs are " ${HPX_LIBRARIES})
+
+add_subdirectory(test)
 
 #-----------------------------------------------------------------------------
 # Find Boost
 #-----------------------------------------------------------------------------
-option(Boost_USE_STATIC "Use static Boost libraries" ON)
-find_package(Boost 1.49 REQUIRED thread system) 
-link_directories(${Boost_LIBRARY_DIRS})
-include_directories(${Boost_INCLUDE_DIR})
+#option(Boost_USE_STATIC "Use static Boost libraries" ON)
+find_package(Boost 1.65 REQUIRED thread system)
 message("Boost link dir is ${Boost_LIBRARY_DIRS}")
 
 #-----------------------------------------------------------------------------
@@ -71,16 +75,28 @@ include_directories(
 )
 
 #-----------------------------------------------------------------------------
+# Set DATA_PATH directory of the repository
+#-----------------------------------------------------------------------------
+set(DATA_PATH "${PROJECT_SOURCE_DIR}/data")
+
+configure_file(
+  "${PROJECT_SOURCE_DIR}/config.h.in"
+  "${PROJECT_BINARY_DIR}/config.h"
+)
+
+#-----------------------------------------------------------------------------
 # MSVC specifics
 #-----------------------------------------------------------------------------
-add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-#option(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "/Zc:wchar_t-")
+if(WIN32)
+  add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+  #option(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "/Zc:wchar_t-")
+endif()
 
 #-----------------------------------------------------------------------------
 # Qt resource files
 #-----------------------------------------------------------------------------
-set(MartyCam_QT_RCCS 
-  resources.qrc
+set(MartyCam_QT_RCCS
+        resources.qrc
 )
 
 #-----------------------------------------------------------------------------
@@ -88,7 +104,7 @@ set(MartyCam_QT_RCCS
 #-----------------------------------------------------------------------------
 set(MartyCam_QT_UIS
   settings.ui
-  martycam.ui
+        martycam.ui
   IPCameraForm.ui
 )
 
@@ -100,7 +116,6 @@ set(MartyCam_QT_MOC_HDRS
   IPCameraForm.h
   settings.h
   renderwidget.h
-  capturethread.h
   processingthread.h
 )
 
@@ -109,17 +124,17 @@ set(MartyCam_QT_MOC_HDRS
 #-----------------------------------------------------------------------------
 
 # generate rules that will run rcc on the resource files
-QT5_ADD_RESOURCES(MartyCam_RCC_SRCS 
+QT5_ADD_RESOURCES(MartyCam_RCC_SRCS
   ${MartyCam_QT_RCCS}
 )
 
 # generate rules that will run uic on .ui files:
-QT5_WRAP_UI(MartyCam_QT_UIS_H 
+QT5_WRAP_UI(MartyCam_QT_UIS_H
   ${MartyCam_QT_UIS}
 )
 
 # generate rules that will run moc on QObject header files
-QT_WRAP_CPP(MartyCam MartyCam_MOC_SRCS 
+QT_WRAP_CPP(MartyCam MartyCam_MOC_SRCS
   ${MartyCam_QT_MOC_HDRS}
 )
 
@@ -129,19 +144,9 @@ QT_WRAP_CPP(MartyCam MartyCam_MOC_SRCS
 ADD_SUBDIRECTORY(AnalogWidgets)
 
 #-----------------------------------------------------------------------------
-# Include directories
+# Main source files
 #-----------------------------------------------------------------------------
-include_directories(
-  "${CMAKE_CURRENT_SOURCE_DIR}"
-  "${CMAKE_CURRENT_BINARY_DIR}"
-  "${CMAKE_CURRENT_SOURCE_DIR}/AnalogWidgets/analogwidgets"
-  "${CMAKE_CURRENT_SOURCE_DIR}/AnalogWidgets/analogwidgets/analogwidgets"
-)
-
-#-----------------------------------------------------------------------------
-# Main source files 
-#-----------------------------------------------------------------------------
-SET(MartyCam_SRCS
+set(MartyCam_SRCS
   capturethread.cpp
   filter.cpp
   PSNRFilter.cpp
@@ -155,6 +160,7 @@ SET(MartyCam_SRCS
   settings.cpp
   IPCameraForm.cpp
   MartyCam.rc
+  FaceRecogFilter.cpp
 )
 if (WIN32)
   set(MartyCam_SRCS
@@ -163,12 +169,11 @@ if (WIN32)
   )
 endif()
 
-message("MartyCam_SRCS are ${MartyCam_SRCS}")
 #-----------------------------------------------------------------------------
 # Target executable
 #-----------------------------------------------------------------------------
-ADD_EXECUTABLE(MartyCam 
-  ${MartyCam_SRCS} 
+ADD_EXECUTABLE(MartyCam
+  ${MartyCam_SRCS}
   ${MartyCam_RCC_SRCS}
   ${MartyCam_QT_UIS_H}
   ${MartyCam_MOC_SRCS}
@@ -176,29 +181,26 @@ ADD_EXECUTABLE(MartyCam
 
 qt5_use_modules(MartyCam Core Widgets Gui Svg OpenGL Concurrent)
 
-target_link_libraries(MartyCam 
+#-----------------------------------------------------------------------------
+# Include directories
+#-----------------------------------------------------------------------------
+target_include_directories(MartyCam 
+  PRIVATE 
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_BINARY_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/AnalogWidgets/analogwidgets"
+    "${CMAKE_CURRENT_SOURCE_DIR}/AnalogWidgets/analogwidgets/analogwidgets"
+    ${HPX_INCLUDE_DIRS}
+)
+
+
+target_link_libraries(MartyCam
   analogue
-  ${OpenCV_LIBS} 
+  iostreams_component
+  ${HPX_LIBRARIES}
+  ${OpenCV_LIBS}
   ${Boost_LIBRARIES}
 )
+#hpx_setup_target(MartyCam COMPONENT_DEPENDENCIES iostreams)
 
-#-----------------------------------------------------------------------------
-# Testing
-#-----------------------------------------------------------------------------
-ADD_EXECUTABLE(OpenCVCameraTest 
-  test/OpenCVCameraTest.cpp
-)
-
-target_link_libraries(OpenCVCameraTest
-  ${OpenCV_LIBS}
-)
-
-ADD_EXECUTABLE(OpenCVCameraTest2
-  test/OpenCVCameraTest2.cpp
-)
-
-target_link_libraries(OpenCVCameraTest2
-  ${OpenCV_LIBS}
-)
-
-
+add_subdirectory(webcam_test)

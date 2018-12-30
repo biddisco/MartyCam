@@ -2,98 +2,105 @@
 #include "renderwidget.h"
 #include "settings.h"
 //
-#include <QTimer>
 #include <QToolBar>
 #include <QDockWidget>
-#include <QSplitter>
 #include <QSettings>
 //
+#include <hpx/lcos/future.hpp>
+#include <hpx/include/async.hpp>
+#include <QtWidgets/QMessageBox>
+
 #include "GraphUpdateFilter.h"
 //
 //----------------------------------------------------------------------------
-MartyCam::MartyCam() : QMainWindow(0) 
+const int MartyCam::IMAGE_BUFF_CAPACITY = 5;
+
+MartyCam::MartyCam(const hpx::threads::executors::pool_executor& defaultExec,
+                   const hpx::threads::executors::pool_executor& blockingExec)
+        : captureThread(nullptr), processingThread(nullptr),
+          defaultExecutor(defaultExec), blockingExecutor(blockingExec),
+          QMainWindow(nullptr)
 {
   this->ui.setupUi(this);
-  this->processingThread = NULL;
-  this->captureThread = NULL;
   //
   QString settingsFileName = QCoreApplication::applicationDirPath() + "/MartyCam.ini";
   QSettings settings(settingsFileName, QSettings::IniFormat);
   restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
   //
-  this->renderWidget = new RenderWidget(this);
-  this->centralWidget()->layout()->addWidget(this->renderWidget);
-  QSplitter *splitter = new QSplitter(Qt::Vertical, this);
-  splitter->addWidget(this->ui.motionGroup);
-  splitter->addWidget(renderWidget);
-  this->setCentralWidget(splitter);
+  this->renderWidget = std::make_shared<RenderWidget>(this);
+  this->ui.gridLayout->addWidget(this->renderWidget.get(), 0, Qt::AlignHCenter || Qt::AlignTop);
+
+  this->imageBuffer = ImageBuffer(new ConcurrentCircularBuffer<cv::Mat>(IMAGE_BUFF_CAPACITY));
+
   //
-  connect(this->renderWidget, SIGNAL(mouseDblClicked(const QPoint&)), this,
+  connect(this->renderWidget.get(), SIGNAL(mouseDblClicked(const QPoint&)), this,
     SLOT (onMouseDoubleClickEvent(const QPoint&)));
   //
-  // Main threads for capture and processing
-  //
-  this->EventRecordCounter      = 0;
-  this->insideMotionEvent       = 0;
-  this->imageSize               = cv::Size(0,0);
-  this->imageBuffer             = ImageBuffer(new ConcurrentCircularBuffer<cv::Mat>(5));
-  this->cameraIndex             = 1;
 
-  // Layout of - chart
-  QWidget * widget = this->ui.motionGroup;
-  Chart *chart = this->ui.chart; 
 
   //
   // create a dock widget to hold the settings
   //
-  settingsDock = new QDockWidget("Settings", this);
+  settingsDock = std::make_shared<QDockWidget>("Choose Processing Type", this);
   settingsDock->setAllowedAreas(Qt::RightDockWidgetArea | Qt::LeftDockWidgetArea);
+  settingsDock->setFeatures(QDockWidget::DockWidgetMovable);
   settingsDock->setObjectName("SettingsDock");
   //
   // create the settings widget itself
   //
-  this->settingsWidget = new SettingsWidget(this);
-  this->settingsWidget->setRenderWidget(this->renderWidget);
-  settingsDock->setWidget(this->settingsWidget);
+  this->settingsWidget = std::make_shared<SettingsWidget>(this);
+  this->settingsWidget->setRenderWidget(this->renderWidget.get());
+  settingsDock->setWidget(this->settingsWidget.get());
   settingsDock->setMinimumWidth(300);
-  addDockWidget(Qt::RightDockWidgetArea, settingsDock);
-  connect(this->settingsWidget, SIGNAL(resolutionSelected(cv::Size)), this, SLOT(onResolutionSelected(cv::Size)));
-  connect(this->settingsWidget, SIGNAL(rotationChanged(int)), this, SLOT(onRotationChanged(int)));
-  connect(this->settingsWidget, SIGNAL(CameraIndexChanged(int,QString)), this, SLOT(onCameraIndexChanged(int,QString)));
+  addDockWidget(Qt::RightDockWidgetArea, settingsDock.get());
+  connect(this->settingsWidget.get(), SIGNAL(resolutionSelected(cv::Size)), this, SLOT(onResolutionSelected(cv::Size)));
+  connect(this->settingsWidget.get(), SIGNAL(rotationChanged(int)), this, SLOT(onRotationChanged(int)));
+  connect(this->settingsWidget.get(), SIGNAL(CameraIndexChanged(int,QString)), this, SLOT(onCameraIndexChanged(int,QString)));
+  connect(this->ui.actionQuit, SIGNAL(triggered()), this, SLOT(close()));
   //
   // not all controls could fit on the settings dock, trackval + graphs are separate.
   //
-  connect(this->ui.user_trackval, SIGNAL(valueChanged(int)), this, SLOT(onUserTrackChanged(int))); 
+  connect(this->ui.user_trackval, SIGNAL(valueChanged(int)), this, SLOT(onUserTrackChanged(int)));
   //
-  connect(this->ui.actionQuit, SIGNAL(triggered()), this, SLOT(close()));
   //
   this->loadSettings();
   this->settingsWidget->loadSettings();
   //
   std::string camerastring;
-  int index = this->settingsWidget->getCameraIndex(camerastring);
+  this->cameraIndex = this->settingsWidget->getCameraIndex(camerastring);
   //
-  while (this->imageSize.width==0 && this->cameraIndex>=0) {
-    cv::Size res = this->settingsWidget->getSelectedResolution();
-    this->createCaptureThread(15, res, this->cameraIndex, camerastring);
-    this->imageSize = this->captureThread->getImageSize();
-    if (this->imageSize.width==0) {
-      this->cameraIndex -=1;
+  bool captureLaunched = false;
+  while (!captureLaunched && this->cameraIndex >= 0) {
+    bool requestedSizeCorrect = false;
+    int numeResolutionsToTry = this->settingsWidget->getNumOfResolutions();
+    while (!requestedSizeCorrect  && numeResolutionsToTry > 0) {
+      // Loop over different resolutions to make sure the one supported by webcam is chosen
+      cv::Size res = this->settingsWidget->getSelectedResolution();
+      this->createCaptureThread(res, this->cameraIndex, camerastring, blockingExecutor);
+      requestedSizeCorrect = captureThread->isRequestedSizeCorrect();
+      if(!requestedSizeCorrect) {
+        this->deleteCaptureThread();
+        this->settingsWidget->switchToNextResolution();
+      } else {
+        captureLaunched = true;
+      }
+      numeResolutionsToTry-=1;
+    }
+    if (this->captureThread->getImageSize().width == 0) {
+      this->cameraIndex -= 1;
       camerastring = "";
       this->deleteCaptureThread();
     }
   }
-  if (this->imageSize.width>0) {
-    this->renderWidget->setCVSize(this->imageSize);
-    this->processingThread = this->createProcessingThread(this->imageSize, NULL);
-    this->processingThread->start();
-    //  
+  if (this->captureThread->getImageSize().width > 0) {
+    this->renderWidget->setCVSize(this->captureThread->getImageSize());
+    this->createProcessingThread(nullptr, defaultExecutor, this->settingsWidget->getCurentProcessingType());
     this->initChart();
   }
   else {
     //abort if no camera devices connected
   }
-  // 
+  //
   restoreState(settings.value("mainWindowState").toByteArray());
 }
 //----------------------------------------------------------------------------
@@ -104,47 +111,48 @@ void MartyCam::closeEvent(QCloseEvent*) {
   this->deleteProcessingThread();
 }
 //----------------------------------------------------------------------------
-void MartyCam::createCaptureThread(int FPS, cv::Size &size, int camera, const std::string &cameraname)
+void MartyCam::createCaptureThread(cv::Size &size, int camera, const std::string &cameraname,
+                                   hpx::threads::executors::pool_executor exec)
 {
-  this->captureThread = new CaptureThread(imageBuffer, size, camera, cameraname);
-  this->captureThread->setRotation(this->settingsWidget->getSelectedRotation());
-  this->captureThread->start(QThread::IdlePriority);
+  this->captureThread =
+          std::make_shared<CaptureThread>(imageBuffer, size, this->settingsWidget->getSelectedRotation(),
+                                            camera, cameraname, this->blockingExecutor,
+                                            this->settingsWidget->getRequestedFps());
   this->captureThread->startCapture();
   this->settingsWidget->setThreads(this->captureThread, this->processingThread);
-
-  connect(this->captureThread, SIGNAL(RecordingState(bool)), 
-    this, SLOT(onRecordingStateChanged(bool)),Qt::QueuedConnection); 
 }
 //----------------------------------------------------------------------------
 void MartyCam::deleteCaptureThread()
 {
-  this->captureThread->setAbort(true);
-  this->captureThread->wait();
+  this->captureThread->stopCapture();
   this->imageBuffer->clear();
-  delete captureThread;
-  // we will push an empty image onto the image buffer to ensure that any waiting processing thread is freed
+  this->settingsWidget->unsetCaptureThread();
+  this->captureThread = nullptr;
+
   this->imageBuffer->send(cv::Mat());
 }
 //----------------------------------------------------------------------------
-ProcessingThread *MartyCam::createProcessingThread(cv::Size &size, ProcessingThread *oldThread)
+void MartyCam::createProcessingThread(ProcessingThread *oldThread,
+                                      hpx::threads::executors::pool_executor exec,
+                                      ProcessingType processingType)
 {
-  ProcessingThread *temp = new ProcessingThread(imageBuffer, this->imageSize);
-  if (oldThread) temp->CopySettings(oldThread);
-  temp->setRootFilter(renderWidget);
-  this->settingsWidget->setThreads(this->captureThread, temp);
+  MotionFilterParams mfp = this->settingsWidget->getMotionFilterParams();
+  FaceRecogFilterParams frfp = this->settingsWidget->getFaceRecogFilterParams();
+    this->processingThread = std::make_shared<ProcessingThread>(imageBuffer, exec, processingType, mfp, frfp);
+  if (oldThread) this->processingThread->CopySettings(oldThread);
+  this->processingThread->setRootFilter(renderWidget.get());
+  this->processingThread->startProcessing();
+
+  this->settingsWidget->setThreads(this->captureThread, this->processingThread);
   //
-  connect(temp, SIGNAL(NewData()), 
-    this, SLOT(updateGUI()),Qt::QueuedConnection);
-  //
-  return temp;
+  connect(this->processingThread.get(), SIGNAL(NewData()), this, SLOT(updateGUI()),Qt::QueuedConnection);
 }
 //----------------------------------------------------------------------------
 void MartyCam::deleteProcessingThread()
 {
-  this->processingThread->setAbort(true);
-  this->processingThread->wait();
-  delete processingThread;
-  this->processingThread = NULL;
+  this->processingThread->stopProcessing();
+  this->settingsWidget->unsetProcessingThread();
+  this->processingThread = nullptr;
 }
 //----------------------------------------------------------------------------
 void MartyCam::onCameraIndexChanged(int index, QString URL)
@@ -159,17 +167,24 @@ void MartyCam::onCameraIndexChanged(int index, QString URL)
   this->clearGraphs();
 }
 //----------------------------------------------------------------------------
-void MartyCam::onResolutionSelected(cv::Size newSize) 
+void MartyCam::onResolutionSelected(cv::Size newSize)
 {
-  if (newSize==this->imageSize) {
-    return;
+  if(this->captureThread->setResolution(newSize))
+    // Update GUI renderwidget size
+    this->renderWidget->setCVSize(newSize);
+  else{
+    QMessageBox::warning(
+            this,
+            tr("Unsupported Resolution."),
+            tr(qPrintable(QString("Requested Resolution %1 x %2 is unsupported by your webcam. \n")
+                                  .arg(newSize.width).arg(newSize.height)))
+            + QString("Keeping the current resolution."));
+    this->settingsWidget->switchToPreviousResolution();
   }
-  this->imageSize = newSize;
-  this->captureThread->setResolution(this->imageSize);
   this->clearGraphs();
 }
 //----------------------------------------------------------------------------
-void MartyCam::onRotationChanged(int rotation) 
+void MartyCam::onRotationChanged(int rotation)
 {
   this->captureThread->setRotation(rotation);
   //
@@ -186,6 +201,18 @@ void MartyCam::updateGUI() {
   //
   if (!this->processingThread) return;
 
+  statusBar()->showMessage(QString("FPS : %1 | Frame Counter : %2 "
+                                   "| Image Buffer Occupancy : %3\% "
+                                   "| Sleep in CaptureThread: %4ms "
+                                   "| Capture Time: %5ms "
+                                   "| Processing Time: %6ms").
+    arg(this->captureThread->getActualFps(), 5, 'f', 2).
+    arg(captureThread->GetFrameCounter(), 5).
+    arg(100 * (float)this->imageBuffer->size()/IMAGE_BUFF_CAPACITY, 4).
+    arg(captureThread->getSleepTime()).
+    arg(captureThread->getCaptureTime()).
+    arg(processingThread->getProcessingTime()));
+
   //
   // as the data scrolls, we move the x-axis start and end (size)
   //
@@ -199,11 +226,6 @@ void MartyCam::updateGUI() {
     this->settingsWidget->RecordMotionAVI(true);
   }
 
-  statusBar()->showMessage(QString("FPS : %1, Counter : %2, Buffer : %3").
-    arg(this->captureThread->getFPS(), 5, 'f', 2).
-    arg(captureThread->GetFrameCounter(), 5).
-    arg(this->imageBuffer->size(), 5));
-
   QDateTime now = QDateTime::currentDateTime();
   QDateTime start = this->settingsWidget->TimeLapseStart();
   QDateTime stop = this->settingsWidget->TimeLapseEnd();
@@ -216,13 +238,13 @@ void MartyCam::updateGUI() {
       if (now>start && now<stop) {
         this->settingsWidget->SetupAVIStrings();
         this->captureThread->startTimeLapse(this->settingsWidget->TimeLapseFPS());
-        this->captureThread->updateTimeLapse(); 
+        this->captureThread->updateTimeLapse();
         this->lastTimeLapse = now;
       }
     }
   }
   else if ((now>next && now<stop) && this->settingsWidget->TimeLapseEnabled()) {
-    this->captureThread->updateTimeLapse(); 
+    this->captureThread->updateTimeLapse();
     this->lastTimeLapse = now;
   }
   else if (now>stop || !this->settingsWidget->TimeLapseEnabled()) {
@@ -238,7 +260,7 @@ void MartyCam::clearGraphs()
 void MartyCam::onUserTrackChanged(int value)
 {
   double percent = value;
-  this->processingThread->motionFilter->triggerLevel = percent; 
+  this->processingThread->motionFilter->triggerLevel = percent;
 
   double logval = percent>1 ? (100.0/4.0)*log10(percent) : 0;
   this->ui.set_value->setText(QString("%1").arg(logval,4 , 'f', 2));
@@ -279,7 +301,7 @@ void MartyCam::saveSettings()
   settings.setValue("mainWindowState", saveState());
   //
   settings.beginGroup("Trigger");
-  settings.setValue("trackval",this->ui.user_trackval->value()); 
+  settings.setValue("trackval",this->ui.user_trackval->value());
   settings.endGroup();
 }
 //----------------------------------------------------------------------------
@@ -291,7 +313,7 @@ void MartyCam::loadSettings()
   settings.beginGroup("Trigger");
   {
     const QSignalBlocker blocker(this->ui.user_trackval);
-    this->ui.user_trackval->setValue(settings.value("trackval",50).toInt()); 
+    this->ui.user_trackval->setValue(settings.value("trackval",50).toInt());
   }
   settings.endGroup();
 }

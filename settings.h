@@ -4,12 +4,16 @@
 #include "ui_settings.h"
 #include "capturethread.h"
 #include "processingthread.h"
+#include "MotionFilter.h"
 #include <QDateTime>
 #include <QTimer>
 #include <QButtonGroup>
 
 class RenderWidget;
 class IPCameraForm;
+
+class SettingsWidget;
+typedef std::shared_ptr<SettingsWidget> SettingsWidget_SP;
 
 template<class T>
 class QMySignalBlocker
@@ -40,12 +44,20 @@ public:
   SettingsWidget(QWidget* parent);
 
   cv::Size  getSelectedResolution();
+  int getSelectedResolutionButton();
   int       getSelectedRotation();
+  int       getRequestedFps();
+  int       getNumOfResolutions();
+
 
   void      RecordMotionAVI(bool state);
 
-  void setThreads(CaptureThread *capthread, ProcessingThread *procthread);
+  void setThreads(CaptureThread_SP capthread, ProcessingThread_SP procthread);
+  void unsetCaptureThread();
+  void unsetProcessingThread();
   void setRenderWidget(RenderWidget *rw) { this->renderWidget = rw; }
+  void switchToNextResolution();
+  void switchToPreviousResolution();
 
   QDateTime TimeLapseStart();
   QDateTime TimeLapseEnd();
@@ -54,6 +66,9 @@ public:
   bool      TimeLapseEnabled() { return this->ui.timeLapseEnabled->isChecked(); }
 
   int getCameraIndex(std::string &text);
+  ProcessingType getCurentProcessingType();
+  MotionFilterParams getMotionFilterParams();
+  FaceRecogFilterParams getFaceRecogFilterParams();
 
 public slots:
   void onThresholdChanged(int value);
@@ -68,10 +83,18 @@ public slots:
   void onRotateSelection(int btn);
   void onResolutionSelection(int btn);
   void onBlendChanged(int value);
-  void onCameraSelection(int index);
+  //
+  void onRequestedFpsChanged(int);
+  //
+  void onDecimationCoeffChanged(int);
+  void onEyesRecogStateChanged(int);
   //
   void onSnapClicked();
   void onStartTimeLapseClicked();
+  //
+  void onTabChanged(int);
+  //
+  void onCameraSelection(int index);
 
   void loadSettings();
   void saveSettings();
@@ -85,9 +108,11 @@ signals:
   void CameraIndexChanged(int, QString);
 
 protected:
+  QString decimationCoeffToQString(int sliderVal);
+
   Ui::SettingsWidget  ui;
-  CaptureThread      *capturethread;
-  ProcessingThread   *processingthread;
+  CaptureThread_SP      capturethread;
+  ProcessingThread_SP   processingthread;
   QTime               AVI_StartTime;
   QTime               AVI_EndTime;
   QTimer              clock;
@@ -95,9 +120,17 @@ protected:
   QButtonGroup        ImageButtonGroup;
   QButtonGroup        RotateButtonGroup;
   QButtonGroup        ResolutionButtonGroup;
+  int                 numberOfResolutions;
+  int                 currentResolutionButtonIndex;
+  int                 previousResolutionButtonIndex;
   RenderWidget       *renderWidget;
   IPCameraForm       *cameraForm;
   int                 NumDevices;
+  //
+  bool                faceRecognitionAcitve;
+  int                 requestedFps;
+  bool                eyesRecognitionActive;
+
 };
 
 #endif

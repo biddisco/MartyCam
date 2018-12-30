@@ -3,6 +3,7 @@
 #include <QFileDialog>
 #include <QSettings>
 #include <QClipboard>
+#include <QMessageBox>
 //
 #include "renderwidget.h"
 #include "IPCameraForm.h"
@@ -12,6 +13,7 @@
 #endif
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/highgui/highgui_c.h>
+#include <QString>
 //
 // we need these to get access to videoInput
 // Caution: including cpp file here as routines are not exported from openCV
@@ -21,8 +23,8 @@
 //----------------------------------------------------------------------------
 SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
 {
-  this->processingthread = NULL;
-  this->capturethread    = NULL;
+//  this->processingthread = NULL;
+//  this->capturethread    = NULL;
   this->SnapshotId       = 0;
   //
   ui.setupUi(this);
@@ -40,9 +42,21 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   connect(ui.blendRatio, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));
   connect(ui.noiseBlend, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));
   //
+  connect(ui.tabWidget, SIGNAL(currentChanged(int)), this, SLOT(onTabChanged(int)));
+  //
+  // Face Recognition Tab
+  //
+  connect(ui.requestedFps_HorizontalSlider, SIGNAL(valueChanged(int)), this, SLOT(onRequestedFpsChanged(int)));
+  connect(ui.eyesRecog_CheckBox, SIGNAL(stateChanged(int)), this, SLOT(onEyesRecogStateChanged(int)));
+  connect(ui.decimationCoeff_HorizontalSlider, SIGNAL(valueChanged(int)), this, SLOT(
+          onDecimationCoeffChanged(int)));
+  //
   connect(ui.snapButton, SIGNAL(clicked()), this, SLOT(onSnapClicked()));
   connect(ui.startTimeLapse, SIGNAL(clicked()), this, SLOT(onStartTimeLapseClicked()));
 
+  previousResolutionButtonIndex = -1;
+  currentResolutionButtonIndex = -1;
+  numberOfResolutions = 5;
   ResolutionButtonGroup.addButton(ui.res1600,4);
   ResolutionButtonGroup.addButton(ui.res1280,3);
   ResolutionButtonGroup.addButton(ui.res720,2);
@@ -68,10 +82,18 @@ SettingsWidget::SettingsWidget(QWidget* parent) : QWidget(parent)
   this->setupCameraList();
 }
 //----------------------------------------------------------------------------
-void SettingsWidget::setThreads(CaptureThread *capthread, ProcessingThread *procthread)
+void SettingsWidget::setThreads(CaptureThread_SP capthread, ProcessingThread_SP procthread)
 {
   this->capturethread = capthread;
   this->processingthread = procthread;
+}
+//----------------------------------------------------------------------------
+void SettingsWidget::unsetCaptureThread(){
+  this->capturethread = nullptr;
+}
+//----------------------------------------------------------------------------
+void SettingsWidget::unsetProcessingThread(){
+  this->processingthread = nullptr;
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::onThresholdChanged(int value)
@@ -114,6 +136,11 @@ void SettingsWidget::onBrowseClicked()
 //----------------------------------------------------------------------------
 void SettingsWidget::onAddCameraClicked()
 {
+    //TODO implement this or delete the GUI element
+    QMessageBox::warning(
+        this,
+        tr("Not implemented warning."),
+        tr("Switching camera from the default is not currently available.") );
   this->cameraForm->seupModelView();
   if(this->cameraForm->exec()) {
     this->cameraForm->saveSettings();
@@ -195,6 +222,29 @@ int SettingsWidget::getCameraIndex(std::string &text)
   return index;
 }
 //----------------------------------------------------------------------------
+MotionFilterParams SettingsWidget::getMotionFilterParams(){
+  MotionFilterParams motionFilterParams;
+
+  motionFilterParams.threshold = ui.threshold->value();
+  motionFilterParams.average = static_cast<float>(ui.average->value())/100;
+  motionFilterParams.erodeIterations = ui.erode->value();
+  motionFilterParams.dilateIterations = ui.dilate->value();
+
+  motionFilterParams.blendRatio = static_cast<float>(ui.blendRatio->value())/100;
+  motionFilterParams.displayImage = this->ImageButtonGroup.checkedId();
+
+  return motionFilterParams;
+}
+//----------------------------------------------------------------------------
+FaceRecogFilterParams SettingsWidget::getFaceRecogFilterParams(){
+  FaceRecogFilterParams faceRecogFilterParams;
+
+  faceRecogFilterParams.detectEyes = ui.eyesRecog_CheckBox->checkState();
+faceRecogFilterParams.decimationCoeff = ui.decimationCoeff_HorizontalSlider->value();
+
+  return faceRecogFilterParams;
+}
+//----------------------------------------------------------------------------
 void SettingsWidget::SetupAVIStrings()
 {
   QString filePath = this->ui.avi_directory->text();
@@ -268,14 +318,27 @@ cv::Size SettingsWidget::getSelectedResolution()
   return cv::Size(320,240);
 }
 //----------------------------------------------------------------------------
-void SettingsWidget::onResolutionSelection(int btn)
-{
+int SettingsWidget::getSelectedResolutionButton(){
+  return this->ResolutionButtonGroup.checkedId();
+}
+//----------------------------------------------------------------------------
+void SettingsWidget::onResolutionSelection(int btn) {
+  if(currentResolutionButtonIndex == -1)
+    currentResolutionButtonIndex = btn;
+  else {
+    previousResolutionButtonIndex = currentResolutionButtonIndex;
+    currentResolutionButtonIndex = btn;
+  }
+
   emit(resolutionSelected(getSelectedResolution()));
 }
 //----------------------------------------------------------------------------
 int SettingsWidget::getSelectedRotation()
 {
   return this->RotateButtonGroup.checkedId();
+}
+int SettingsWidget::getRequestedFps(){
+    return this->ui.requestedFps_HorizontalSlider->value();
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::onRotateSelection(int btn)
@@ -285,6 +348,7 @@ void SettingsWidget::onRotateSelection(int btn)
 //----------------------------------------------------------------------------
 void SettingsWidget::onBlendChanged(int value)
 {
+  //this->processingthread->setBlendRatios(this->ui.blendRatio->value()/100.0);
   this->processingthread->setBlendRatios(this->ui.blendRatio->value()/100.0, this->ui.noiseBlend->value()/100.0);
 }
 //----------------------------------------------------------------------------
@@ -313,19 +377,26 @@ void SettingsWidget::saveSettings()
   settings.setValue("average",this->ui.average->value());
   settings.setValue("erode",this->ui.erode->value());
   settings.setValue("dilate",this->ui.dilate->value());
-  settings.endGroup();
-
-  settings.beginGroup("UserSettings");
-  settings.setValue("resolution",this->ResolutionButtonGroup.checkedId());
-  settings.setValue("rotation",this->RotateButtonGroup.checkedId());
   settings.setValue("display",this->ImageButtonGroup.checkedId());
-  settings.setValue("cameraIndex",this->ui.cameraSelect->currentIndex());
-  settings.setValue("aviDirectory",this->ui.avi_directory->text());
   settings.setValue("blendImage",this->ui.blendRatio->value());
   settings.setValue("blendNoise",this->ui.noiseBlend->value());
   settings.endGroup();
 
-  settings.beginGroup("MotionAVI");
+  settings.beginGroup("FaceRecognition");
+  settings.setValue("eyesRecognition",this->ui.eyesRecog_CheckBox->checkState());
+  settings.setValue("decimationCoeff",this->ui.decimationCoeff_HorizontalSlider->value());
+  settings.endGroup();
+
+  settings.beginGroup("GeneralSettings");
+  settings.setValue("resolution",this->ResolutionButtonGroup.checkedId());
+  settings.setValue("rotation",this->RotateButtonGroup.checkedId());
+  settings.setValue("requestedFps",this->ui.requestedFps_HorizontalSlider->value());
+  settings.setValue("processingType", this->ui.tabWidget->currentIndex());
+  settings.setValue("cameraIndex",this->ui.cameraSelect->currentIndex());
+  settings.endGroup();
+
+  settings.beginGroup("SavingStream");
+  settings.setValue("aviDirectory",this->ui.avi_directory->text());
   settings.setValue("snapshot",this->SnapshotId);
   settings.setValue("aviDuration", this->ui.AVI_Duration->time());
   settings.endGroup();
@@ -343,24 +414,39 @@ void SettingsWidget::loadSettings()
   QSettings settings(settingsFileName, QSettings::IniFormat);
   //
   settings.beginGroup("MotionDetection");
-  SilentCall(this->ui.threshold)->setValue(settings.value("threshold",3).toInt()); 
-  SilentCall(this->ui.average)->setValue(settings.value("average",10).toInt()); 
-  SilentCall(this->ui.erode)->setValue(settings.value("erode",1).toInt()); 
-  SilentCall(this->ui.dilate)->setValue(settings.value("dilate",1).toInt()); 
+  SilentCall(this->ui.threshold)->setValue(settings.value("threshold",3).toInt());
+  SilentCall(this->ui.t_label)->setText(settings.value("threshold", 3).toString());
+  SilentCall(this->ui.average)->setValue(settings.value("average",10).toInt());
+  SilentCall(this->ui.a_label)->setText(QString::number((settings.value("average", 10).toFloat()/100)));
+  SilentCall(this->ui.erode)->setValue(settings.value("erode",1).toInt());
+  SilentCall(this->ui.e_label)->setText(settings.value("erode", 1).toString());
+  SilentCall(this->ui.dilate)->setValue(settings.value("dilate",1).toInt());
+  SilentCall(this->ui.d_label)->setText(settings.value("dilate", 1).toString());
+
+  SilentCall(&this->ImageButtonGroup)->button(settings.value("display",0).toInt())->click();
+  SilentCall(this->ui.blendRatio)->setValue(settings.value("blendImage",0.5).toInt());
+  SilentCall(this->ui.noiseBlend)->setValue(settings.value("blendNoise",0.5).toInt());
   settings.endGroup();
 
-  settings.beginGroup("UserSettings");
+  settings.beginGroup("FaceRecognition");
+  SilentCall(this->ui.eyesRecog_CheckBox)->setChecked(settings.value("eyesRecognition", false).toBool());
+  SilentCall(this->ui.decimationCoeff_HorizontalSlider)->setValue(settings.value("decimationCoeff",50).toInt());
+  SilentCall(this->ui.decimationCoeff_Label)->setText(
+          decimationCoeffToQString((settings.value("decimationCoeff", 50).toInt())));
+  settings.endGroup();
+
+  settings.beginGroup("GeneralSettings");
+  SilentCall(this->ui.requestedFps_HorizontalSlider)->setValue(settings.value("requestedFps",15).toInt());
+  SilentCall(this->ui.requestedFps_ValueLabel)->setText(settings.value("requestedFps", 15).toString());
   SilentCall(&this->ResolutionButtonGroup)->button(settings.value("resolution",0).toInt())->click();
   SilentCall(&this->RotateButtonGroup)->button(settings.value("rotation",0).toInt())->click();
-  SilentCall(&this->ImageButtonGroup)->button(settings.value("display",0).toInt())->click();
   SilentCall(this->ui.cameraSelect)->setCurrentIndex(settings.value("cameraIndex",0).toInt());
-  SilentCall(this->ui.avi_directory)->setText(settings.value("aviDirectory","C:\\Wildlife").toString());
+  SilentCall(this->ui.tabWidget)->setCurrentIndex(settings.value("processingType", 0).toInt());
   //
-  SilentCall(this->ui.blendRatio)->setValue(settings.value("blendImage",0.5).toInt()); 
-  SilentCall(this->ui.noiseBlend)->setValue(settings.value("blendNoise",0.5).toInt()); 
   settings.endGroup();
 
-  settings.beginGroup("MotionAVI");
+  settings.beginGroup("SavingStream");
+  SilentCall(this->ui.avi_directory)->setText(settings.value("aviDirectory","$HOME/wildlife").toString());
   this->SnapshotId = settings.value("snapshot",0).toInt();
   SilentCall(this->ui.AVI_Duration)->setTime(settings.value("aviDuration", QTime(0,0,10)).toTime());
   settings.endGroup();
@@ -374,8 +460,8 @@ void SettingsWidget::loadSettings()
 //----------------------------------------------------------------------------
 void SettingsWidget::onSnapClicked()
 {
-  QPixmap p = QPixmap::grabWidget(this->renderWidget);
-  QString filename = QString("%1/MartySnap-%2").arg(this->ui.avi_directory->text()).arg(SnapshotId, 3, 10, QChar('0')) + QString(".png");
+  QPixmap p = this->renderWidget->grab();
+  QString filename = QString("%1/MartySnap-%2").arg(this->ui.avi_directory->text()).arg(SnapshotId++, 3, 10, QChar('0')) + QString(".png");
   p.save(filename);
   QClipboard *clipboard = QApplication::clipboard();
   clipboard->setPixmap(p);
@@ -402,4 +488,63 @@ QDateTime SettingsWidget::TimeLapseEnd()
   QDateTime result = this->TimeLapseStart().addDays(days);
   return result;
 }
+//---------------------------------------------------------------------------
+void SettingsWidget::onTabChanged(int currentTabIndex){
+  switch(currentTabIndex){
+    case 0: this->processingthread->setMotionDetectionProcessing(); break;
+    case 1: this->processingthread->setFaceRecognitionProcessing(); break;
+    default: std::cout << "Current tab index = "
+                       << std::to_string(currentTabIndex) << " is unsupported\n";
+             break;
+  }
+}
+//---------------------------------------------------------------------------
+void SettingsWidget::onRequestedFpsChanged(int value){
+  this->ui.requestedFps_ValueLabel->setText(QString("%1").arg(value, 2));
+  this->capturethread->setRequestedFps(value);
 
+}
+//---------------------------------------------------------------------------
+void SettingsWidget::onEyesRecogStateChanged(int value){
+  this->processingthread->setEyesRecogState(value);
+}
+
+void SettingsWidget::onDecimationCoeffChanged(int value){
+  this->decimationCoeffToQString(value);
+  this->ui.decimationCoeff_Label->setText(decimationCoeffToQString(value));
+  this->processingthread->setDecimationCoeff(value);
+}
+
+ProcessingType SettingsWidget::getCurentProcessingType() {
+  return ProcessingType(this->ui.tabWidget->currentIndex());
+}
+//---------------------------------------------------------------------------
+void SettingsWidget::switchToNextResolution(){
+  int currentIndex = this->ResolutionButtonGroup.checkedId();
+  int newIndex = (currentIndex + 1) % 5;
+  SilentCall(&this->ResolutionButtonGroup)->button(newIndex)->click();
+}
+//---------------------------------------------------------------------------
+void SettingsWidget::switchToPreviousResolution(){
+ if(this->previousResolutionButtonIndex >=0)
+   this->ResolutionButtonGroup.button(previousResolutionButtonIndex)->click();
+}
+//---------------------------------------------------------------------------
+int SettingsWidget::getNumOfResolutions(){
+  return this->numberOfResolutions;
+}
+//---------------------------------------------------------------------------
+QString SettingsWidget::decimationCoeffToQString(int sliderVal){
+  if(sliderVal > 100 || sliderVal < 0){
+    //return QString();
+    QMessageBox::warning(
+            this,
+            tr("Unsupported decimation Coeff Value."),
+            tr(qPrintable("Current Decimation Coeff = " + QString::number(sliderVal) + "is unsupported\n")) );
+    return "?";
+  }
+  else if(sliderVal == 100)
+    return QString("1.00");
+  else // ( 0 <= sliderVal < 100 )
+    return QString("0.%1").arg(sliderVal, 2);
+}

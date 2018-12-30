@@ -5,24 +5,19 @@
 //
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include "opencv2/videoio/videoio_c.h"
+#include "opencv2/imgproc/imgproc_c.h"
 //
 #include <QDateTime>
 #include <QString>
 //
-boost::accumulators::accumulator_set<int, boost::accumulators::stats<boost::accumulators::tag::rolling_mean> > 
+boost::accumulators::accumulator_set<int, boost::accumulators::stats<boost::accumulators::tag::rolling_mean> >
   acc(boost::accumulators::tag::rolling_window::window_size = 10);
 //
 //----------------------------------------------------------------------------
 MotionFilter::MotionFilter()
 {
   this->imageSize         = cv::Size(-1,-1);
-//  this->floatImage        = NULL;
-//  this->difference        = NULL;
-//  this->blendImage        = NULL;
-//  this->greyScaleImage    = NULL;
-//  this->thresholdImage    = NULL;
-//  this->movingAverage     = NULL;
-//  this->noiseImage        = NULL;
   //
   this->PSNR_Filter       = new PSNRFilter();
   this->decayFilter       = new DecayFilter();
@@ -36,6 +31,31 @@ MotionFilter::MotionFilter()
   this->displayImage      = 3;
   this->blendRatio        = 0.75;
   this->noiseBlendRatio   = 0.75;
+  //
+  this->motionEstimate   = 0.0;
+  this->logMotion        = 0.0;
+  this->normalizedMotion = 0.0;
+  this->rollingMean      = 0.0;
+  this->eventLevel       = 0.0;
+  //
+  this->frameCount = 0;
+}
+
+MotionFilter::MotionFilter(MotionFilterParams mfp){
+  this->imageSize         = cv::Size(-1,-1);
+  //
+  //
+  this->PSNR_Filter       = new PSNRFilter();
+  this->decayFilter       = new DecayFilter();
+  this->renderer          = NULL;
+  //
+  this->triggerLevel      = 100.0;
+  this->threshold         = mfp.threshold;
+  this->average           = mfp.average;
+  this->erodeIterations   = mfp.erodeIterations;
+  this->dilateIterations  = mfp.dilateIterations;
+  this->displayImage      = mfp.displayImage;
+  this->blendRatio        = mfp.blendRatio;
   //
   this->motionEstimate   = 0.0;
   this->logMotion        = 0.0;
@@ -73,7 +93,7 @@ void MotionFilter::process(const cv::Mat &image)
     cv::Mat currentFrame = image;
     cv::Size workingSize = image.size();
     if (workingSize.width!=this->imageSize.width ||
-      workingSize.height!=this->imageSize.height) 
+      workingSize.height!=this->imageSize.height)
     {
       this->DeleteTemporaryStorage();
       this->imageSize = workingSize;
@@ -100,7 +120,7 @@ void MotionFilter::process(const cv::Mat &image)
 
     cv::Mat shownImage;
     if (1) {
-      // add last frame to weighted moving average 
+      // add last frame to weighted moving average
       // if average = 1 we compare this frame to last frame
       // if average = epsilon, we compare this frame to smoothed average of previous frames
       cv::accumulateWeighted(this->lastFrame, this->movingAverage, this->average);
@@ -167,10 +187,10 @@ void MotionFilter::process(const cv::Mat &image)
     double pixels = this->thresholdImage.total();
     // max 1, min 0
     this->motionEstimate = nonzero/pixels;
-    // 10.0*log10(1  / 640*480) = -54dB : so max is 0, min -54 
-    // 10.0*log10(10 / 640*480) = -44dB : 
+    // 10.0*log10(1  / 640*480) = -54dB : so max is 0, min -54
+    // 10.0*log10(10 / 640*480) = -44dB :
     this->logMotion = this->motionEstimate>0 ? -10.0*log10(this->motionEstimate) : 54.0;
-    // clamp values 
+    // clamp values
     this->logMotion = (this->logMotion>54.0) ? 54.0 : this->logMotion;
     this->logMotion = 100.0*(54.0-this->logMotion)/54.0;
     //
@@ -179,7 +199,7 @@ void MotionFilter::process(const cv::Mat &image)
     }
     this->normalizedMotion = (this->normalizedMotion>100.0) ? 100.0 : this->normalizedMotion;
 
-    TimeValue tv(this->frameCount++, this->logMotion); 
+    TimeValue tv(this->frameCount++, this->logMotion);
     this->decayFilter->process(tv);
 
     acc(this->normalizedMotion);
@@ -192,7 +212,7 @@ void MotionFilter::process(const cv::Mat &image)
     //
     QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
     cv::putText(shownImage, timestring.toLatin1().data(),
-      cvPoint(shownImage.size().width - text_size.width - 4, text_size.height+4), 
+      cvPoint(shownImage.size().width - text_size.width - 4, text_size.height+4),
       CV_FONT_HERSHEY_PLAIN, 1.0, cv::Scalar(255, 255, 255, 0), 1);
     //
     // Pass final image to GUI
@@ -206,12 +226,12 @@ void MotionFilter::process(const cv::Mat &image)
   this->lastFrame = image;
 }
 //----------------------------------------------------------------------------
-void MotionFilter::updateNoiseMap(const cv::Mat &image, double noiseblend) 
+void MotionFilter::updateNoiseMap(const cv::Mat &image, double noiseblend)
 {
   static int cnt = 0;
   if (cnt==0) {
     cv::rectangle(
-      this->noiseImage, 
+      this->noiseImage,
       cvPoint(0,0), this->noiseImage.size(),
       cvScalar(0), CV_FILLED);
     cnt = 0;
@@ -235,7 +255,7 @@ void MotionFilter::updateNoiseMap(const cv::Mat &image, double noiseblend)
   cnt++;
 }
 //----------------------------------------------------------------------------
-void MotionFilter::countPixels(const cv::Mat &image) 
+void MotionFilter::countPixels(const cv::Mat &image)
 {
   // Acquire image unfo
   int height    = image.size().height;
@@ -258,7 +278,7 @@ void MotionFilter::countPixels(const cv::Mat &image)
       }
       if (nonwhite == 1) white++;
     }
-  }           
+  }
 
   this->motionEstimate = 100.0*white/(height*width);
 }

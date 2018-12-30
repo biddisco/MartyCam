@@ -7,6 +7,10 @@
 #include <opencv2/core/core.hpp>
 //
 #include "filter.h"
+#include <memory>
+
+class RenderWidget;
+typedef std::shared_ptr<RenderWidget> RenderWidget_SP;
 
 class RenderWidget : public QWidget, public Filter {
 Q_OBJECT;

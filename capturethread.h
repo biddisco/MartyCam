@@ -1,39 +1,53 @@
 #ifndef CAPTURE_THREAD_H
 #define CAPTURE_THREAD_H
-
-#include <QThread>
-#include <QMutex>
-#include <QWaitCondition>
+//
+#include <hpx/config.hpp>
 //
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 //
-#ifndef Q_MOC_RUN
- #include <boost/shared_ptr.hpp>
- #include "ConcurrentCircularBuffer.h"
- typedef boost::circular_buffer< int > FrameSpeedBuffer;
- typedef boost::shared_ptr< ConcurrentCircularBuffer<cv::Mat> > ImageBuffer;
-#endif
+#include <QMutex>
+#include <QWaitCondition>
 //
+#include <memory>
+#include <boost/lockfree/spsc_queue.hpp>
+//
+#include <hpx/parallel/execution.hpp>
+#include <hpx/parallel/executors/pool_executor.hpp>
+//
+#include "ConcurrentCircularBuffer.h"
+#define IMAGE_QUEUE_LEN 1024
 
-class CaptureThread : public QThread {
-Q_OBJECT;
-public: 
-   CaptureThread(ImageBuffer buffer, const cv::Size &size, int device, const std::string &URL);
+typedef boost::circular_buffer< int > IntCircBuff;
+typedef std::shared_ptr< ConcurrentCircularBuffer<cv::Mat> > ImageBuffer;
+typedef std::shared_ptr< boost::lockfree::spsc_queue<cv::Mat, boost::lockfree::capacity<IMAGE_QUEUE_LEN>> > ImageQueue;
+
+class CaptureThread;
+typedef std::shared_ptr<CaptureThread> CaptureThread_SP;
+
+class CaptureThread{
+public:
+   CaptureThread(ImageBuffer imageBuffer, const cv::Size &size, int rotation, int device,
+                 const std::string &URL,
+                 hpx::threads::executors::pool_executor exec,
+                 int requestedFps);
   ~CaptureThread() ;
 
   void run();
-  void setAbort(bool a) { this->abort = a; }
   //
   bool connectCamera(int index, const std::string &URL);
   bool startCapture();
   bool stopCapture();
   //
-  void setResolution(const cv::Size &res);
+  bool setResolution(const cv::Size &res);
   //
-  double getFPS() { return fps; }
+  void setRequestedFps(int value);
+  double getActualFps() { return actualFps; }
+  int getSleepTime() {return sleepTime_ms; }
+  int getCaptureTime() { return captureTime_ms; }
   bool isCapturing() { return captureActive; }
-  
+  bool isRequestedSizeCorrect() { return requestedSizeCorrect; }
+
   int  GetFrameCounter() { return this->FrameCounter; }
   std::string getCaptureStatusString() { return this->CaptureStatus; }
 
@@ -58,8 +72,8 @@ public:
   void closeAVI();
 
   void saveTimeLapseAVI(const cv::Mat &image);
-  void startTimeLapse(double fps); 
-  void stopTimeLapse(); 
+  void startTimeLapse(double fps);
+  void stopTimeLapse();
   void updateTimeLapse();
 
   void setRotation(int value);
@@ -70,25 +84,34 @@ public:
   cv::Size getImageSize() { return this->imageSize; }
   cv::Size getRotatedSize() { return this->rotatedSize; }
 
-signals:
+private:
+  bool tryResolutionUpdate(cv::Size requestedResolution);
+
+  void setAbort(bool a) { this->abort = a; }
+  void updateActualFps(int time_ms);
+  void updateCaptureTime(int time_ms);
+
   void RecordingState(bool);
 
-public:
-  void updateFPS(int time);
   //
-  QMutex           captureLock, stopLock;
-  QWaitCondition   captureWait, stopWait;
+  QMutex           stopLock;
+  QWaitCondition   stopWait;
+  hpx::threads::executors::pool_executor executor;
   //
-  bool             abort; 
+  bool             abort;
   ImageBuffer      imageBuffer;
   bool             captureActive;
   bool             deInterlace;
-  int              requestedFPS; 
   cv::Size         imageSize;
+  bool             requestedSizeCorrect;
   cv::Size         rotatedSize;
   cv::VideoCapture capture;
-  double           fps;
-  FrameSpeedBuffer frameTimes;
+  double           actualFps;
+  int              requestedFps;
+  int              sleepTime_ms;
+  int              captureTime_ms;
+  IntCircBuff      frameTimes;
+  IntCircBuff      captureTimes;
   int              deviceIndex;
   int              rotation;
   int              FrameCounter;
@@ -97,7 +120,6 @@ public:
   cv::VideoWriter  MotionAVI_Writer;
   cv::VideoWriter  TimeLapseAVI_Writer;
   bool             MotionAVI_Writing;
-  bool             TimeLapseAVI_Writing;
   std::string      AVI_Directory;
   std::string      MotionAVI_Name;
   std::string      TimeLapseAVI_Name;
@@ -107,6 +129,10 @@ public:
   cv::Size         text_size;
   cv::Mat          currentFrame;
   cv::Mat          rotatedImage;
+
+public:
+  bool             TimeLapseAVI_Writing;
+
 };
 
 #endif
