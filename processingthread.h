@@ -2,8 +2,8 @@
 #define PROCESSING_THREAD_H
 //
 #include <hpx/config.hpp>
-#include <hpx/parallel/execution.hpp>
-#include <hpx/parallel/executors/pool_executor.hpp>
+#include <hpx/execution/execution.hpp>
+#include <hpx/include/parallel_executors.hpp>
 //
 #include <QMutex>
 #include <QWaitCondition>
@@ -35,7 +35,7 @@ class ProcessingThread : public QObject{
 Q_OBJECT;
 public:
    ProcessingThread(ImageBuffer buffer,
-                    hpx::threads::executors::pool_executor exec,
+                    hpx::execution::parallel_executor exec,
                     ProcessingType processingType,
                     MotionFilterParams mfp, FaceRecogFilterParams frfp);
   ~ProcessingThread();
@@ -89,7 +89,7 @@ private:
   QWaitCondition   stopWait;
   bool             processingActive;
   bool             abort;
-  hpx::threads::executors::pool_executor executor;
+  hpx::execution::parallel_executor executor;
   //
   ImageBuffer  imageBuffer;
   ProcessingType processingType;

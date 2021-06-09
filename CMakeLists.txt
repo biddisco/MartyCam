@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.5.1)
 
-project(MartyCam CXX)
+project(martycam CXX)
 
 #--------------------------------------------------
 # CXX standard
@@ -95,23 +95,23 @@ endif()
 #-----------------------------------------------------------------------------
 # Qt resource files
 #-----------------------------------------------------------------------------
-set(MartyCam_QT_RCCS
+set(martycam_QT_RCCS
         resources.qrc
 )
 
 #-----------------------------------------------------------------------------
 # Qt GUI interface wrapping
 #-----------------------------------------------------------------------------
-set(MartyCam_QT_UIS
+set(martycam_QT_UIS
   settings.ui
-        martycam.ui
+  martycam.ui
   IPCameraForm.ui
 )
 
 #-----------------------------------------------------------------------------
 # Qt QObjects for MOC
 #-----------------------------------------------------------------------------
-set(MartyCam_QT_MOC_HDRS
+set(martycam_QT_MOC_HDRS
   martycam.h
   IPCameraForm.h
   settings.h
@@ -124,18 +124,18 @@ set(MartyCam_QT_MOC_HDRS
 #-----------------------------------------------------------------------------
 
 # generate rules that will run rcc on the resource files
-QT5_ADD_RESOURCES(MartyCam_RCC_SRCS
-  ${MartyCam_QT_RCCS}
+QT5_ADD_RESOURCES(martycam_RCC_SRCS
+  ${martycam_QT_RCCS}
 )
 
 # generate rules that will run uic on .ui files:
-QT5_WRAP_UI(MartyCam_QT_UIS_H
-  ${MartyCam_QT_UIS}
+QT5_WRAP_UI(martycam_QT_UIS_H
+  ${martycam_QT_UIS}
 )
 
 # generate rules that will run moc on QObject header files
-QT_WRAP_CPP(MartyCam MartyCam_MOC_SRCS
-  ${MartyCam_QT_MOC_HDRS}
+QT_WRAP_CPP(martycam martycam_MOC_SRCS
+  ${martycam_QT_MOC_HDRS}
 )
 
 #-----------------------------------------------------------------------------
@@ -146,7 +146,7 @@ ADD_SUBDIRECTORY(AnalogWidgets)
 #-----------------------------------------------------------------------------
 # Main source files
 #-----------------------------------------------------------------------------
-set(MartyCam_SRCS
+set(martycam_SRCS
   capturethread.cpp
   filter.cpp
   PSNRFilter.cpp
@@ -159,12 +159,12 @@ set(MartyCam_SRCS
   renderwidget.cpp
   settings.cpp
   IPCameraForm.cpp
-  MartyCam.rc
+  martycam.rc
   FaceRecogFilter.cpp
 )
 if (WIN32)
-  set(MartyCam_SRCS
-    ${MartyCam_SRCS}
+  set(martycam_SRCS
+    ${martycam_SRCS}
     ${CMAKE_CURRENT_SOURCE_DIR}/videoInput/videoInputSrcAndDemos/libs/videoInput/videoInput.cpp
   )
 endif()
@@ -172,19 +172,19 @@ endif()
 #-----------------------------------------------------------------------------
 # Target executable
 #-----------------------------------------------------------------------------
-ADD_EXECUTABLE(MartyCam
-  ${MartyCam_SRCS}
-  ${MartyCam_RCC_SRCS}
-  ${MartyCam_QT_UIS_H}
-  ${MartyCam_MOC_SRCS}
+ADD_EXECUTABLE(martycam
+  ${martycam_SRCS}
+  ${martycam_RCC_SRCS}
+  ${martycam_QT_UIS_H}
+  ${martycam_MOC_SRCS}
 )
 
-qt5_use_modules(MartyCam Core Widgets Gui Svg OpenGL Concurrent)
+qt5_use_modules(martycam Core Widgets Gui Svg OpenGL Concurrent)
 
 #-----------------------------------------------------------------------------
 # Include directories
 #-----------------------------------------------------------------------------
-target_include_directories(MartyCam 
+target_include_directories(martycam 
   PRIVATE 
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_BINARY_DIR}"
@@ -194,13 +194,11 @@ target_include_directories(MartyCam
 )
 
 
-target_link_libraries(MartyCam
+target_link_libraries(martycam
   analogue
-  iostreams_component
-  ${HPX_LIBRARIES}
+  HPX::hpx
   ${OpenCV_LIBS}
   ${Boost_LIBRARIES}
 )
-#hpx_setup_target(MartyCam COMPONENT_DEPENDENCIES iostreams)
 
 add_subdirectory(webcam_test)

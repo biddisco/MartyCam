@@ -2,7 +2,7 @@
 #define HEAD_TRACKER_H
 
 #include <hpx/config.hpp>
-#include <hpx/parallel/execution.hpp>
+#include <hpx/execution/execution.hpp>
 
 #include <QMainWindow>
 #include <QDateTime>
@@ -27,7 +27,7 @@ typedef std::shared_ptr<QDockWidget> QDockWidget_SP;
 class MartyCam : public QMainWindow {
 Q_OBJECT
 public:
-  MartyCam(const hpx::threads::executors::pool_executor&, const hpx::threads::executors::pool_executor&);
+  MartyCam(const hpx::execution::parallel_executor&, const hpx::execution::parallel_executor&);
 
   void loadSettings();
   void saveSettings();
@@ -47,9 +47,9 @@ protected:
   void closeEvent(QCloseEvent*);
   void deleteCaptureThread();
   void createCaptureThread(cv::Size &size, int camera, const std::string &cameraname,
-                           hpx::threads::executors::pool_executor exec);
+                           hpx::execution::parallel_executor exec);
   void deleteProcessingThread();
-  void createProcessingThread(ProcessingThread *oldThread, hpx::threads::executors::pool_executor exec,
+  void createProcessingThread(ProcessingThread *oldThread, hpx::execution::parallel_executor exec,
                               ProcessingType processingType);
 
   void resetChart();
@@ -70,8 +70,8 @@ public:
 
   ImageBuffer              imageBuffer;
 
-  hpx::threads::executors::pool_executor blockingExecutor;
-  hpx::threads::executors::pool_executor defaultExecutor;
+  hpx::execution::parallel_executor blockingExecutor;
+  hpx::execution::parallel_executor defaultExecutor;
 
   QDockWidget             *progressToolbar;
   cv::Size                 imageSize;

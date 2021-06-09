@@ -12,11 +12,12 @@
 #include "PSNRFilter.h"
 #include "GraphUpdateFilter.h"
 //
-#include <hpx/lcos/future.hpp>
+#include <hpx/future.hpp>
 #include <hpx/include/async.hpp>
-#include <utility> //----------------------------------------------------------------------------
+#include <utility>
+//----------------------------------------------------------------------------
 ProcessingThread::ProcessingThread(ImageBuffer buffer,
-                                   hpx::threads::executors::pool_executor exec,
+                                   hpx::execution::parallel_executor exec,
                                    ProcessingType processingType,
                                    MotionFilterParams mfp,
                                    FaceRecogFilterParams frfp)

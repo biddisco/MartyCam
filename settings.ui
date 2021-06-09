@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>426</width>
-    <height>918</height>
+    <height>947</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -32,7 +32,7 @@
    <item alignment="Qt::AlignTop">
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="Motion_tab">
       <property name="enabled">
@@ -364,7 +364,7 @@
           <item row="6" column="0" colspan="3">
            <widget class="QLineEdit" name="avi_directory_TL">
             <property name="text">
-             <string>c:\wildlife</string>
+             <string>$HOME/wildlife</string>
             </property>
            </widget>
           </item>
@@ -411,6 +411,9 @@
               <month>1</month>
               <day>1</day>
              </datetime>
+            </property>
+            <property name="displayFormat">
+             <string>hh:mm:ss</string>
             </property>
             <property name="time">
              <time>
@@ -518,10 +521,13 @@
               <hour>0</hour>
               <minute>0</minute>
               <second>0</second>
-              <year>2013</year>
-              <month>2</month>
-              <day>21</day>
+              <year>2020</year>
+              <month>1</month>
+              <day>1</day>
              </datetime>
+            </property>
+            <property name="displayFormat">
+             <string>dd/MM/yy hh:mm::ss</string>
             </property>
             <property name="calendarPopup">
              <bool>true</bool>

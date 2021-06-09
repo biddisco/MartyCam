@@ -5,8 +5,9 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/circular_buffer.hpp>
+#include <boost/core/noncopyable.hpp>
 
-// Thread safe circular buffer 
+// Thread safe circular buffer
 template <typename T>
 class ConcurrentCircularBuffer : private boost::noncopyable
 {

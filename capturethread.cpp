@@ -9,7 +9,7 @@
 #include "opencv2/videoio/videoio_c.h"
 #include "opencv2/imgproc/imgproc_c.h"
 
-#include <hpx/lcos/future.hpp>
+#include <hpx/future.hpp>
 #include <hpx/include/async.hpp>
 #include <utility>
 
@@ -56,7 +56,7 @@ CaptureThread::CaptureThread(ImageBuffer imageBuffer,
                              int rotation,
                              int device,
                              const std::string &URL,
-                             hpx::threads::executors::pool_executor exec,
+                             hpx::execution::parallel_executor exec,
                              int requestedFps)
         : imageBuffer(std::move(imageBuffer)),
           imageSize(cv::Size(0,0)),

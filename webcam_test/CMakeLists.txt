@@ -18,10 +18,9 @@ find_package(OpenCV REQUIRED)
 add_hpx_executable(hpx_opencv_webcam
         ESSENTIAL
         SOURCES hpx_opencv_webcam.cpp system_characteristics.hpp
-        DEPENDENCIES ${OpenCV_LIBS}
-        COMPONENT_DEPENDENCIES iostreams)
+        DEPENDENCIES ${OpenCV_LIBS})
 
-target_link_libraries(hpx_opencv_webcam ${OpenCV_LIBS})
+    target_link_libraries(hpx_opencv_webcam PUBLIC ${OpenCV_LIBS})
 
 if(MSVC)
     add_definitions(-D_USE_MATH_DEFINES)

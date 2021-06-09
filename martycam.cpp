@@ -6,7 +6,7 @@
 #include <QDockWidget>
 #include <QSettings>
 //
-#include <hpx/lcos/future.hpp>
+#include <hpx/future.hpp>
 #include <hpx/include/async.hpp>
 #include <QtWidgets/QMessageBox>
 
@@ -15,8 +15,8 @@
 //----------------------------------------------------------------------------
 const int MartyCam::IMAGE_BUFF_CAPACITY = 5;
 
-MartyCam::MartyCam(const hpx::threads::executors::pool_executor& defaultExec,
-                   const hpx::threads::executors::pool_executor& blockingExec)
+MartyCam::MartyCam(const hpx::execution::parallel_executor& defaultExec,
+                   const hpx::execution::parallel_executor& blockingExec)
         : captureThread(nullptr), processingThread(nullptr),
           defaultExecutor(defaultExec), blockingExecutor(blockingExec),
           QMainWindow(nullptr)
@@ -112,7 +112,7 @@ void MartyCam::closeEvent(QCloseEvent*) {
 }
 //----------------------------------------------------------------------------
 void MartyCam::createCaptureThread(cv::Size &size, int camera, const std::string &cameraname,
-                                   hpx::threads::executors::pool_executor exec)
+                                   hpx::execution::parallel_executor exec)
 {
   this->captureThread =
           std::make_shared<CaptureThread>(imageBuffer, size, this->settingsWidget->getSelectedRotation(),
@@ -133,7 +133,7 @@ void MartyCam::deleteCaptureThread()
 }
 //----------------------------------------------------------------------------
 void MartyCam::createProcessingThread(ProcessingThread *oldThread,
-                                      hpx::threads::executors::pool_executor exec,
+                                      hpx::execution::parallel_executor exec,
                                       ProcessingType processingType)
 {
   MotionFilterParams mfp = this->settingsWidget->getMotionFilterParams();

@@ -12,8 +12,7 @@
 #include <memory>
 #include <boost/lockfree/spsc_queue.hpp>
 //
-#include <hpx/parallel/execution.hpp>
-#include <hpx/parallel/executors/pool_executor.hpp>
+#include <hpx/include/parallel_executors.hpp>
 //
 #include "ConcurrentCircularBuffer.h"
 #define IMAGE_QUEUE_LEN 1024
@@ -29,7 +28,7 @@ class CaptureThread{
 public:
    CaptureThread(ImageBuffer imageBuffer, const cv::Size &size, int rotation, int device,
                  const std::string &URL,
-                 hpx::threads::executors::pool_executor exec,
+                 hpx::execution::parallel_executor exec,
                  int requestedFps);
   ~CaptureThread() ;
 
@@ -96,7 +95,7 @@ private:
   //
   QMutex           stopLock;
   QWaitCondition   stopWait;
-  hpx::threads::executors::pool_executor executor;
+  hpx::execution::parallel_executor executor;
   //
   bool             abort;
   ImageBuffer      imageBuffer;

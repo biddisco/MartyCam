@@ -1,11 +1,11 @@
 #include <hpx/hpx_init.hpp>
 //
 #include <hpx/parallel/algorithms/for_loop.hpp>
-#include <hpx/parallel/execution.hpp>
+#include <hpx/execution/execution.hpp>
+#include <hpx/thread_executors/executors.hpp>
+#include <hpx/include/parallel_executors.hpp>
 //
-#include <hpx/runtime/resource/partitioner.hpp>
-//
-#include <hpx/include/iostreams.hpp>
+#include <hpx/resource_partitioner/partitioner.hpp>
 //
 #include "system_characteristics.hpp"
 //
@@ -28,7 +28,7 @@ static std::string opencv_tp_name("opencv");
 ///////////////////////////////////////////////////////////////////////////
 /// Function Definitions
 cv::Mat load_image(const std::string &path) {
-    hpx::cout << "load_image from " << path << "\n";
+    std::cout << "load_image from " << path << "\n";
     cv::Mat image = cv::imread(path, 1);
     if (!image.data)
         throw std::runtime_error("No image data \n");
@@ -37,7 +37,7 @@ cv::Mat load_image(const std::string &path) {
 }
 
 cv::Mat take_webcam_image() {
-    hpx::cout << "Taking webcam image.";
+    std::cout << "Taking webcam image.";
     cv::VideoCapture cap;
 
     // arg=0 opens the default camera
@@ -105,10 +105,10 @@ int detect_face(cv::Mat& img, cv::CascadeClassifier& cascade,
 
 int start_webcam_capture(int num_frames, cv::CascadeClassifier cascade,
                          cv::CascadeClassifier nestedCascade, double scale,
-                         hpx::threads::executors::pool_executor def_exec) {
+                         hpx::execution::parallel_executor def_exec) {
     cv::VideoCapture capture;
     if(!capture.open(0)){
-        hpx::cout << "Could not open camera...";
+        std::cout << "Could not open camera...";
         return -1;
     }
 
@@ -116,7 +116,7 @@ int start_webcam_capture(int num_frames, cv::CascadeClassifier cascade,
             hpx::threads::get_self_id())->get_pool_name();
 
     // Capture frames from video and detect faces
-    hpx::cout << "Starting face detection... \n";
+    std::cout << "Starting face detection... \n";
     cv::Mat captured_frame, processed_frame;
     while(true) {
         capture >> captured_frame;
@@ -151,7 +151,7 @@ int start_webcam_capture(int num_frames, cv::CascadeClassifier cascade,
 // Warning - for now it is blocking forever (until user closes the window).
 // Should be run in a separate thread?
 void show_image(const cv::Mat &image, std::string win_name) {
-    hpx::cout << "show_image in " << win_name << "\n";
+    std::cout << "show_image in " << win_name << "\n";
     cv::namedWindow(win_name, cv::WINDOW_AUTOSIZE);
     imshow(win_name, image);
     cv::waitKey(0);
@@ -162,7 +162,7 @@ void save_image(const cv::Mat &image, const std::string &path) {
 }
 
 cv::Mat transform_to_grey(cv::Mat image) {
-    hpx::cout << "transform to grey" << "\n";
+    std::cout << "transform to grey" << "\n";
     cv::Mat grey_image;
     cv::cvtColor(image, grey_image, cv::COLOR_RGB2GRAY);
     return grey_image;
@@ -170,36 +170,36 @@ cv::Mat transform_to_grey(cv::Mat image) {
 
 void print_system_params() {
     // print partition characteristics
-    hpx::cout << "\n\n[hpx_main] print resource_partitioner characteristics : "
+    std::cout << "\n\n[hpx_main] print resource_partitioner characteristics : "
               << "\n";
     hpx::resource::get_partitioner().print_init_pool_data(std::cout);
 
     // print partition characteristics
-    hpx::cout << "\n\n[hpx_main] print thread-manager pools : "
+    std::cout << "\n\n[hpx_main] print thread-manager pools : "
               << "\n";
     hpx::threads::get_thread_manager().print_pools(std::cout);
 
     // print system characteristics
-    hpx::cout << "\n\n[hpx_main] print System characteristics : "
+    std::cout << "\n\n[hpx_main] print System characteristics : "
               << "\n";
     print_system_characteristics();
 }
 
 ///////////////////////////////////////////////////////////////////////////
 /// hpx_main is called on an hpx thread after the runtime starts up
-int hpx_main(boost::program_options::variables_map& vm)
+int hpx_main(hpx::program_options::variables_map& vm)
 {
     // ======================== CONFIGURATION ========================
-    hpx::cout << "[hpx_main] starting hpx_main in "
+    std::cout << "[hpx_main] starting hpx_main in "
               << hpx::threads::get_pool(hpx::threads::get_self_id())->get_pool_name()
               << "\n";
 
     std::size_t num_work_threads = hpx::get_num_worker_threads();
-    hpx::cout << "[hpx_main] HPX using threads = " << num_work_threads << "\n";
+    std::cout << "[hpx_main] HPX using threads = " << num_work_threads << "\n";
 
-    hpx::threads::executors::pool_executor def_executor("default");
-    hpx::threads::executors::pool_executor opencv_executor(opencv_tp_name);
-    hpx::cout << "[hpx_main] Created default and " << opencv_tp_name
+    hpx::execution::parallel_executor def_executor(&hpx::resource::get_thread_pool("default"));
+    hpx::execution::parallel_executor opencv_executor(&hpx::resource::get_thread_pool(opencv_tp_name));
+    std::cout << "[hpx_main] Created default and " << opencv_tp_name
               << " pool_executors \n";
 
     print_system_params();
@@ -216,7 +216,7 @@ int hpx_main(boost::program_options::variables_map& vm)
     // Load classifiers
     std::string nestedCascadePath = DATA_PATH + std::string("/models/haarcascade_eye_tree_eyeglasses.xml");
     std::string cascadePath = DATA_PATH + std::string("/models/haarcascade_frontalface_default.xml");
-    
+
     if(detect_eyes)
         nestedCascade.load(nestedCascadePath);
     cascade.load(cascadePath);
@@ -230,20 +230,20 @@ int hpx_main(boost::program_options::variables_map& vm)
     // schedule taking webcam image on the opencv pool
     hpx::future<cv::Mat> f_image =
             webcam_closed.then([&](hpx::future<int>&& wc){
-                hpx::cout << "Webcam closed\n";
+                std::cout << "Webcam closed\n";
                 return take_webcam_image();
             });
 
     // schedule transforming webcam image to grey-scale on opencv pool
     hpx::future<cv::Mat> f_grey_image =
             f_image.then([&](hpx::future<cv::Mat>&& fi){
-                hpx::cout << "Image taken\n";
+                std::cout << "Image taken\n";
                 webcam_img = fi.get();
                 return transform_to_grey(webcam_img);
             });
 
     f_grey_image.then([&](hpx::future<cv::Mat>&& fgi){
-            hpx::cout << "Image transformed to grey\n";
+            std::cout << "Image transformed to grey\n";
             grey_webcam_img = fgi.get();
             return save_image(grey_webcam_img, "");
         });
@@ -251,42 +251,14 @@ int hpx_main(boost::program_options::variables_map& vm)
     return hpx::finalize();
 }
 
-///////////////////////////////////////////////////////////////////////////
-// Normal int main function that is called at startup and runs on an OS thread
-// the user must call hpx::init to start the hpx runtime which will execute
-// hpx_main on an hpx thread
-int main(int argc, char* argv[])
+void init_resource_partitioner_handler(hpx::resource::partitioner& rp, hpx::program_options::variables_map const&)
 {
-    namespace po = boost::program_options;
-    po::options_description desc_cmdline("Options");
-    desc_cmdline.add_options()
-        ("opencv_tp_num_threads,m",
-          po::value<int>()->default_value(1),
-          "Number of threads to assign to custom pool")
-        ("num_frames,f",
-         po::value<int>()->default_value(25),
-         "Number of frames per second in the video stream.")
-        ("detect_eyes,e",
-         po::value<bool>()->default_value(false),
-         "If set to true the application will detect eyes.");
+    // Create the resource partitioner
+    std::cout << "[main] obtained reference to the resource_partitioner\n";
 
-    // HPX uses a boost program options variable map, but we need it before
-    // hpx-main, so we will create another one here and throw it away after use
-    po::variables_map vm;
-    try {
-        po::store(po::command_line_parser(argc, argv).allow_unregistered()
-                          .options(desc_cmdline).run(), vm);
-    }
-    catch(po::error& e) {
-        std::cerr << "ERROR: " << e.what() << "\n\n";
-        std::cerr << desc_cmdline << "\n";
-        return -1;
-    }
-
-    opencv_tp_num_threads = vm["opencv_tp_num_threads"].as<int>();
+    opencv_tp_num_threads = 2; // vm["opencv_tp_num_threads"].as<int>();
 
     // Create the resource partitioner
-    hpx::resource::partitioner rp(desc_cmdline, argc, argv);
     std::cout << "[main] obtained reference to the resource_partitioner\n";
 
     rp.create_thread_pool("default",
@@ -320,5 +292,45 @@ int main(int argc, char* argv[])
 
     std::cout << "[main] resources added to thread_pools \n";
 
-    return hpx::init();
+}
+
+///////////////////////////////////////////////////////////////////////////
+// Normal int main function that is called at startup and runs on an OS thread
+// the user must call hpx::init to start the hpx runtime which will execute
+// hpx_main on an hpx thread
+int main(int argc, char* argv[])
+{
+    namespace po = hpx::program_options;
+    po::options_description desc_cmdline("Options");
+    desc_cmdline.add_options()
+        ("opencv_tp_num_threads,m",
+          po::value<int>()->default_value(1),
+          "Number of threads to assign to custom pool")
+        ("num_frames,f",
+         po::value<int>()->default_value(25),
+         "Number of frames per second in the video stream.")
+        ("detect_eyes,e",
+         po::value<bool>()->default_value(false),
+         "If set to true the application will detect eyes.");
+
+    // HPX uses a boost program options variable map, but we need it before
+    // hpx-main, so we will create another one here and throw it away after use
+    po::variables_map vm;
+    try {
+        po::store(po::command_line_parser(argc, argv).allow_unregistered()
+                          .options(desc_cmdline).run(), vm);
+    }
+    catch(po::error& e) {
+        std::cerr << "ERROR: " << e.what() << "\n\n";
+        std::cerr << desc_cmdline << "\n";
+        return -1;
+    }
+
+    // Setup the init parameters
+    hpx::init_params init_args;
+    init_args.desc_cmdline = desc_cmdline;
+
+    // Set the callback to init the thread_pools
+    init_args.rp_callback = &init_resource_partitioner_handler;
+    return hpx::init(argc, argv, init_args);
 }

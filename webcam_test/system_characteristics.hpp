@@ -7,8 +7,8 @@
 #define RM_EXPERIMENT_SYSTEM_CHARACTERISTICS_H_H
 
 #include <hpx/include/runtime.hpp>
-#include <hpx/runtime/threads/threadmanager.hpp>
-#include <hpx/runtime_impl.hpp>
+#include <hpx/include/threadmanager.hpp>
+//#include <hpx/runtime.hpp>
 
 #include <iostream>
 
@@ -34,13 +34,13 @@ void print_system_characteristics()
     //! -------------------------------------- runtime
     std::cout << "[Runtime], instance number " << rt->get_instance_number()
               << "\n"
-              << "called by thread named     " << rt->get_thread_name()
+              << "called by thread named     " << hpx::get_thread_name()
               << "\n\n";
 
     //! -------------------------------------- thread_manager
     std::cout << "[Thread manager]\n"
               << "worker thread number  : " << std::dec
-              << thrd_manager.get_worker_thread_num() << "\n\n";
+              << hpx::get_worker_thread_num() << "\n\n";
 
     //! -------------------------------------- runtime_configuration
     std::cout << "[Runtime configuration]\n"
