@@ -1,6 +1,7 @@
 #include "capturethread.h"
 
-#include <QTime>
+#include <QDateTime>
+#include <QElapsedTimer>
 //
 #include <iostream>
 #include <iomanip>
@@ -185,13 +186,13 @@ void CaptureThread::run()
   // Clear the frameTimes circular buffer to ensure actualFps is computed correctly from the first frame
   this->frameTimes.clear();
 
-  QTime actualFpsTime;
+  QElapsedTimer actualFpsTime;
   actualFpsTime.start();
 
-  QTime requestedFpsTime;
+  QElapsedTimer requestedFpsTime;
   requestedFpsTime.start();
 
-  QTime captureWaitTime;
+  QElapsedTimer captureWaitTime;
   captureWaitTime.start();
 
   while (!this->abort) {
