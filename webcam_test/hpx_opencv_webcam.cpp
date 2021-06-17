@@ -2,7 +2,6 @@
 //
 #include <hpx/parallel/algorithms/for_loop.hpp>
 #include <hpx/execution/execution.hpp>
-#include <hpx/thread_executors/executors.hpp>
 #include <hpx/include/parallel_executors.hpp>
 //
 #include <hpx/resource_partitioner/partitioner.hpp>

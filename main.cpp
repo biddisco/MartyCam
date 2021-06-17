@@ -1,7 +1,6 @@
 #include <QObject>
 #include <hpx/hpx.hpp>
 #include <hpx/hpx_init.hpp>
-#include <hpx/include/thread_executors.hpp>
 #include <hpx/future.hpp>
 #include <hpx/functional/bind.hpp>
 #include <hpx/program_options.hpp>
