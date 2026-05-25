@@ -46,17 +46,18 @@ SET(QOBJECT_HDRS
   "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/analogwidgets/chart.h"
 )
 
-QT_WRAP_CPP(
-  analogue
-  analogue_MOC_FILES 
-  ${QOBJECT_HDRS}
-)
-
-QT5_ADD_RESOURCES(
-  analogue_RSRCS
-  "${CMAKE_CURRENT_SOURCE_DIR}/resources/resources.qrc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/code/analogwidgets.qrc"
-)
+set(CMAKE_AUTOMOC ON)
+#QT_WRAP_CPP(
+#  analogue
+#  analogue_MOC_FILES 
+#  ${QOBJECT_HDRS}
+#)
+#
+#QT5_ADD_RESOURCES(
+#  analogue_RSRCS
+#  "${CMAKE_CURRENT_SOURCE_DIR}/resources/resources.qrc"
+#  "${CMAKE_CURRENT_SOURCE_DIR}/analogwidgets/code/analogwidgets.qrc"
+#)
 
 ADD_LIBRARY(analogue STATIC
   ${analogue_RSRCS}
@@ -64,7 +65,20 @@ ADD_LIBRARY(analogue STATIC
   ${CPP_SRCS}
 )
 
-qt5_use_modules(analogue Core Widgets Gui Svg OpenGL Concurrent)
+set_property(TARGET analogue PROPERTY AUTOMOC ON)
+set_property(TARGET analogue PROPERTY AUTOUIC ON)
+set_property(TARGET analogue PROPERTY AUTORCC ON)
+
+#qt5_use_modules(analogue Core Widgets Gui Svg OpenGL Concurrent)
+target_link_libraries(analogue 
+         Qt::Core
+         Qt::Concurrent
+         Qt::Gui
+         Qt::OpenGL
+         Qt::Svg
+         Qt::Widgets
+         Qt::OpenGLWidgets
+         )
 
 #--------------------------------------------------
 # ScriptTool
@@ -106,22 +120,22 @@ ENDIF (QT_QTSCRIPT_LIBRARY)
 # Testing
 #--------------------------------------------------
 
-QT5_WRAP_UI( 
-  test_UIS_H
-  test/testform.ui
-)
-
-QT_WRAP_CPP(
-  test
-  test_MOC_FILES 
-  test/test.h
-  test/widgettester.h
-)
-
-QT5_ADD_RESOURCES(
-  test_RSRCS
-  "${CMAKE_CURRENT_SOURCE_DIR}/test/test.qrc"
-)
+# QT5_WRAP_UI( 
+#   test_UIS_H
+#   test/testform.ui
+# )
+# 
+# QT_WRAP_CPP(
+#   test
+#   test_MOC_FILES 
+#   test/test.h
+#   test/widgettester.h
+# )
+# 
+# QT5_ADD_RESOURCES(
+#   test_RSRCS
+#   "${CMAKE_CURRENT_SOURCE_DIR}/test/test.qrc"
+# )
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 

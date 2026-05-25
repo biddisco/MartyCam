@@ -105,7 +105,7 @@ void Counter::paintEvent (QPaintEvent *)
   pen.setWidthF(6.0); 
   p.setPen(pen);
   p.setBrush(Qt::black);
-  p.drawRoundRect(3,3,width-6,height-6,7,(7*width)/(double)height);
+  p.drawRoundedRect(3,3,width-6,height-6,7,(7*width)/(double)height);
 
 
   int w = (width-2*X_OFFSET)/m_digits; 

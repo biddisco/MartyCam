@@ -36,13 +36,27 @@ include(SubProject)
 #-----------------------------------------------------------------------------
 # Find OpenCV
 #-----------------------------------------------------------------------------
-find_package(OpenCV REQUIRED)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc videoio highgui)
 message("opencv libs are " ${OpenCV_LIBS})
 
-#-----------------------------------------------------------------------------
-# Find Qt
-#-----------------------------------------------------------------------------
-find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Svg OpenGL Concurrent)
+# ------------------------------------------------------------------------------
+# Find Qt6
+# ------------------------------------------------------------------------------
+# this line to force correct var so that Qt-AdvancedDocking uses Qt6 by default
+find_package(QT NAMES Qt6 COMPONENTS Core REQUIRED)
+#
+set(qtcomponents
+    Core
+    Widgets
+    Gui
+    OpenGL
+    OpenGLWidgets
+    PrintSupport
+    Svg
+    Concurrent
+)
+
+find_package(Qt6 REQUIRED COMPONENTS ${qtcomponents})
 
 #-----------------------------------------------------------------------------
 # Find HPX
@@ -92,51 +106,51 @@ if(WIN32)
   #option(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "/Zc:wchar_t-")
 endif()
 
-#-----------------------------------------------------------------------------
-# Qt resource files
-#-----------------------------------------------------------------------------
-set(martycam_QT_RCCS
-        resources.qrc
-)
-
-#-----------------------------------------------------------------------------
-# Qt GUI interface wrapping
-#-----------------------------------------------------------------------------
-set(martycam_QT_UIS
-  settings.ui
-  martycam.ui
-  IPCameraForm.ui
-)
-
-#-----------------------------------------------------------------------------
-# Qt QObjects for MOC
-#-----------------------------------------------------------------------------
-set(martycam_QT_MOC_HDRS
-  martycam.h
-  IPCameraForm.h
-  settings.h
-  renderwidget.h
-  processingthread.h
-)
-
-#-----------------------------------------------------------------------------
-# Invoke Qt wrapping
-#-----------------------------------------------------------------------------
-
-# generate rules that will run rcc on the resource files
-QT5_ADD_RESOURCES(martycam_RCC_SRCS
-  ${martycam_QT_RCCS}
-)
-
-# generate rules that will run uic on .ui files:
-QT5_WRAP_UI(martycam_QT_UIS_H
-  ${martycam_QT_UIS}
-)
-
-# generate rules that will run moc on QObject header files
-QT_WRAP_CPP(martycam martycam_MOC_SRCS
-  ${martycam_QT_MOC_HDRS}
-)
+##-----------------------------------------------------------------------------
+## Qt resource files
+##-----------------------------------------------------------------------------
+#set(martycam_QT_RCCS
+#        resources.qrc
+#)
+#
+##-----------------------------------------------------------------------------
+## Qt GUI interface wrapping
+##-----------------------------------------------------------------------------
+#set(martycam_QT_UIS
+#  settings.ui
+#  martycam.ui
+#  IPCameraForm.ui
+#)
+#
+##-----------------------------------------------------------------------------
+## Qt QObjects for MOC
+##-----------------------------------------------------------------------------
+#set(martycam_QT_MOC_HDRS
+#  martycam.h
+#  IPCameraForm.h
+#  settings.h
+#  renderwidget.h
+#  processingthread.h
+#)
+#
+##-----------------------------------------------------------------------------
+## Invoke Qt wrapping
+##-----------------------------------------------------------------------------
+#
+## generate rules that will run rcc on the resource files
+#QT6_ADD_RESOURCES(martycam_RCC_SRCS
+#  ${martycam_QT_RCCS}
+#)
+#
+## generate rules that will run uic on .ui files:
+#QT6_WRAP_UI(martycam_QT_UIS_H
+#  ${martycam_QT_UIS}
+#)
+#
+## generate rules that will run moc on QObject header files
+#QT_WRAP_CPP(martycam martycam_MOC_SRCS
+#  ${martycam_QT_MOC_HDRS}
+#)
 
 #-----------------------------------------------------------------------------
 # Analogue widgets library used for graph plotting
@@ -179,7 +193,21 @@ ADD_EXECUTABLE(martycam
   ${martycam_MOC_SRCS}
 )
 
-qt5_use_modules(martycam Core Widgets Gui Svg OpenGL Concurrent)
+#qt5_use_modules(martycam Core Widgets Gui Svg OpenGL Concurrent)
+# Qt properties
+set_property(TARGET martycam PROPERTY AUTOMOC ON)
+set_property(TARGET martycam PROPERTY AUTOUIC ON)
+set_property(TARGET martycam PROPERTY AUTORCC ON)
+
+target_link_libraries(martycam 
+         Qt::Core
+         Qt::Concurrent
+         Qt::Gui
+         Qt::OpenGL
+         Qt::Svg
+         Qt::Widgets
+         Qt::OpenGLWidgets
+         )
 
 #-----------------------------------------------------------------------------
 # Include directories

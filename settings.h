@@ -1,13 +1,14 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
-#include "ui_settings.h"
+#include "MotionFilter.h"
 #include "capturethread.h"
 #include "processingthread.h"
-#include "MotionFilter.h"
-#include <QDateTime>
-#include <QTimer>
+#include "ui_settings.h"
 #include <QButtonGroup>
+#include <QDateTime>
+#include <QElapsedTimer>
+#include <QTimer>
 
 class RenderWidget;
 class IPCameraForm;
@@ -15,42 +16,39 @@ class IPCameraForm;
 class SettingsWidget;
 typedef std::shared_ptr<SettingsWidget> SettingsWidget_SP;
 
-template<class T>
-class QMySignalBlocker
-{
-  T* const o;
+template <class T> class QMySignalBlocker {
+  T *const o;
+
 public:
-  explicit QMySignalBlocker( T * oo ) : o(oo) {}
-  T* operator->()
-  {
-    if (o) o->blockSignals( true );
+  explicit QMySignalBlocker(T *oo) : o(oo) {}
+  T *operator->() {
+    if (o)
+      o->blockSignals(true);
     return o;
   }
-  ~QMySignalBlocker()
-  {
-    if (o) o->blockSignals(false);
+  ~QMySignalBlocker() {
+    if (o)
+      o->blockSignals(false);
   }
 };
 
-template<class T>
-QMySignalBlocker<T> SilentCall(T* o)
-{
+template <class T> QMySignalBlocker<T> SilentCall(T *o) {
   return QMySignalBlocker<T>(o);
 }
 
 class SettingsWidget : public QWidget {
-Q_OBJECT;
+  Q_OBJECT;
+
 public:
-  SettingsWidget(QWidget* parent);
+  SettingsWidget(QWidget *parent);
 
-  cv::Size  getSelectedResolution();
+  cv::Size getSelectedResolution();
   int getSelectedResolutionButton();
-  int       getSelectedRotation();
-  int       getRequestedFps();
-  int       getNumOfResolutions();
+  int getSelectedRotation();
+  int getRequestedFps();
+  int getNumOfResolutions();
 
-
-  void      RecordMotionAVI(bool state);
+  void RecordMotionAVI(bool state);
 
   void setThreads(CaptureThread_SP capthread, ProcessingThread_SP procthread);
   void unsetCaptureThread();
@@ -61,9 +59,11 @@ public:
 
   QDateTime TimeLapseStart();
   QDateTime TimeLapseEnd();
-  QTime     TimeLapseInterval() { return this->ui.interval->time(); }
-  double    TimeLapseFPS() { return this->ui.timeLapseFPS->value(); }
-  bool      TimeLapseEnabled() { return this->ui.timeLapseEnabled->isChecked(); }
+  qint64 TimeLapseInterval() {
+    return this->ui.interval->time().msecsSinceStartOfDay();
+  }
+  double TimeLapseFPS() { return this->ui.timeLapseFPS->value(); }
+  bool TimeLapseEnabled() { return this->ui.timeLapseEnabled->isChecked(); }
 
   int getCameraIndex(std::string &text);
   ProcessingType getCurentProcessingType();
@@ -99,7 +99,7 @@ public slots:
   void loadSettings();
   void saveSettings();
   void setupCameraList();
-  void SetupAVIStrings() ;
+  void SetupAVIStrings();
 
 signals:
   void resolutionSelected(cv::Size);
@@ -110,27 +110,26 @@ signals:
 protected:
   QString decimationCoeffToQString(int sliderVal);
 
-  Ui::SettingsWidget  ui;
-  CaptureThread_SP      capturethread;
-  ProcessingThread_SP   processingthread;
-  QTime               AVI_StartTime;
-  QTime               AVI_EndTime;
-  QTimer              clock;
-  int                 SnapshotId;
-  QButtonGroup        ImageButtonGroup;
-  QButtonGroup        RotateButtonGroup;
-  QButtonGroup        ResolutionButtonGroup;
-  int                 numberOfResolutions;
-  int                 currentResolutionButtonIndex;
-  int                 previousResolutionButtonIndex;
-  RenderWidget       *renderWidget;
-  IPCameraForm       *cameraForm;
-  int                 NumDevices;
+  Ui::SettingsWidget ui;
+  CaptureThread_SP capturethread;
+  ProcessingThread_SP processingthread;
+  QElapsedTimer AVI_StartTime;
+  QTime AVI_EndTime;
+  QTimer clock;
+  int SnapshotId;
+  QButtonGroup ImageButtonGroup;
+  QButtonGroup RotateButtonGroup;
+  QButtonGroup ResolutionButtonGroup;
+  int numberOfResolutions;
+  int currentResolutionButtonIndex;
+  int previousResolutionButtonIndex;
+  RenderWidget *renderWidget;
+  IPCameraForm *cameraForm;
+  int NumDevices;
   //
-  bool                faceRecognitionAcitve;
-  int                 requestedFps;
-  bool                eyesRecognitionActive;
-
+  bool faceRecognitionAcitve;
+  int requestedFps;
+  bool eyesRecognitionActive;
 };
 
 #endif

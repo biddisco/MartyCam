@@ -1,5 +1,6 @@
 #include <QDebug>
 #include <QTime>
+#include <QElapsedTimer>
 //
 #include <iostream>
 //
@@ -61,7 +62,7 @@ void ProcessingThread::setFaceRecognitionProcessing(){
 //----------------------------------------------------------------------------
 void ProcessingThread::run() {
   int framenum = 0;
-  QTime processingTime;
+  QElapsedTimer processingTime;
   processingTime.start();
 
   while (!this->abort) {

@@ -509,8 +509,8 @@ QMenu * Chart::contextMenu()
     
   QAction * a_data,*a_scale,*a; 
      
-  a_data  = menu->addAction(trUtf8("Dane")); 
-  a_scale = menu->addAction(trUtf8("Skala pionowa"));
+  a_data  = menu->addAction(tr("Dane")); 
+  a_scale = menu->addAction(tr("Skala pionowa"));
 
        QMenu * data = new QMenu(this); 
        QMenu * scale = new QMenu(this); 
@@ -546,23 +546,23 @@ QMenu * Chart::contextMenu()
   a = menu->addAction(""); 
   a->setSeparator(true);    
      
-  a = menu->addAction(trUtf8("Siatka"));
+  a = menu->addAction(tr("Siatka"));
   a->setCheckable(true); 
   a->setChecked(showGrid()); 
   connect(a,SIGNAL(toggled(bool)),this,SLOT(setShowGrid(bool)));  
   
 
-  a = menu->addAction(trUtf8("Skala pozioma")); 
+  a = menu->addAction(tr("Skala pozioma")); 
   a->setCheckable(true);
   a->setChecked(showScale()); 
   connect(a,SIGNAL(toggled(bool)),this,SLOT(setShowScale(bool))); 
     
-  a = menu->addAction(trUtf8("Legenda")); 
+  a = menu->addAction(tr("Legenda")); 
   a->setCheckable(true); 
   a->setChecked(showLegend()); 
   connect(a,SIGNAL(toggled(bool)),this,SLOT(setShowLegend(bool))); 
     
-  a = menu->addAction(trUtf8("Antialiasing"));
+  a = menu->addAction(tr("Antialiasing"));
   a->setCheckable(true);
   a->setChecked(antialiasing());
   connect(a,SIGNAL(toggled(bool)),this,SLOT(setAntialiasing(bool))); 

@@ -8,7 +8,7 @@
 #include <cstddef>
 #include <vector>
 
-using hpx::util::high_resolution_timer;
+using hpx::chrono::high_resolution_timer;
 #include <QtWidgets/QApplication>
 #include "martycam.h"
 
@@ -91,7 +91,7 @@ int hpx_main(int argc, char ** argv)
     // Store a pointer to the runtime here.
     auto rt = hpx::get_runtime_ptr();
     std::thread qt_thread([&](){
-        hpx::error_code ec(hpx::lightweight);
+        hpx::error_code ec(hpx::throwmode::lightweight);
         hpx::register_thread(rt, "Qt", ec);
         //
         qt_main(argc, argv);

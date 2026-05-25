@@ -87,7 +87,7 @@ void LegendDecorator::paintLegendFrame(QPainter & painter, Chart * chart)
     int x = width + 2*XOFFSET + RIGHTOFFSET;
     int y =  TOPOFFSET;
     // Namalowanie ramki z t³em
-    painter.drawRoundRect(chart->width() - x, y, width+XOFFSET*2,height+YOFFSET,9,18);
+    painter.drawRoundedRect(chart->width() - x, y, width+XOFFSET*2,height+YOFFSET,9,18);
 
     // Malowanie napisów z opisami
     i = channels.begin();
