@@ -122,7 +122,7 @@ void TestWidget::initialize() {
   dialCombo->addItem(":/default/resources/dial4.svg");
   dialCombo->addItem(":/test/resources/volume.svg");
 
-  connect(dialCombo, SIGNAL(activated(const QString &)), m_dial,
+  connect(dialCombo, SIGNAL(textActivated(const QString &)), m_dial,
           SLOT(setSvgResourceFile(const QString &)));
 
   connect(HSlider, SIGNAL(valueChanged(int)), m_dial, SLOT(setValue(int)));
@@ -147,7 +147,7 @@ void TestWidget::initialize() {
   connect(chartPosition, SIGNAL(valueChanged(int)), this,
           SLOT(movePosition(int)));
   connect(sizeSlider, SIGNAL(sliderMoved(int)), this, SLOT(setSize(int)));
-  connect(injCombo, SIGNAL(activated(const QString &)), this,
+  connect(injCombo, SIGNAL(textActivated(const QString &)), this,
           SLOT(loadInjection(const QString &)));
   connect(zoomBox, SIGNAL(valueChanged(double)), chart, SLOT(setZoom(double)));
   HSlider->setMaximum(1000);

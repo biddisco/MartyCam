@@ -72,8 +72,8 @@ SettingsWidget::SettingsWidget(QWidget *parent) : QWidget(parent) {
   ResolutionButtonGroup.addButton(ui.res720, 2);
   ResolutionButtonGroup.addButton(ui.res640, 1);
   ResolutionButtonGroup.addButton(ui.res320, 0);
-  connect(&ResolutionButtonGroup, SIGNAL(buttonClicked(int)), this,
-          SLOT(onResolutionSelection(int)));
+  connect(&ResolutionButtonGroup, &QButtonGroup::idClicked, this,
+          &SettingsWidget::onResolutionSelection);
 
   ImageButtonGroup.addButton(ui.cameraImage, 0);
   ImageButtonGroup.addButton(ui.movingAverage, 1);
@@ -81,15 +81,15 @@ SettingsWidget::SettingsWidget(QWidget *parent) : QWidget(parent) {
   ImageButtonGroup.addButton(ui.blendedImage, 3);
   ImageButtonGroup.addButton(ui.maskImage, 4);
   ImageButtonGroup.addButton(ui.noiseImage, 5);
-  connect(&ImageButtonGroup, SIGNAL(buttonClicked(int)), this,
-          SLOT(onImageSelection(int)));
+  connect(&ImageButtonGroup, &QButtonGroup::idClicked, this,
+          &SettingsWidget::onImageSelection);
 
   RotateButtonGroup.addButton(ui.rotate0, 0);
   RotateButtonGroup.addButton(ui.rotate90, 1);
   RotateButtonGroup.addButton(ui.rotate90m, 2);
   RotateButtonGroup.addButton(ui.rotate180, 3);
-  connect(&RotateButtonGroup, SIGNAL(buttonClicked(int)), this,
-          SLOT(onRotateSelection(int)));
+  connect(&RotateButtonGroup, &QButtonGroup::idClicked, this,
+          &SettingsWidget::onRotateSelection);
   //
   this->cameraForm = new IPCameraForm(this);
   this->setupCameraList();
