@@ -8,59 +8,62 @@
 #include <QMutex>
 #include <QWaitCondition>
 //
+#include <QtCore/QObject>
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
-#include <QtCore/QObject>
 //
 #include <memory>
 #include "ConcurrentCircularBuffer.h"
-typedef std::shared_ptr< ConcurrentCircularBuffer<cv::Mat> > ImageBuffer;
-typedef boost::circular_buffer< int > IntCircBuff;
+typedef std::shared_ptr<ConcurrentCircularBuffer<cv::Mat>> ImageBuffer;
+typedef boost::circular_buffer<int> IntCircBuff;
 class ProcessingThread;
 typedef std::shared_ptr<ProcessingThread> ProcessingThread_SP;
 //
 class Filter;
 class PSNRFilter;
 class GraphUpdateFilter;
-#include "MotionFilter.h"
 #include "FaceRecogFilter.hpp"
+#include "MotionFilter.h"
 
-enum class ProcessingType: int
+enum class ProcessingType : int
 {
-    motionDetection = 0,
-    faceRecognition =1,
+  motionDetection = 0,
+  faceRecognition = 1,
 };
 
-class ProcessingThread : public QObject{
-Q_OBJECT;
-public:
-   ProcessingThread(ImageBuffer buffer,
-                    hpx::execution::parallel_executor exec,
-                    ProcessingType processingType,
-                    MotionFilterParams mfp, FaceRecogFilterParams frfp);
+class ProcessingThread : public QObject
+{
+  Q_OBJECT;
+
+  public:
+  ProcessingThread(ImageBuffer buffer, hpx::execution::parallel_executor exec,
+      ProcessingType processingType, MotionFilterParams mfp, FaceRecogFilterParams frfp);
   ~ProcessingThread();
   //
-  void CopySettings(ProcessingThread *thread);
+  void CopySettings(ProcessingThread* thread);
   void DeleteTemporaryStorage();
   //
   double getmotionEstimate() { return this->motionFilter->motionEstimate; }
   //
-  void setRootFilter(Filter* filter) {   this->motionFilter->renderer = filter;
-                                         this->faceRecogFilter->setRenderer(filter); }
+  void setRootFilter(Filter* filter)
+  {
+    this->motionFilter->renderer = filter;
+    this->faceRecogFilter->setRenderer(filter);
+  }
   void setThreshold(int val) { this->motionFilter->threshold = val; }
   void setAveraging(double val) { this->motionFilter->average = val; }
   void setErodeIterations(int val) { this->motionFilter->erodeIterations = val; }
   void setDilateIterations(int val) { this->motionFilter->dilateIterations = val; }
   void setDisplayImage(int image) { this->motionFilter->displayImage = image; }
   void setBlendRatios(double ratio1) { this->motionFilter->blendRatio = ratio1; }
-  void setBlendRatios(double ratio1, double ratio2) {
+  void setBlendRatios(double ratio1, double ratio2)
+  {
     this->motionFilter->blendRatio = ratio1;
     this->motionFilter->noiseBlendRatio = ratio2;
   }
   //
-  void setEyesRecogState(int val) { this->faceRecogFilter->setEyesRecogState((bool)val); }
-  void setDecimationCoeff(int val) {
-    this->faceRecogFilter->setDecimationCoeff(val); }
+  void setEyesRecogState(int val) { this->faceRecogFilter->setEyesRecogState((bool) val); }
+  void setDecimationCoeff(int val) { this->faceRecogFilter->setDecimationCoeff(val); }
   int getProcessingTime() { return this->processingTime_ms; }
   void run();
   bool startProcessing();
@@ -68,30 +71,29 @@ public:
 
   void setMotionDetectionProcessing();
   void setFaceRecognitionProcessing();
-  MotionFilter_SP       motionFilter;
-  FaceRecogFilter_SP    faceRecogFilter;
-
+  MotionFilter_SP motionFilter;
+  FaceRecogFilter_SP faceRecogFilter;
 
   double getPSNR();
-  cv::Scalar getMSSIM(const cv::Mat& i1, const cv::Mat& i2);
+  cv::Scalar getMSSIM(cv::Mat const& i1, cv::Mat const& i2);
 
   //
-  GraphUpdateFilter  *graphFilter;
+  GraphUpdateFilter* graphFilter;
 
-signals:
-    void NewData();
+  signals:
+  void NewData();
 
-private:
+  private:
   void updateProcessingTime(int time_ms);
 
   //
-  QMutex           stopLock;
-  QWaitCondition   stopWait;
-  bool             processingActive;
-  bool             abort;
+  QMutex stopLock;
+  QWaitCondition stopWait;
+  bool processingActive;
+  bool abort;
   hpx::execution::parallel_executor executor;
   //
-  ImageBuffer  imageBuffer;
+  ImageBuffer imageBuffer;
   ProcessingType processingType;
   int processingTime_ms;
   IntCircBuff processingTimes;

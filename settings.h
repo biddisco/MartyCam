@@ -1,14 +1,14 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
-#include "MotionFilter.h"
-#include "capturethread.h"
-#include "processingthread.h"
-#include "ui_settings.h"
 #include <QButtonGroup>
 #include <QDateTime>
 #include <QElapsedTimer>
 #include <QTimer>
+#include "MotionFilter.h"
+#include "capturethread.h"
+#include "processingthread.h"
+#include "ui_settings.h"
 
 class RenderWidget;
 class IPCameraForm;
@@ -16,31 +16,39 @@ class IPCameraForm;
 class SettingsWidget;
 typedef std::shared_ptr<SettingsWidget> SettingsWidget_SP;
 
-template <class T> class QMySignalBlocker {
-  T *const o;
+template <class T>
+class QMySignalBlocker
+{
+  T* const o;
 
-public:
-  explicit QMySignalBlocker(T *oo) : o(oo) {}
-  T *operator->() {
-    if (o)
-      o->blockSignals(true);
+  public:
+  explicit QMySignalBlocker(T* oo)
+    : o(oo)
+  {
+  }
+  T* operator->()
+  {
+    if (o) o->blockSignals(true);
     return o;
   }
-  ~QMySignalBlocker() {
-    if (o)
-      o->blockSignals(false);
+  ~QMySignalBlocker()
+  {
+    if (o) o->blockSignals(false);
   }
 };
 
-template <class T> QMySignalBlocker<T> SilentCall(T *o) {
+template <class T>
+QMySignalBlocker<T> SilentCall(T* o)
+{
   return QMySignalBlocker<T>(o);
 }
 
-class SettingsWidget : public QWidget {
+class SettingsWidget : public QWidget
+{
   Q_OBJECT;
 
-public:
-  SettingsWidget(QWidget *parent);
+  public:
+  SettingsWidget(QWidget* parent);
 
   cv::Size getSelectedResolution();
   int getSelectedResolutionButton();
@@ -53,24 +61,22 @@ public:
   void setThreads(CaptureThread_SP capthread, ProcessingThread_SP procthread);
   void unsetCaptureThread();
   void unsetProcessingThread();
-  void setRenderWidget(RenderWidget *rw) { this->renderWidget = rw; }
+  void setRenderWidget(RenderWidget* rw) { this->renderWidget = rw; }
   void switchToNextResolution();
   void switchToPreviousResolution();
 
   QDateTime TimeLapseStart();
   QDateTime TimeLapseEnd();
-  qint64 TimeLapseInterval() {
-    return this->ui.interval->time().msecsSinceStartOfDay();
-  }
+  qint64 TimeLapseInterval() { return this->ui.interval->time().msecsSinceStartOfDay(); }
   double TimeLapseFPS() { return this->ui.timeLapseFPS->value(); }
   bool TimeLapseEnabled() { return this->ui.timeLapseEnabled->isChecked(); }
 
-  int getCameraIndex(std::string &text);
+  int getCameraIndex(std::string& text);
   ProcessingType getCurentProcessingType();
   MotionFilterParams getMotionFilterParams();
   FaceRecogFilterParams getFaceRecogFilterParams();
 
-public slots:
+  public slots:
   void onThresholdChanged(int value);
   void onAverageChanged(int value);
   void onErodeChanged(int value);
@@ -101,13 +107,13 @@ public slots:
   void setupCameraList();
   void SetupAVIStrings();
 
-signals:
+  signals:
   void resolutionSelected(cv::Size);
   void rotationChanged(int);
 
   void CameraIndexChanged(int, QString);
 
-protected:
+  protected:
   QString decimationCoeffToQString(int sliderVal);
 
   Ui::SettingsWidget ui;
@@ -123,8 +129,8 @@ protected:
   int numberOfResolutions;
   int currentResolutionButtonIndex;
   int previousResolutionButtonIndex;
-  RenderWidget *renderWidget;
-  IPCameraForm *cameraForm;
+  RenderWidget* renderWidget;
+  IPCameraForm* cameraForm;
   int NumDevices;
   //
   bool faceRecognitionAcitve;

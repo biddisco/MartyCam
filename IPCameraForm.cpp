@@ -5,11 +5,12 @@
 
 #include <QtGui>
 
-QStandardItemModel* createModel(QObject* parent, stringpairlist &CameraList)
+QStandardItemModel* createModel(QObject* parent, stringpairlist& CameraList)
 {
   QStandardItemModel* model = new QStandardItemModel();
   QList<QStandardItem*> itemlist;
-  for (stringpairlist::iterator it=CameraList.begin(); it!=CameraList.end(); ++it) {
+  for (stringpairlist::iterator it = CameraList.begin(); it != CameraList.end(); ++it)
+  {
     itemlist.clear();
     //
     QString text = QString(it->first.c_str());
@@ -21,28 +22,29 @@ QStandardItemModel* createModel(QObject* parent, stringpairlist &CameraList)
     itemlist.append(child);
     model->appendRow(itemlist);
   }
-  model->setHorizontalHeaderItem( 0, new QStandardItem( "Name" ));
-  model->setHorizontalHeaderItem( 1, new QStandardItem( "URL" ) );
+  model->setHorizontalHeaderItem(0, new QStandardItem("Name"));
+  model->setHorizontalHeaderItem(1, new QStandardItem("URL"));
   return model;
 }
 
 //----------------------------------------------------------------------------
-IPCameraForm::IPCameraForm(QWidget* parent) : QDialog(parent) 
+IPCameraForm::IPCameraForm(QWidget* parent)
+  : QDialog(parent)
 {
   ui.setupUi(this);
   this->loadSettings();
 }
 //----------------------------------------------------------------------------
-void IPCameraForm::seupModelView() 
+void IPCameraForm::seupModelView()
 {
-  QTableView *table = this->ui.tableView; // new QTableView(this);
+  QTableView* table = this->ui.tableView;    // new QTableView(this);
   table->setModel(createModel(this, this->CameraList));
   //
-  QVBoxLayout *mainLayout = new QVBoxLayout();
+  QVBoxLayout* mainLayout = new QVBoxLayout();
   //
-  table->setEditTriggers(QAbstractItemView::NoEditTriggers);    
+  table->setEditTriggers(QAbstractItemView::NoEditTriggers);
   table->setSelectionBehavior(QAbstractItemView::SelectRows);
-  table->setSelectionMode(QAbstractItemView::SingleSelection);    
+  table->setSelectionMode(QAbstractItemView::SingleSelection);
   table->resizeColumnsToContents();
   table->resizeRowsToContents();
   //
@@ -55,13 +57,15 @@ void IPCameraForm::saveSettings()
   QSettings settings(settingsFileName, QSettings::IniFormat);
   //
   settings.beginWriteArray("UserCameras");
-  int i=0;
-  for (stringpairlist::iterator it=this->CameraList.begin(); it!=this->CameraList.end(); ++it,++i) {
+  int i = 0;
+  for (stringpairlist::iterator it = this->CameraList.begin(); it != this->CameraList.end();
+       ++it, ++i)
+  {
     settings.setArrayIndex(i);
     settings.setValue("CameraName", QVariant(it->first.c_str()));
     settings.setValue("URL", QVariant(it->second.c_str()));
   }
-  settings.endArray();  
+  settings.endArray();
 }
 //----------------------------------------------------------------------------
 void IPCameraForm::loadSettings()
@@ -71,7 +75,8 @@ void IPCameraForm::loadSettings()
   //
   this->CameraList.clear();
   int size = settings.beginReadArray("UserCameras");
-  for (int i=0; i<size; ++i) {
+  for (int i = 0; i < size; ++i)
+  {
     settings.setArrayIndex(i);
     stringpair camera;
     camera.first = settings.value("CameraName").toString().toLatin1().data();

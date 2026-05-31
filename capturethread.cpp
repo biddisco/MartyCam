@@ -3,18 +3,18 @@
 #include <QDateTime>
 #include <QElapsedTimer>
 //
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 //
 #include "opencv2/imgproc.hpp"
-#include "opencv2/videoio/videoio_c.h"
 #include "opencv2/imgproc/imgproc_c.h"
+#include "opencv2/videoio/videoio_c.h"
 
 #include <hpx/future.hpp>
 #include <hpx/include/async.hpp>
 #include <utility>
 
-typedef std::shared_ptr< ConcurrentCircularBuffer<cv::Mat> > ImageBuffer;
+typedef std::shared_ptr<ConcurrentCircularBuffer<cv::Mat>> ImageBuffer;
 
 //
 // May 2012.
@@ -23,64 +23,60 @@ typedef std::shared_ptr< ConcurrentCircularBuffer<cv::Mat> > ImageBuffer;
 //
 
 // Image deinterlacing function for DV camera
-cv::Mat Deinterlace(cv::Mat &src)
+cv::Mat Deinterlace(cv::Mat& src)
 {
-  cv::Mat res = src; // src.clone();
+  cv::Mat res = src;    // src.clone();
   uchar* linea;
   uchar* lineb;
   uchar* linec;
 
-  for (int i = 1; i < res.size().height-1; i+=2)
+  for (int i = 1; i < res.size().height - 1; i += 2)
   {
-    linea = (uchar*)res.data + ((i-1) * res.step[0]);
-    lineb = (uchar*)res.data + ((i) * res.step[0]);
-    linec = (uchar*)res.data + ((i+1) * res.step[0]);
+    linea = (uchar*) res.data + ((i - 1) * res.step[0]);
+    lineb = (uchar*) res.data + ((i) *res.step[0]);
+    linec = (uchar*) res.data + ((i + 1) * res.step[0]);
 
     for (int j = 0; j < res.size().width * res.channels(); j++)
     {
-      lineb[j] = (uchar)((linea[j] + linec[j])/2);
+      lineb[j] = (uchar) ((linea[j] + linec[j]) / 2);
     }
   }
 
   if (res.size().height > 1 && res.size().height % 2 == 0)
   {
-    linea = (uchar*)res.data + ((res.size().height-2) * res.step[0]);
-    lineb = (uchar*)res.data + ((res.size().height-1) * res.step[0]);
+    linea = (uchar*) res.data + ((res.size().height - 2) * res.step[0]);
+    lineb = (uchar*) res.data + ((res.size().height - 1) * res.step[0]);
     memcpy(lineb, linea, res.size().width);
   }
   return res;
 }
 
 //----------------------------------------------------------------------------
-CaptureThread::CaptureThread(ImageBuffer imageBuffer,
-                             const cv::Size& size,
-                             int rotation,
-                             int device,
-                             const std::string &URL,
-                             hpx::execution::parallel_executor exec,
-                             int requestedFps)
-        : imageBuffer(std::move(imageBuffer)),
-          imageSize(cv::Size(0,0)),
-          rotation(rotation),
-          deviceIndex(device),
-          executor(std::move(exec)),
-          requestedFps(requestedFps),
-          requestedSizeCorrect(false),
-          actualFps(0.0),
-          FrameCounter(0),
-          frameTimes(50),
-          captureTimes(15),
-          abort(false),
-          captureActive(false),
-          deInterlace(false),
-          MotionAVI_Writing(false),
-          capture(),
-          rotatedImage(),
-          rotatedSize(cv::Size(0,0))
+CaptureThread::CaptureThread(ImageBuffer imageBuffer, cv::Size const& size, int rotation,
+    int device, std::string const& URL, hpx::execution::parallel_executor exec, int requestedFps)
+  : imageBuffer(std::move(imageBuffer))
+  , imageSize(cv::Size(0, 0))
+  , rotation(rotation)
+  , deviceIndex(device)
+  , executor(std::move(exec))
+  , requestedFps(requestedFps)
+  , requestedSizeCorrect(false)
+  , actualFps(0.0)
+  , FrameCounter(0)
+  , frameTimes(50)
+  , captureTimes(15)
+  , abort(false)
+  , captureActive(false)
+  , deInterlace(false)
+  , MotionAVI_Writing(false)
+  , capture()
+  , rotatedImage()
+  , rotatedSize(cv::Size(0, 0))
 {
   // initialize font and precompute text size
   QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
-  this->text_size = cv::getTextSize( timestring.toUtf8().constData(), CV_FONT_HERSHEY_PLAIN, 1.0, 1, NULL);
+  this->text_size =
+      cv::getTextSize(timestring.toUtf8().constData(), CV_FONT_HERSHEY_PLAIN, 1.0, 1, NULL);
 
   // Connect to camera and use its default resolution
   this->connectCamera(this->deviceIndex, this->CameraURL);
@@ -96,21 +92,22 @@ CaptureThread::~CaptureThread()
   this->capture.release();
 }
 //----------------------------------------------------------------------------
-bool CaptureThread::connectCamera(int index, const std::string &URL)
+bool CaptureThread::connectCamera(int index, std::string const& URL)
 {
   bool wasActive = this->stopCapture();
-  if (this->capture.isOpened()) {
-    this->capture.release();
-  }
+  if (this->capture.isOpened()) { this->capture.release(); }
 
   //
   // start this->capture device driver
   //
-  if (URL=="NULL") {
+  if (URL == "NULL")
+  {
     // null camera, dummy
   }
-  else {
-    if (URL.size()>0) {
+  else
+  {
+    if (URL.size() > 0)
+    {
       this->CameraURL = URL;
       std::cout << "Attempting IP camera connection " << this->CameraURL.c_str() << std::endl;
       // using an IP camera, assume default string to access martycam
@@ -118,46 +115,44 @@ bool CaptureThread::connectCamera(int index, const std::string &URL)
       // this->capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/videostream.cgi?req_fps=30&.mjpg");
       this->capture.open(URL);
     }
-    else {
+    else
+    {
       std::cout << "opening device " << index << std::endl;
 #ifdef _WIN32
-      this->capture.open(CV_CAP_DSHOW + index );
+      this->capture.open(CV_CAP_DSHOW + index);
 #else
-//      CvCapture* camera = cvCaptureFromCAM(CV_CAP_ANY);
-      if (index==0) {
+      //      CvCapture* camera = cvCaptureFromCAM(CV_CAP_ANY);
+      if (index == 0)
+      {
         std::cout << "Opening capture" << std::endl;
-//        capture.open(CV_CAP_ANY);
+        //        capture.open(CV_CAP_ANY);
         capture.open("/dev/video0");
         std::cout << "Done opening capture" << std::endl;
       }
-      else {
-        capture.open(index);
-      }
+      else { capture.open(index); }
 #endif
     }
-    if (!this->capture.isOpened()) {
+    if (!this->capture.isOpened())
+    {
       std::cout << "Camera connection failed" << std::endl;
       return false;
     }
   }
-  if (wasActive) {
-    return this->startCapture();
-  }
+  if (wasActive) { return this->startCapture(); }
   return true;
 }
 //----------------------------------------------------------------------------
 //Returns true if the resolution was actually changed and false if not.
-bool CaptureThread::setResolution(const cv::Size &res)
+bool CaptureThread::setResolution(cv::Size const& res)
 {
-  if (this->imageSize==res) {
-    return true;
-  }
+  if (this->imageSize == res) { return true; }
 
   bool wasActive = this->stopCapture();
   this->imageBuffer->clear();
 
   bool resolutionUpdated = this->tryResolutionUpdate(res);
-  if (resolutionUpdated){
+  if (resolutionUpdated)
+  {
     this->imageSize = res;
     this->rotatedSize = cv::Size(this->imageSize.height, this->imageSize.width);
   }
@@ -169,14 +164,13 @@ bool CaptureThread::setResolution(const cv::Size &res)
 //----------------------------------------------------------------------------
 void CaptureThread::setRotation(int value)
 {
-  if (this->rotation==value) {
-    return;
-  }
+  if (this->rotation == value) { return; }
   bool wasActive = this->stopCapture();
   this->rotation = value;
-  if (this->rotation==1 || this->rotation==2) {
+  if (this->rotation == 1 || this->rotation == 2)
+  {
     cv::Size workingSize = cv::Size(this->imageSize.height, this->imageSize.width);
-    this->rotatedImage = cv::Mat( workingSize, CV_8UC3);
+    this->rotatedImage = cv::Mat(workingSize, CV_8UC3);
   }
   if (wasActive) this->startCapture();
 }
@@ -195,8 +189,10 @@ void CaptureThread::run()
   QElapsedTimer captureWaitTime;
   captureWaitTime.start();
 
-  while (!this->abort) {
-    if (!captureActive) {
+  while (!this->abort)
+  {
+    if (!captureActive)
+    {
       std::cout << "WARN: CaptureThread::run() still running even though captureActive=false";
       continue;
     }
@@ -206,8 +202,9 @@ void CaptureThread::run()
 
     this->sleepTime_ms = requestedFrameTime_ms - frameProcessingTime_ms;
 
-    if(sleepTime_ms > 0){
-        boost::this_thread::sleep(boost::posix_time::milliseconds(sleepTime_ms));
+    if (sleepTime_ms > 0)
+    {
+      boost::this_thread::sleep(boost::posix_time::milliseconds(sleepTime_ms));
     }
 
     // get latest frame from webcam
@@ -216,13 +213,15 @@ void CaptureThread::run()
     this->capture >> frame;
     updateCaptureTime(captureWaitTime.elapsed());
 
-    if (frame.empty()) {
+    if (frame.empty())
+    {
       this->setAbort(true);
-      std::cout << "Empty camera image, aborting this->capture " <<std::endl;
+      std::cout << "Empty camera image, aborting this->capture " << std::endl;
       continue;
     }
 
-    if (this->deInterlace) {
+    if (this->deInterlace)
+    {
       // de-interlace image
       frame = Deinterlace(frame);
     }
@@ -231,7 +230,8 @@ void CaptureThread::run()
     this->rotateImage(frame, this->rotatedImage);
 
     // always write the frame out if saving movie or in the process of closing AVI
-    if (this->MotionAVI_Writing || this->MotionAVI_Writer.isOpened()) {
+    if (this->MotionAVI_Writing || this->MotionAVI_Writer.isOpened())
+    {
       // add date time stamp if enabled
       this->captionImage(this->rotatedImage);
       this->saveAVI(this->rotatedImage);
@@ -242,7 +242,6 @@ void CaptureThread::run()
     // add to buffer if space is available,
     imageBuffer->send(this->rotatedImage);
 
-
     this->FrameCounter++;
 
     updateActualFps(actualFpsTime.elapsed());
@@ -252,30 +251,34 @@ void CaptureThread::run()
 
   // The run() task is exiting -> wake the threads waiting for that.
   this->stopWait.wakeAll();
-
 }
 //----------------------------------------------------------------------------
 bool CaptureThread::startCapture()
 {
-  if (!captureActive) {
-    if (this->imageSize.width>0) {
+  if (!captureActive)
+  {
+    if (this->imageSize.width > 0)
+    {
       this->capture.set(CV_CAP_PROP_FRAME_WIDTH, this->imageSize.width);
       this->capture.set(CV_CAP_PROP_FRAME_HEIGHT, this->imageSize.height);
     }
-    else {
+    else
+    {
       this->capture.set(CV_CAP_PROP_FRAME_WIDTH, 2048);
       this->capture.set(CV_CAP_PROP_FRAME_HEIGHT, 2048);
     }
     this->capture.set(CV_CAP_PROP_FPS, this->requestedFps);
     std::ostringstream output;
-    output << "CV_CAP_PROP_FRAME_WIDTH\t"   << this->capture.get(CV_CAP_PROP_FRAME_WIDTH) << std::endl;
-    output << "CV_CAP_PROP_FRAME_HEIGHT\t"  << this->capture.get(CV_CAP_PROP_FRAME_HEIGHT) << std::endl;
-    output << "CV_CAP_PROP_FPS\t"           << this->capture.get(CV_CAP_PROP_FPS) << std::endl;
-    output << "CV_CAP_PROP_FOURCC\t"        << this->capture.get(CV_CAP_PROP_FOURCC) << std::endl;
-    output << "CV_CAP_PROP_BRIGHTNESS\t"    << this->capture.get(CV_CAP_PROP_BRIGHTNESS) << std::endl;
-    output << "CV_CAP_PROP_CONTRAST\t"      << this->capture.get(CV_CAP_PROP_CONTRAST) << std::endl;
-    output << "CV_CAP_PROP_SATURATION\t"    << this->capture.get(CV_CAP_PROP_SATURATION) << std::endl;
-    output << "CV_CAP_PROP_HUE\t"           << this->capture.get(CV_CAP_PROP_HUE) << std::endl;
+    output << "CV_CAP_PROP_FRAME_WIDTH\t" << this->capture.get(CV_CAP_PROP_FRAME_WIDTH)
+           << std::endl;
+    output << "CV_CAP_PROP_FRAME_HEIGHT\t" << this->capture.get(CV_CAP_PROP_FRAME_HEIGHT)
+           << std::endl;
+    output << "CV_CAP_PROP_FPS\t" << this->capture.get(CV_CAP_PROP_FPS) << std::endl;
+    output << "CV_CAP_PROP_FOURCC\t" << this->capture.get(CV_CAP_PROP_FOURCC) << std::endl;
+    output << "CV_CAP_PROP_BRIGHTNESS\t" << this->capture.get(CV_CAP_PROP_BRIGHTNESS) << std::endl;
+    output << "CV_CAP_PROP_CONTRAST\t" << this->capture.get(CV_CAP_PROP_CONTRAST) << std::endl;
+    output << "CV_CAP_PROP_SATURATION\t" << this->capture.get(CV_CAP_PROP_SATURATION) << std::endl;
+    output << "CV_CAP_PROP_HUE\t" << this->capture.get(CV_CAP_PROP_HUE) << std::endl;
 
     captureActive = true;
     abort = false;
@@ -289,9 +292,11 @@ bool CaptureThread::startCapture()
   return false;
 }
 //----------------------------------------------------------------------------
-bool CaptureThread::stopCapture() {
+bool CaptureThread::stopCapture()
+{
   bool wasActive = this->captureActive;
-  if (wasActive) {
+  if (wasActive)
+  {
     this->stopLock.lock();
     captureActive = false;
     abort = true;
@@ -304,151 +309,133 @@ bool CaptureThread::stopCapture() {
 void CaptureThread::updateTimeLapse()
 {
   // always write the frame out if saving movie or in the process of closing AVI
-  if (this->TimeLapseAVI_Writer.isOpened()) {
+  if (this->TimeLapseAVI_Writer.isOpened())
+  {
     // add date time stamp if enabled
     this->saveTimeLapseAVI(this->currentFrame);
   }
 }
 //----------------------------------------------------------------------------
-void CaptureThread::saveTimeLapseAVI(const cv::Mat &image)
+void CaptureThread::saveTimeLapseAVI(cv::Mat const& image)
 {
-  if (!this->TimeLapseAVI_Writing) {
-    this->TimeLapseAVI_Writer.release();
-  }
-  else if (this->TimeLapseAVI_Writer.isOpened()) {
-    this->TimeLapseAVI_Writer.write(image);
-  }
+  if (!this->TimeLapseAVI_Writing) { this->TimeLapseAVI_Writer.release(); }
+  else if (this->TimeLapseAVI_Writer.isOpened()) { this->TimeLapseAVI_Writer.write(image); }
 }
 //----------------------------------------------------------------------------
 void CaptureThread::startTimeLapse(double fps)
 {
   std::string path = this->AVI_Directory + "/" + this->TimeLapseAVI_Name + std::string(".avi");
-  if (!this->TimeLapseAVI_Writer.isOpened()) {
+  if (!this->TimeLapseAVI_Writer.isOpened())
+  {
     this->TimeLapseAVI_Writer.open(
-      path.c_str(),
-      CV_FOURCC('X', 'V', 'I', 'D'),
-      fps,
-      this->getImageSize()
-    );
-//    emit(RecordingState(true));
+        path.c_str(), CV_FOURCC('X', 'V', 'I', 'D'), fps, this->getImageSize());
+    //    emit(RecordingState(true));
   }
 
-  if (!this->TimeLapseAVI_Writer.isOpened()) {
+  if (!this->TimeLapseAVI_Writer.isOpened())
+  {
     std::cout << "Failed to open Time Lapse AVI writer : " << path.c_str() << std::endl;
     this->TimeLapseAVI_Writing = false;
   }
-  else {
-    this->TimeLapseAVI_Writing = true;
-  }
+  else { this->TimeLapseAVI_Writing = true; }
 }
 //----------------------------------------------------------------------------
 void CaptureThread::stopTimeLapse()
 {
   this->TimeLapseAVI_Writing = false;
-//    emit(RecordingState(true));
+  //    emit(RecordingState(true));
 }
 //----------------------------------------------------------------------------
-void CaptureThread::setRequestedFps(int value){
+void CaptureThread::setRequestedFps(int value)
+{
   this->requestedFps = value;
   this->frameTimes.clear();
 }
 //----------------------------------------------------------------------------
-void CaptureThread::updateActualFps(int time) {
+void CaptureThread::updateActualFps(int time)
+{
   frameTimes.push_back(time);
-  if (frameTimes.size() > 1) {
-    actualFps = frameTimes.size()/((double)time-frameTimes.front())*1000.0;
-    actualFps = (static_cast<int>(actualFps*10))/10.0;
+  if (frameTimes.size() > 1)
+  {
+    actualFps = frameTimes.size() / ((double) time - frameTimes.front()) * 1000.0;
+    actualFps = (static_cast<int>(actualFps * 10)) / 10.0;
   }
-  else {
-    actualFps = 0;
-  }
+  else { actualFps = 0; }
 }
 //----------------------------------------------------------------------------
-void CaptureThread::updateCaptureTime(int time_ms) {
+void CaptureThread::updateCaptureTime(int time_ms)
+{
   captureTimes.push_back(time_ms);
 
-  captureTime_ms = static_cast<int>(std::accumulate(captureTimes.begin(),
-          captureTimes.end(), 0) / captureTimes.size());
+  captureTime_ms = static_cast<int>(
+      std::accumulate(captureTimes.begin(), captureTimes.end(), 0) / captureTimes.size());
 }
 //----------------------------------------------------------------------------
-void CaptureThread::saveAVI(const cv::Mat &image)
+void CaptureThread::saveAVI(cv::Mat const& image)
 {
   //CV_FOURCC('M', 'J', 'P', 'G'),
   //CV_FOURCC('M', 'P', '4', '2') = MPEG-4.2 codec
   //CV_FOURCC('D', 'I', 'V', '3') = MPEG-4.3 codec
   //CV_FOURCC('D', 'I', 'V', 'X') = MPEG-4 codec
   //CV_FOURCC('X', 'V', 'I', 'D')
-  if (!this->MotionAVI_Writer.isOpened()) {
+  if (!this->MotionAVI_Writer.isOpened())
+  {
     std::string path = this->AVI_Directory + "/" + this->MotionAVI_Name + std::string(".avi");
     this->MotionAVI_Writer.open(
-      path.c_str(),
-      CV_FOURCC('X', 'V', 'I', 'D'),
-      this->getActualFps(),
-      image.size()
-    );
+        path.c_str(), CV_FOURCC('X', 'V', 'I', 'D'), this->getActualFps(), image.size());
     // emit(RecordingState(true));
   }
-  if (this->MotionAVI_Writer.isOpened()) {
+  if (this->MotionAVI_Writer.isOpened())
+  {
     this->MotionAVI_Writer.write(image);
     // if CloseAvi has been called, stop writing.
-    if (!this->MotionAVI_Writing) {
+    if (!this->MotionAVI_Writing)
+    {
       this->MotionAVI_Writer.release();
       // emit(RecordingState(false));
     }
   }
-  else {
+  else
+  {
     std::cout << "Failed to create AVI writer" << std::endl;
     return;
   }
 }
 //----------------------------------------------------------------------------
-void CaptureThread::closeAVI()
-{
-  this->MotionAVI_Writing = false;
-}
+void CaptureThread::closeAVI() { this->MotionAVI_Writing = false; }
 //----------------------------------------------------------------------------
-void CaptureThread::setWriteMotionAVIDir(const char *dir)
-{
-  this->AVI_Directory = dir;
-}
+void CaptureThread::setWriteMotionAVIDir(char const* dir) { this->AVI_Directory = dir; }
 //----------------------------------------------------------------------------
-void CaptureThread::setWriteMotionAVIName(const char *name)
-{
-  this->MotionAVI_Name = name;
-}
+void CaptureThread::setWriteMotionAVIName(char const* name) { this->MotionAVI_Name = name; }
 //----------------------------------------------------------------------------
-void CaptureThread::setWriteTimeLapseAVIName(const char *name)
-{
-  this->TimeLapseAVI_Name = name;
-}
+void CaptureThread::setWriteTimeLapseAVIName(char const* name) { this->TimeLapseAVI_Name = name; }
 //----------------------------------------------------------------------------
-void CaptureThread::rotateImage(const cv::Mat &source, cv::Mat &rotated)
+void CaptureThread::rotateImage(cv::Mat const& source, cv::Mat& rotated)
 {
-  switch (this->rotation) {
-    case 0:
-      source.copyTo(rotated);
-      break;
-    case 1:
-      cv::flip(source, rotated, 1);
-      cv::transpose(rotated, rotated);
-      break;
-    case 2:
-      cv::transpose(source, rotated);
-      cv::flip(rotated, rotated, 1);
-      break;
-    case 3:
-      source.copyTo(rotated);
-      cv::flip(rotated, rotated, -1);
-      break;
+  switch (this->rotation)
+  {
+  case 0: source.copyTo(rotated); break;
+  case 1:
+    cv::flip(source, rotated, 1);
+    cv::transpose(rotated, rotated);
+    break;
+  case 2:
+    cv::transpose(source, rotated);
+    cv::flip(rotated, rotated, 1);
+    break;
+  case 3:
+    source.copyTo(rotated);
+    cv::flip(rotated, rotated, -1);
+    break;
   }
 }
 //----------------------------------------------------------------------------
-void CaptureThread::captionImage(cv::Mat &image)
+void CaptureThread::captionImage(cv::Mat& image)
 {
   QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
   cv::putText(image, timestring.toLatin1().data(),
-    cvPoint(image.size().width - text_size.width - 4, text_size.height+4),
-    CV_FONT_HERSHEY_PLAIN, 1.0, cv::Scalar(255, 255, 255, 0), 1);
+      cvPoint(image.size().width - text_size.width - 4, text_size.height + 4),
+      CV_FONT_HERSHEY_PLAIN, 1.0, cv::Scalar(255, 255, 255, 0), 1);
 }
 //----------------------------------------------------------------------------
 // If the requested resolution is available switches to it and returns true.
