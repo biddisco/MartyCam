@@ -19,7 +19,8 @@ typedef std::shared_ptr<ConcurrentCircularBuffer<cv::Mat>> ImageBuffer;
 //
 // May 2012.
 // FOSCAM FI8904W running firmware 11.25.2.44
-// capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/videostream.cgi?req_fps=30&.mjpg");
+// capture =
+// cvCaptureFromFile("http://admin:1234@192.168.1.21/videostream.cgi?req_fps=30&.mjpg");
 //
 
 // Image deinterlacing function for DV camera
@@ -142,7 +143,7 @@ bool CaptureThread::connectCamera(int index, std::string const& URL)
   return true;
 }
 //----------------------------------------------------------------------------
-//Returns true if the resolution was actually changed and false if not.
+// Returns true if the resolution was actually changed and false if not.
 bool CaptureThread::setResolution(cv::Size const& res)
 {
   if (this->imageSize == res) { return true; }
@@ -177,7 +178,8 @@ void CaptureThread::setRotation(int value)
 //----------------------------------------------------------------------------
 void CaptureThread::run()
 {
-  // Clear the frameTimes circular buffer to ensure actualFps is computed correctly from the first frame
+  // Clear the frameTimes circular buffer to ensure actualFps is computed
+  // correctly from the first frame
   this->frameTimes.clear();
 
   QElapsedTimer actualFpsTime;
@@ -193,25 +195,40 @@ void CaptureThread::run()
   {
     if (!captureActive)
     {
-      std::cout << "WARN: CaptureThread::run() still running even though captureActive=false";
+      std::cout << "WARN: CaptureThread::run() still running even though "
+                   "captureActive=false";
+      boost::this_thread::sleep(boost::posix_time::milliseconds(10));
       continue;
     }
 
-    int frameProcessingTime_ms = requestedFpsTime.elapsed();
-    int requestedFrameTime_ms = 1000 / this->requestedFps;
+    // Continuously grab from camera to drain backend buffers and keep the
+    // stream current; publish to processing only at requested FPS.
+    captureWaitTime.restart();
+    bool const grabbed = this->capture.grab();
+    updateCaptureTime(captureWaitTime.elapsed());
 
-    this->sleepTime_ms = requestedFrameTime_ms - frameProcessingTime_ms;
-
-    if (sleepTime_ms > 0)
+    if (!grabbed)
     {
-      boost::this_thread::sleep(boost::posix_time::milliseconds(sleepTime_ms));
+      this->setAbort(true);
+      std::cout << "Failed to grab camera image, aborting this->capture " << std::endl;
+      continue;
     }
 
-    // get latest frame from webcam
+    int requestedFrameTime_ms = (this->requestedFps > 0) ? (1000 / this->requestedFps) : 1000;
+    int elapsedSinceLastOutput_ms = requestedFpsTime.elapsed();
+    this->sleepTime_ms = requestedFrameTime_ms - elapsedSinceLastOutput_ms;
+    if (this->sleepTime_ms < 0) { this->sleepTime_ms = 0; }
+
+    if (elapsedSinceLastOutput_ms < requestedFrameTime_ms) { continue; }
+
+    // Retrieve the most recently grabbed frame for publication.
     cv::Mat frame;
-    captureWaitTime.restart();
-    this->capture >> frame;
-    updateCaptureTime(captureWaitTime.elapsed());
+    if (!this->capture.retrieve(frame))
+    {
+      this->setAbort(true);
+      std::cout << "Failed to retrieve camera image, aborting this->capture " << std::endl;
+      continue;
+    }
 
     if (frame.empty())
     {
@@ -229,7 +246,8 @@ void CaptureThread::run()
     // rotate image if necessary, makes a copy which we can pass to queue
     this->rotateImage(frame, this->rotatedImage);
 
-    // always write the frame out if saving movie or in the process of closing AVI
+    // always write the frame out if saving movie or in the process of closing
+    // AVI
     if (this->MotionAVI_Writing || this->MotionAVI_Writer.isOpened())
     {
       // add date time stamp if enabled
@@ -268,6 +286,9 @@ bool CaptureThread::startCapture()
       this->capture.set(CV_CAP_PROP_FRAME_HEIGHT, 2048);
     }
     this->capture.set(CV_CAP_PROP_FPS, this->requestedFps);
+    // Minimize kernel frame buffering so capture >> frame always returns the
+    // most recent frame rather than a stale buffered one (reduces display lag).
+    this->capture.set(cv::CAP_PROP_BUFFERSIZE, 1);
     std::ostringstream output;
     output << "CV_CAP_PROP_FRAME_WIDTH\t" << this->capture.get(CV_CAP_PROP_FRAME_WIDTH)
            << std::endl;
@@ -373,11 +394,11 @@ void CaptureThread::updateCaptureTime(int time_ms)
 //----------------------------------------------------------------------------
 void CaptureThread::saveAVI(cv::Mat const& image)
 {
-  //CV_FOURCC('M', 'J', 'P', 'G'),
-  //CV_FOURCC('M', 'P', '4', '2') = MPEG-4.2 codec
-  //CV_FOURCC('D', 'I', 'V', '3') = MPEG-4.3 codec
-  //CV_FOURCC('D', 'I', 'V', 'X') = MPEG-4 codec
-  //CV_FOURCC('X', 'V', 'I', 'D')
+  // CV_FOURCC('M', 'J', 'P', 'G'),
+  // CV_FOURCC('M', 'P', '4', '2') = MPEG-4.2 codec
+  // CV_FOURCC('D', 'I', 'V', '3') = MPEG-4.3 codec
+  // CV_FOURCC('D', 'I', 'V', 'X') = MPEG-4 codec
+  // CV_FOURCC('X', 'V', 'I', 'D')
   if (!this->MotionAVI_Writer.isOpened())
   {
     std::string path = this->AVI_Directory + "/" + this->MotionAVI_Name + std::string(".avi");

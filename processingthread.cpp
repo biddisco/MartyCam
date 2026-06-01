@@ -64,8 +64,9 @@ void ProcessingThread::run()
 
   while (!this->abort)
   {
-    // blocking : waits until next image is available if necessary
-    cv::Mat cameraImage = imageBuffer->receive();
+    // Blocking: waits for data, then consume only the newest frame and drop
+    // stale buffered frames to keep display/processing responsive.
+    cv::Mat cameraImage = imageBuffer->receive_latest();
     // if camera not working or disconnected, abort
     if (cameraImage.empty())
     {

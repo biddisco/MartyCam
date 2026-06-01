@@ -32,6 +32,16 @@ class ConcurrentCircularBuffer : private boost::noncopyable
     return imdata;
   }
 
+  // Return the newest frame and drop older queued frames to avoid lag.
+  T receive_latest()
+  {
+    lock lk(monitor);
+    while (cb.empty()) { buffer_not_empty.wait(lk); }
+    T imdata = cb.back();
+    cb.clear();
+    return imdata;
+  }
+
   void clear()
   {
     lock lk(monitor);
