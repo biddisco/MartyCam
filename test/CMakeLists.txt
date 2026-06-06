@@ -1,12 +1,20 @@
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Testing
-#-----------------------------------------------------------------------------
-ADD_EXECUTABLE(OpenCVCameraTest
-  OpenCVCameraTest.cpp
-)
+# -----------------------------------------------------------------------------
+add_executable(OpenCVCameraTest OpenCVCameraTest.cpp)
 
-target_link_libraries(OpenCVCameraTest
-  ${HPX_LIBRARIES}
+add_executable(OpenCV_camera_resolutions OpenCV_camera_resolutions.cpp)
+add_executable(Qt_camera_resolutions Qt_camera_resolutions.cpp)
+
+target_link_libraries(OpenCVCameraTest ${HPX_LIBRARIES} ${OpenCV_LIBS})
+target_link_libraries(OpenCV_camera_resolutions ${HPX_LIBRARIES} ${OpenCV_LIBS})
+target_link_libraries(
+  Qt_camera_resolutions
   ${OpenCV_LIBS}
-)
-
+  Qt::Core
+  Qt::Concurrent
+  Qt::Gui
+  Qt::OpenGL
+  Qt::Svg
+  Qt::Widgets
+  Qt::OpenGLWidgets)
