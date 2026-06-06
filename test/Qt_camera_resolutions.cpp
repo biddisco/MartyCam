@@ -9,21 +9,40 @@
 #include <QList>
 #include <QMediaDevices>
 #include <QMessageBox>
+#include <QProgressBar>
+#include <QProgressDialog>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QScreen>
+#include <QTabWidget>
 #include <QVBoxLayout>
 #include <QVariant>
 //
-#include <opencv2/opencv.hpp>
+#include <cstring>    // For memset
+#include <fcntl.h>    // For open() and O_RDONLY
+#include <functional>
+#include <linux/videodev2.h>
 #include <regex>
 #include <string>
+#include <sys/ioctl.h>
+#include <unistd.h>
 #include <unordered_map>
 #include <vector>
+//
+#include <linux/videodev2.h>
+#include <opencv2/opencv.hpp>
 
 struct ResCheck
 {
   int width;
   int height;
+};
+
+// Internal structure to group combined format properties
+struct ResolutionConfig
+{
+  int fourcc;
+  QVariantList fpsList;
 };
 
 // Extractor helper to parse absolute index from device ID string
@@ -38,61 +57,120 @@ int parseActualCameraIndex(QString const& qtDeviceId, int fallbackIndex)
 }
 
 // --------------------------------------------------------------------
+// Instantly queries the Linux kernel for a camera's supported FOURCC codes
+// --------------------------------------------------------------------
+std::vector<int> getSupportedFourCCs(int cameraIndex)
+{
+  std::vector<int> supportedCodes;
+  std::string devicePath = "/dev/video" + std::to_string(cameraIndex);
+
+  int fd = open(devicePath.c_str(), O_RDONLY | O_NONBLOCK);
+  if (fd < 0) { return supportedCodes; }
+
+  struct v4l2_fmtdesc fmtdesc;
+  memset(&fmtdesc, 0, sizeof(fmtdesc));
+  fmtdesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+  fmtdesc.index = 0;
+
+  while (ioctl(fd, VIDIOC_ENUM_FMT, &fmtdesc) == 0)
+  {
+    supportedCodes.push_back(static_cast<int>(fmtdesc.pixelformat));
+    // qDebug() << "Found supported FOURCC code:"
+    //          << QString::fromStdString(std::string((char*) &fmtdesc.pixelformat, 4));
+    fmtdesc.index++;
+  }
+
+  close(fd);
+  return supportedCodes;
+}
+
+// --------------------------------------------------------------------
+// Convenience function to convert FOURCC int to string for debugging
+// --------------------------------------------------------------------
+std::string fourCCToString(int fourcc)
+{
+  std::string code;
+  code += static_cast<char>(fourcc & 0xFF);            // 1st byte
+  code += static_cast<char>((fourcc >> 8) & 0xFF);     // 2nd byte
+  code += static_cast<char>((fourcc >> 16) & 0xFF);    // 3rd byte
+  code += static_cast<char>((fourcc >> 24) & 0xFF);    // 4th byte
+  return code;
+}
+
+// --------------------------------------------------------------------
 // Robust OpenCV resolution probing module
 // --------------------------------------------------------------------
-QButtonGroup* createCameraResolutionGroup(QWidget* parent, int targetSystemIndex)
+QButtonGroup* createCameraResolutionGroup(QWidget* parent, int targetSystemIndex,
+    std::function<void(int, int, int)> const& onProbeStepProgress = nullptr)
 {
   QButtonGroup* buttonGroup = new QButtonGroup(parent);
   buttonGroup->setExclusive(true);
 
-  // Hardware verification check
-  {
-    cv::VideoCapture testCap;
-    testCap.open(targetSystemIndex, cv::CAP_V4L2);
-    if (!testCap.isOpened()) return buttonGroup;
+  std::vector<int> hardwareCodecs = getSupportedFourCCs(targetSystemIndex);
 
-    int fourcc = static_cast<int>(testCap.get(cv::CAP_PROP_FOURCC));
-    double fps = testCap.get(cv::CAP_PROP_FPS);
-    if (fourcc == 0 && fps <= 0.0)
-    {
-      testCap.release();
-      return buttonGroup;
-    }
-    testCap.release();
+  bool hasMJPEG = false;
+  bool hasGREY = false;
+
+  for (int codec : hardwareCodecs)
+  {
+    if (codec == V4L2_PIX_FMT_MJPEG) hasMJPEG = true;
+    if (codec == V4L2_PIX_FMT_GREY) hasGREY = true;
   }
 
-  std::vector<ResCheck> testResolutions = {
-      {320, 240},      //
-      {640, 480},      //
-      {800, 600},      //
-      {1024, 768},     //
-      {1280, 720},     // 720p
-      {1920, 1080},    // 1080p
-      {2560, 1440},    // 2K
-      {3840, 2160}     // 4K
-  };
-  std::vector<int> testFPS = {30, 60};
-  std::unordered_map<std::string, QVariantList> resolutionMap;
+  if (!hasMJPEG && !hasGREY) { return buttonGroup; }
+
+  std::vector<int> targetFourCCs;
+  if (hasMJPEG) targetFourCCs.push_back(cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
+  if (hasGREY) targetFourCCs.push_back(cv::VideoWriter::fourcc('G', 'R', 'E', 'Y'));
+
+  std::vector<ResCheck> testResolutions = {{320, 240}, {640, 480}, {640, 360}, {800, 600},
+      {1024, 768}, {1280, 720}, {1920, 1080}, {2560, 1440}, {3840, 2160}};
+  std::vector<int> testFPS = {15, 30, 60};
+
+  // Track configurations unique to each resolution name string
+  std::unordered_map<std::string, ResolutionConfig> resolutionMap;
 
   cv::VideoCapture cap(targetSystemIndex, cv::CAP_V4L2);
-  if (!cap.isOpened()) return buttonGroup;
+  if (!cap.isOpened()) { return buttonGroup; }
 
-  for (auto const& res : testResolutions)
+  for (int currentFourCC : targetFourCCs)
   {
-    for (int fps : testFPS)
+    for (auto const& res : testResolutions)
     {
-      cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
-      cap.set(cv::CAP_PROP_FPS, fps);
-      cap.set(cv::CAP_PROP_FRAME_WIDTH, res.width);
-      cap.set(cv::CAP_PROP_FRAME_HEIGHT, res.height);
-
-      int actualWidth = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_WIDTH));
-      int actualHeight = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_HEIGHT));
-
-      if (actualWidth == res.width && actualHeight == res.height)
+      for (int fps : testFPS)
       {
-        std::string resKey = std::to_string(res.width) + " x " + std::to_string(res.height);
-        if (!resolutionMap[resKey].contains(fps)) { resolutionMap[resKey].append(fps); }
+        // Enforce converted mode baseline off to support native single-channel parsing
+        cap.set(cv::CAP_PROP_CONVERT_RGB, 0);
+        cap.set(cv::CAP_PROP_FOURCC, currentFourCC);
+        cap.set(cv::CAP_PROP_FPS, fps);
+        cap.set(cv::CAP_PROP_FRAME_WIDTH, res.width);
+        cap.set(cv::CAP_PROP_FRAME_HEIGHT, res.height);
+
+        int actualWidth = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_WIDTH));
+        int actualHeight = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_HEIGHT));
+
+        if (actualWidth == res.width && actualHeight == res.height)
+        {
+          std::string resKey = std::to_string(res.width) + " x " + std::to_string(res.height);
+
+          // Seed new structural configs inside the tracking map
+          if (resolutionMap.find(resKey) == resolutionMap.end())
+          {
+            resolutionMap[resKey] = ResolutionConfig{currentFourCC, QVariantList()};
+          }
+
+          if (!resolutionMap[resKey].fpsList.contains(fps))
+          {
+            resolutionMap[resKey].fpsList.append(fps);
+          }
+
+          std::string codecName = fourCCToString(currentFourCC);
+        //   qDebug() << "Camera supports resolution:" << QString::fromStdString(codecName) << " : "
+        //            << QString::fromStdString(resKey) << "@" << fps << "FPS";
+        }
+
+        if (onProbeStepProgress) { onProbeStepProgress(res.width, res.height, fps); }
+        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
       }
     }
   }
@@ -101,10 +179,12 @@ QButtonGroup* createCameraResolutionGroup(QWidget* parent, int targetSystemIndex
   for (auto const& pair : resolutionMap)
   {
     QString resName = QString::fromStdString(pair.first);
-    QVariantList fpsList = pair.second;
+    ResolutionConfig const& config = pair.second;
 
     QRadioButton* radioButton = new QRadioButton(resName, parent);
-    radioButton->setProperty("supported_fps", fpsList);
+    radioButton->setProperty("supported_fps", config.fpsList);
+    radioButton->setProperty(
+        "supported_fourcc", config.fourcc);    // FIX 1: Save target codec integer code
     radioButton->setProperty("camera_index", targetSystemIndex);
     buttonGroup->addButton(radioButton);
   }
@@ -115,97 +195,180 @@ QButtonGroup* createCameraResolutionGroup(QWidget* parent, int targetSystemIndex
 }
 
 // --------------------------------------------------------------------
-// Custom Dialog Subclass to handle dynamic UI refreshes upon hardware changes
+// Reusable widget that can be embedded into a larger form.
 // --------------------------------------------------------------------
-class CameraSelectorDialog : public QDialog
+class CameraSelectorWidget : public QWidget
 {
-  Q_OBJECT
-
   public:
-  explicit CameraSelectorDialog(QWidget* parent = nullptr)
-    : QDialog(parent)
+  explicit CameraSelectorWidget(QWidget* parent = nullptr)
+    : QWidget(parent)
   {
-    setWindowTitle("Hot-Plug Camera Manager");
     setMinimumWidth(450);
 
-    // Core Window Structural Layout
     m_mainLayout = new QVBoxLayout(this);
-
-    // This sub-layout holds our dynamic camera list boxes
     m_camerasContainerLayout = new QVBoxLayout();
     m_mainLayout->addLayout(m_camerasContainerLayout);
 
-    // Persistent Close Action Button at the bottom
-    QHBoxLayout* actionLayout = new QHBoxLayout();
-    QPushButton* closeButton = new QPushButton("Apply & Exit", this);
-    actionLayout->addStretch();
-    actionLayout->addWidget(closeButton);
-    m_mainLayout->addLayout(actionLayout);
-
-    connect(closeButton, &QPushButton::clicked, this, &QDialog::accept);
-
-    // Build initial UI state
     refreshCameraList();
 
-    // HOT-PLUG HOOK: Listen to the OS hardware subsystem via Qt Multimedia.
-    // Triggers instantly whenever a camera device is added or removed.
-    // FIX: Instantiate a new QMediaDevices object or connect directly via a pointer to one
     connect(new QMediaDevices(this), &QMediaDevices::videoInputsChanged, this,
-        &CameraSelectorDialog::refreshCameraList);
+        &CameraSelectorWidget::refreshCameraList);
   }
 
-  private slots:
+  private:
   void refreshCameraList()
   {
     qDebug() << "Hardware modification detected! Refreshing camera grid...";
 
-    // 1. Clear out existing UI elements inside the camera layout container
+    // create a progress dialog to provide feedback during potentially long-running camera queries
+    QProgressDialog progressDialog("Querying Cameras", QString(), 0, 1, this);
+    progressDialog.setWindowFlags(Qt::FramelessWindowHint | Qt::Dialog);
+    progressDialog.setWindowModality(Qt::WindowModal);
+    progressDialog.setCancelButton(nullptr);
+    progressDialog.setAutoClose(false);
+    progressDialog.setAutoReset(false);
+    progressDialog.resize(420, 120);
+
+    // Center the progress dialog on the screen
+    QRect const screenGeometry = QApplication::primaryScreen()->geometry();
+    QRect const dialogGeometry = progressDialog.frameGeometry();
+    progressDialog.move((screenGeometry.width() - dialogGeometry.width()) / 2,
+        (screenGeometry.height() - dialogGeometry.height()) / 2);
+    progressDialog.show();
+    QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+
+    // Clear out existing layouts
     QLayoutItem* item;
     while ((item = m_camerasContainerLayout->takeAt(0)) != nullptr)
     {
-      if (item->widget())
-      {
-        delete item->widget();    // Cleans up the QGroupBox frames cleanly
-      }
+      if (item->widget()) { delete item->widget(); }
       delete item;
     }
 
-    // 2. Query updated system hardware nodes
+    // Query cameras before building the UI to get an accurate count for
+    // progress tracking and to avoid redundant queries during widget construction
     QList<QCameraDevice> const cameras = QMediaDevices::videoInputs();
-
     if (cameras.empty())
     {
       m_camerasContainerLayout->addWidget(new QLabel("No active video devices detected.", this));
+      progressDialog.hide();
       return;
     }
 
-    // 3. Rebuild the device interface grids
+    // resolutions we will check for - can be expanded to include more exotic formats if needed,
+    // but these cover the most common use cases
+    std::vector<ResCheck> const testResolutions = {
+        {320, 240},                 // QVGA
+        {640, 480},                 // VGA
+        {640, 360},                 // IR cameras : non-standard aspect ratios
+        {800, 600},                 // XGA
+        {1024, 768},                // SVGA
+        {1280, 720},                // HD
+        {1920, 1080},               // Full HD
+        {2560, 1440},               // 2K
+        {3840, 2160}                // Ultra HD
+    };
+    int const totalFPSCount = 3;    // {15, 30, 60}
+
+    // Probing each camera for supported resolutions and codecs can take a while, so we
+    // quick check each camera first to get an accurate count of total steps for progress 
+    // tracking before starting the full render loop
+    int totalGlobalProbeSteps = 0;
+    std::vector<int> targetSystemIndices;
+    std::vector<int> codecsPerCamera;
+
+    for (int i = 0; i < cameras.size(); ++i)
+    {
+      int systemIndex = parseActualCameraIndex(cameras[i].id(), i);
+      targetSystemIndices.push_back(systemIndex);
+
+      // currently we are only bothering with MJPEG and GREY since they are the most common V4L2 
+      // formats that support multiple resolutions, but this can be expanded as needed
+      std::vector<int> codecs = getSupportedFourCCs(systemIndex);
+      int validCodecCount = 0;
+      for (int c : codecs)
+      {
+        if (c == V4L2_PIX_FMT_MJPEG || c == V4L2_PIX_FMT_GREY) { validCodecCount++; }
+      }
+      codecsPerCamera.push_back(validCodecCount);
+      totalGlobalProbeSteps +=
+          (validCodecCount * static_cast<int>(testResolutions.size()) * totalFPSCount);
+    }
+    // set the progress bar limits
+    progressDialog.setRange(0, totalGlobalProbeSteps > 0 ? totalGlobalProbeSteps : 1);
+    progressDialog.setValue(0);
+    progressDialog.setLabelText(QString("Querying Cameras (%1 detected)").arg(cameras.size()));
+    QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+
+    // Build a new widget for each camera and add it to the tab container
+    QTabWidget* cameraTabs = new QTabWidget(this);
+    bool hasUsableCamera = false;
+    int currentGlobalProgressCounter = 0;
+
+    // Rebuild Tab Container Layout Grid
     for (int i = 0; i < cameras.size(); ++i)
     {
       QString cameraName = cameras[i].description();
-      QString rawDeviceId = QString::fromUtf8(cameras[i].id());
-      int systemIndex = parseActualCameraIndex(rawDeviceId, i);
+      int systemIndex = targetSystemIndices[i];
 
-      QGroupBox* cameraBox =
-          new QGroupBox(QString("%1 (/dev/video%2)").arg(cameraName).arg(systemIndex), this);
-      QVBoxLayout* boxLayout = new QVBoxLayout(cameraBox);
+      QWidget* cameraTab = new QWidget(cameraTabs);
+      QVBoxLayout* tabLayout = new QVBoxLayout(cameraTab);
 
-      QButtonGroup* resGroup = createCameraResolutionGroup(this, systemIndex);
+      QLabel* deviceInfoLabel = new QLabel(QString("Device: %1\nNode: /dev/video%2\nID: %3")
+                                               .arg(cameraName)
+                                               .arg(systemIndex)
+                                               .arg(cameras[i].id()),
+          cameraTab);
+      deviceInfoLabel->setWordWrap(true);
+      tabLayout->addWidget(deviceInfoLabel);
 
+      progressDialog.setLabelText(QString("Querying Cameras: %1").arg(cameraName));
+      qDebug() << "Probing camera:" << cameraName << "(Node:" << cameras[i].id() << ")";
+      QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+
+      // Trigger the probe using an incremental absolute progress hook reference
+      QButtonGroup* resGroup = createCameraResolutionGroup(
+          cameraTab, systemIndex, [&](int probeWidth, int probeHeight, int probeFps) {
+            currentGlobalProgressCounter++;
+            progressDialog.setLabelText(
+                QString("Querying Cameras: %1/%2 - %3\nTesting %4x%5 @ %6 FPS")
+                    .arg(i + 1)
+                    .arg(cameras.size())
+                    .arg(cameraName)
+                    .arg(probeWidth)
+                    .arg(probeHeight)
+                    .arg(probeFps));
+            progressDialog.setValue(currentGlobalProgressCounter);
+            QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+          });
+
+      // If no valid codes exist on this sensor, skip rendering the tab frame
       if (resGroup->buttons().isEmpty())
       {
-        delete cameraBox;
-        delete resGroup;
+        delete cameraTab;
         continue;
       }
 
-      for (QAbstractButton* button : resGroup->buttons()) { boxLayout->addWidget(button); }
+      for (QAbstractButton* button : resGroup->buttons()) { tabLayout->addWidget(button); }
+      tabLayout->addStretch();
 
-      // Bind selection change notifications
       connect(resGroup, &QButtonGroup::buttonClicked, this,
-          &CameraSelectorDialog::onResolutionSelected);
-      m_camerasContainerLayout->addWidget(cameraBox);
+          &CameraSelectorWidget::onResolutionSelected);
+
+      cameraTabs->addTab(cameraTab, cameraName);
+      hasUsableCamera = true;
     }
+
+    if (hasUsableCamera) { m_camerasContainerLayout->addWidget(cameraTabs); }
+    else
+    {
+      delete cameraTabs;
+      m_camerasContainerLayout->addWidget(
+          new QLabel("No cameras with supported resolutions were detected.", this));
+    }
+
+    progressDialog.setValue(progressDialog.maximum());
+    progressDialog.hide();
   }
 
   void onResolutionSelected(QAbstractButton* button)
@@ -213,6 +376,8 @@ class CameraSelectorDialog : public QDialog
     if (!button) return;
 
     int realCamIdx = button->property("camera_index").toInt();
+    int packedFourCC =
+        button->property("supported_fourcc").toInt();    // Read stored user-data parameter format
     QString resText = button->text();
     QVariantList fpsList = button->property("supported_fps").toList();
 
@@ -220,14 +385,16 @@ class CameraSelectorDialog : public QDialog
     for (QVariant const& fps : fpsList) fpsStrings << QString::number(fps.toInt());
     QString fpsDisplay = fpsStrings.join(", ");
 
+    QString codecNameStr = QString::fromStdString(fourCCToString(packedFourCC));
+
     QMessageBox::information(this, "Device Stream Configured",
-        QString("Target Node: /dev/video%1\nResolution: %2\nFramerates: %3 FPS")
+        QString("Target Node: /dev/video%1\nCodec Format: %2\nResolution: %3\nFramerates: %4 FPS")
             .arg(realCamIdx)
+            .arg(codecNameStr)
             .arg(resText)
             .arg(fpsDisplay));
   }
 
-  private:
   QVBoxLayout* m_mainLayout;
   QVBoxLayout* m_camerasContainerLayout;
 };
@@ -236,10 +403,22 @@ int main(int argc, char* argv[])
 {
   QApplication app(argc, argv);
 
-  CameraSelectorDialog dialog;
+  QDialog dialog;
+  dialog.setWindowTitle("Hot-Plug Camera Manager");
+
+  QVBoxLayout* dialogLayout = new QVBoxLayout(&dialog);
+  CameraSelectorWidget* selectorWidget = new CameraSelectorWidget(&dialog);
+  dialogLayout->addWidget(selectorWidget);
+
+  QHBoxLayout* actionLayout = new QHBoxLayout();
+  QPushButton* closeButton = new QPushButton("Apply & Exit", &dialog);
+  actionLayout->addStretch();
+  actionLayout->addWidget(closeButton);
+  dialogLayout->addLayout(actionLayout);
+
+  QObject::connect(closeButton, &QPushButton::clicked, &dialog, &QDialog::accept);
+
   dialog.show();
 
   return app.exec();
 }
-
-#include "Qt_camera_resolutions.moc"    // Required for standalone single-file Qt compilation builds
