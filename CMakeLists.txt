@@ -75,6 +75,8 @@ find_package(Qt6 REQUIRED COMPONENTS ${qtcomponents})
 find_package(HPX REQUIRED)
 message("HPX libs are " ${HPX_LIBRARIES})
 
+add_subdirectory(utility_widgets)
+
 add_subdirectory(test)
 
 # -----------------------------------------------------------------------------
@@ -201,6 +203,6 @@ target_include_directories(
     ${HPX_INCLUDE_DIRS})
 
 target_link_libraries(martycam analogue HPX::hpx ${OpenCV_LIBS}
-                      ${Boost_LIBRARIES})
+                      ${Boost_LIBRARIES} utility_widgets)
 
 add_subdirectory(webcam_test)
