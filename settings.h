@@ -5,9 +5,12 @@
 #include <QDateTime>
 #include <QElapsedTimer>
 #include <QTimer>
+//
 #include "MotionFilter.h"
 #include "capturethread.h"
 #include "processingthread.h"
+#include "utility_widgets/CameraSelectorWidget.h"
+//
 #include "ui_settings.h"
 
 class RenderWidget;
@@ -49,6 +52,9 @@ class SettingsWidget : public QWidget
 
   public:
   SettingsWidget(QWidget* parent);
+
+  // Create the camera selector widget and add it to the settings widget layout
+  void createCameraSelector();
 
   cv::Size getSelectedResolution();
   int getSelectedResolutionButton();
@@ -125,10 +131,11 @@ class SettingsWidget : public QWidget
   int SnapshotId;
   QButtonGroup ImageButtonGroup;
   QButtonGroup RotateButtonGroup;
-  QButtonGroup ResolutionButtonGroup;
-  int numberOfResolutions;
-  int currentResolutionButtonIndex;
-  int previousResolutionButtonIndex;
+  CameraSelectorWidget* cameraSelectorWidget;
+  // QButtonGroup ResolutionButtonGroup;
+  // int numberOfResolutions;
+  // int currentResolutionButtonIndex;
+  // int previousResolutionButtonIndex;
   RenderWidget* renderWidget;
   IPCameraForm* cameraForm;
   int NumDevices;

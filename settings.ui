@@ -29,7 +29,7 @@
    <property name="bottomMargin">
     <number>3</number>
    </property>
-   <item alignment="Qt::AlignTop">
+   <item alignment="Qt::AlignmentFlag::AlignTop">
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
       <number>1</number>
@@ -69,7 +69,7 @@
              <number>20</number>
             </property>
             <property name="orientation">
-             <enum>Qt::Horizontal</enum>
+             <enum>Qt::Orientation::Horizontal</enum>
             </property>
            </widget>
           </item>
@@ -102,7 +102,7 @@
              <number>1</number>
             </property>
             <property name="orientation">
-             <enum>Qt::Horizontal</enum>
+             <enum>Qt::Orientation::Horizontal</enum>
             </property>
            </widget>
           </item>
@@ -118,7 +118,7 @@
              <string>1</string>
             </property>
             <property name="alignment">
-             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
             </property>
            </widget>
           </item>
@@ -134,7 +134,7 @@
              <string>0.20</string>
             </property>
             <property name="alignment">
-             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
             </property>
            </widget>
           </item>
@@ -160,7 +160,7 @@
              <number>0</number>
             </property>
             <property name="orientation">
-             <enum>Qt::Horizontal</enum>
+             <enum>Qt::Orientation::Horizontal</enum>
             </property>
            </widget>
           </item>
@@ -176,7 +176,7 @@
              <string>0</string>
             </property>
             <property name="alignment">
-             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
             </property>
            </widget>
           </item>
@@ -192,7 +192,7 @@
              <string>3</string>
             </property>
             <property name="alignment">
-             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
             </property>
            </widget>
           </item>
@@ -212,7 +212,7 @@
              <number>3</number>
             </property>
             <property name="orientation">
-             <enum>Qt::Horizontal</enum>
+             <enum>Qt::Orientation::Horizontal</enum>
             </property>
            </widget>
           </item>
@@ -235,7 +235,7 @@
              <string>3</string>
             </property>
             <property name="alignment">
-             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
             </property>
            </widget>
           </item>
@@ -248,7 +248,7 @@
              <number>3</number>
             </property>
             <property name="orientation">
-             <enum>Qt::Horizontal</enum>
+             <enum>Qt::Orientation::Horizontal</enum>
             </property>
            </widget>
           </item>
@@ -304,7 +304,7 @@
              <number>70</number>
             </property>
             <property name="orientation">
-             <enum>Qt::Horizontal</enum>
+             <enum>Qt::Orientation::Horizontal</enum>
             </property>
            </widget>
           </item>
@@ -334,7 +334,7 @@
              <number>70</number>
             </property>
             <property name="orientation">
-             <enum>Qt::Horizontal</enum>
+             <enum>Qt::Orientation::Horizontal</enum>
             </property>
            </widget>
           </item>
@@ -407,9 +407,9 @@
               <hour>0</hour>
               <minute>0</minute>
               <second>30</second>
-              <year>2000</year>
-              <month>1</month>
-              <day>1</day>
+              <year>1999</year>
+              <month>12</month>
+              <day>30</day>
              </datetime>
             </property>
             <property name="displayFormat">
@@ -438,9 +438,9 @@
               <hour>0</hour>
               <minute>0</minute>
               <second>0</second>
-              <year>2000</year>
-              <month>1</month>
-              <day>1</day>
+              <year>1999</year>
+              <month>12</month>
+              <day>30</day>
              </datetime>
             </property>
             <property name="displayFormat">
@@ -540,7 +540,7 @@
        <item>
         <spacer name="verticalSpacer">
          <property name="orientation">
-          <enum>Qt::Vertical</enum>
+          <enum>Qt::Orientation::Vertical</enum>
          </property>
          <property name="sizeHint" stdset="0">
           <size>
@@ -598,7 +598,7 @@
              <number>100</number>
             </property>
             <property name="orientation">
-             <enum>Qt::Horizontal</enum>
+             <enum>Qt::Orientation::Horizontal</enum>
             </property>
            </widget>
           </item>
@@ -615,10 +615,10 @@
        <item>
         <spacer name="verticalSpacer_3">
          <property name="orientation">
-          <enum>Qt::Vertical</enum>
+          <enum>Qt::Orientation::Vertical</enum>
          </property>
          <property name="sizeType">
-          <enum>QSizePolicy::Expanding</enum>
+          <enum>QSizePolicy::Policy::Expanding</enum>
          </property>
          <property name="sizeHint" stdset="0">
           <size>
@@ -633,6 +633,13 @@
     </widget>
    </item>
    <item>
+    <widget class="QGroupBox" name="camera_box">
+     <property name="title">
+      <string>Camera</string>
+     </property>
+    </widget>
+   </item>
+   <item>
     <widget class="QGroupBox" name="groupBox_3">
      <property name="title">
       <string>General Settings</string>
@@ -641,10 +648,10 @@
       <item>
        <widget class="QFrame" name="frame_2">
         <property name="frameShape">
-         <enum>QFrame::StyledPanel</enum>
+         <enum>QFrame::Shape::StyledPanel</enum>
         </property>
         <property name="frameShadow">
-         <enum>QFrame::Raised</enum>
+         <enum>QFrame::Shadow::Raised</enum>
         </property>
         <layout class="QHBoxLayout" name="horizontalLayout_2">
          <item>
@@ -672,7 +679,7 @@
             <number>30</number>
            </property>
            <property name="orientation">
-            <enum>Qt::Horizontal</enum>
+            <enum>Qt::Orientation::Horizontal</enum>
            </property>
           </widget>
          </item>
@@ -689,10 +696,10 @@
       <item>
        <widget class="QFrame" name="frame">
         <property name="frameShape">
-         <enum>QFrame::StyledPanel</enum>
+         <enum>QFrame::Shape::StyledPanel</enum>
         </property>
         <property name="frameShadow">
-         <enum>QFrame::Raised</enum>
+         <enum>QFrame::Shadow::Raised</enum>
         </property>
         <layout class="QGridLayout" name="gridLayout_5">
          <property name="leftMargin">
@@ -707,7 +714,7 @@
          <property name="bottomMargin">
           <number>0</number>
          </property>
-         <item row="0" column="1">
+         <item row="0" column="0">
           <widget class="QGroupBox" name="groupBox_8">
            <property name="title">
             <string>Rotation</string>
@@ -748,105 +755,6 @@
              </widget>
             </item>
            </layout>
-          </widget>
-         </item>
-         <item row="0" column="0">
-          <widget class="QGroupBox" name="groupBox">
-           <property name="title">
-            <string>Resolution</string>
-           </property>
-           <layout class="QGridLayout" name="gridLayout_4">
-            <item row="3" column="0">
-             <widget class="QRadioButton" name="res640">
-              <property name="text">
-               <string>&amp;640x480</string>
-              </property>
-              <property name="checked">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-            <item row="2" column="0">
-             <widget class="QRadioButton" name="res720">
-              <property name="text">
-               <string>&amp;720x576</string>
-              </property>
-              <property name="checked">
-               <bool>false</bool>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="0">
-             <widget class="QRadioButton" name="res1280">
-              <property name="text">
-               <string>&amp;1280x720</string>
-              </property>
-              <property name="checked">
-               <bool>false</bool>
-              </property>
-             </widget>
-            </item>
-            <item row="0" column="0">
-             <widget class="QRadioButton" name="res1600">
-              <property name="text">
-               <string>1600x1&amp;200</string>
-              </property>
-              <property name="checked">
-               <bool>false</bool>
-              </property>
-             </widget>
-            </item>
-            <item row="4" column="0">
-             <widget class="QRadioButton" name="res320">
-              <property name="enabled">
-               <bool>true</bool>
-              </property>
-              <property name="text">
-               <string>&amp;320x240</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </widget>
-         </item>
-        </layout>
-       </widget>
-      </item>
-      <item>
-       <widget class="QGroupBox" name="groupBox_7">
-        <property name="title">
-         <string>Camera</string>
-        </property>
-        <layout class="QGridLayout" name="gridLayout_3">
-         <item row="0" column="0">
-          <widget class="QComboBox" name="cameraSelect"/>
-         </item>
-         <item row="0" column="1">
-          <widget class="QPushButton" name="add_camera">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="minimumSize">
-            <size>
-             <width>16</width>
-             <height>0</height>
-            </size>
-           </property>
-           <property name="maximumSize">
-            <size>
-             <width>24</width>
-             <height>16777215</height>
-            </size>
-           </property>
-           <property name="toolTip">
-            <string>Click here to add an IP Camera URL</string>
-           </property>
-           <property name="text">
-            <string>...</string>
-           </property>
           </widget>
          </item>
         </layout>
@@ -935,9 +843,9 @@
              <hour>0</hour>
              <minute>0</minute>
              <second>10</second>
-             <year>2000</year>
-             <month>1</month>
-             <day>1</day>
+             <year>1999</year>
+             <month>12</month>
+             <day>30</day>
             </datetime>
            </property>
            <property name="time">

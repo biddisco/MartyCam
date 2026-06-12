@@ -105,7 +105,7 @@ bool ProcessingThread::startProcessing()
     processingActive = true;
     abort = false;
 
-    hpx::async(this->executor, &ProcessingThread::run, this);
+    // hpx::async(this->executor, &ProcessingThread::run, this);
 
     return true;
   }

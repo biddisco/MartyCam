@@ -7,6 +7,7 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QMainWindow>
+#include <QShowEvent>
 //
 #include <opencv2/core/core.hpp>
 //
@@ -36,9 +37,8 @@ class MartyCam : public QMainWindow
 
   public slots:
   void updateGUI();
-  void onResolutionSelected(cv::Size newSize);
   void onRotationChanged(int rotation);
-  void onCameraIndexChanged(int index, QString URL);
+  void onCameraChanged(int index, QString URL);
   void onUserTrackChanged(int value);
   void onRecordingStateChanged(bool state);
   //
@@ -56,10 +56,18 @@ class MartyCam : public QMainWindow
   void resetChart();
   void initChart();
 
+  protected:
+  // Override the showEvent method
+  void showEvent(QShowEvent* event) override;
+
+  private:
   private:
   public:
   static int const IMAGE_BUFF_CAPACITY;
   Ui::MartyCam ui;
+
+  // The tracking flag, initialized to false
+  bool m_isFirstShow = false;
 
   CaptureThread_SP captureThread;
   ProcessingThread_SP processingThread;

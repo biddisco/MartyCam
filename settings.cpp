@@ -8,6 +8,8 @@
 //
 #include "IPCameraForm.h"
 #include "renderwidget.h"
+#include "utility_widgets/CameraSelectorWidget.h"
+#include "debug/logging.hpp"
 //
 #ifdef WIN32
 # include "videoInput.h"
@@ -21,10 +23,14 @@
 // #include "../../highgui/src/precomp.hpp"
 // #include "../../highgui/src/cap_dshow.cpp"
 
+// ----------------------------------------------------------------------------
+static auto settings_log = martycam::log::create("Settings");
+
 //----------------------------------------------------------------------------
 SettingsWidget::SettingsWidget(QWidget* parent)
   : QWidget(parent)
 {
+  cameraSelectorWidget = nullptr;
   //  this->processingthread = NULL;
   //  this->capturethread    = NULL;
   this->SnapshotId = 0;
@@ -32,42 +38,40 @@ SettingsWidget::SettingsWidget(QWidget* parent)
   ui.setupUi(this);
   setMinimumWidth(150);
   //
-  connect(ui.threshold, SIGNAL(valueChanged(int)), this, SLOT(onThresholdChanged(int)));
-  connect(ui.average, SIGNAL(valueChanged(int)), this, SLOT(onAverageChanged(int)));
-  connect(ui.erode, SIGNAL(valueChanged(int)), this, SLOT(onErodeChanged(int)));
-  connect(ui.dilate, SIGNAL(valueChanged(int)), this, SLOT(onDilateChanged(int)));
-  connect(ui.browse, SIGNAL(clicked()), this, SLOT(onBrowseClicked()));
-  connect(ui.add_camera, SIGNAL(clicked()), this, SLOT(onAddCameraClicked()));
+  connect(ui.threshold, SIGNAL(valueChanged(int)), this, SLOT(onThresholdChanged(int)),
+      Qt::QueuedConnection);
+  connect(ui.average, SIGNAL(valueChanged(int)), this, SLOT(onAverageChanged(int)),
+      Qt::QueuedConnection);
+  connect(
+      ui.erode, SIGNAL(valueChanged(int)), this, SLOT(onErodeChanged(int)), Qt::QueuedConnection);
+  connect(
+      ui.dilate, SIGNAL(valueChanged(int)), this, SLOT(onDilateChanged(int)), Qt::QueuedConnection);
+  connect(ui.browse, SIGNAL(clicked()), this, SLOT(onBrowseClicked()), Qt::QueuedConnection);
+  // connect(ui.add_camera, SIGNAL(clicked()), this, SLOT(onAddCameraClicked()), Qt::QueuedConnection);
 
-  connect(ui.WriteMotionAVI, SIGNAL(toggled(bool)), this, SLOT(onWriteMotionAVIToggled(bool)));
-  connect(&this->clock, SIGNAL(timeout()), this, SLOT(onTimer()));
-  connect(ui.blendRatio, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));
-  connect(ui.noiseBlend, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)));
+  connect(ui.WriteMotionAVI, SIGNAL(toggled(bool)), this, SLOT(onWriteMotionAVIToggled(bool)),
+      Qt::QueuedConnection);
+  connect(&this->clock, SIGNAL(timeout()), this, SLOT(onTimer()), Qt::QueuedConnection);
+  connect(ui.blendRatio, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)),
+      Qt::QueuedConnection);
+  connect(ui.noiseBlend, SIGNAL(valueChanged(int)), this, SLOT(onBlendChanged(int)),
+      Qt::QueuedConnection);
   //
-  connect(ui.tabWidget, SIGNAL(currentChanged(int)), this, SLOT(onTabChanged(int)));
+  connect(ui.tabWidget, SIGNAL(currentChanged(int)), this, SLOT(onTabChanged(int)),
+      Qt::QueuedConnection);
   //
   // Face Recognition Tab
   //
   connect(ui.requestedFps_HorizontalSlider, SIGNAL(valueChanged(int)), this,
-      SLOT(onRequestedFpsChanged(int)));
-  connect(
-      ui.eyesRecog_CheckBox, SIGNAL(stateChanged(int)), this, SLOT(onEyesRecogStateChanged(int)));
+      SLOT(onRequestedFpsChanged(int)), Qt::QueuedConnection);
+  connect(ui.eyesRecog_CheckBox, SIGNAL(stateChanged(int)), this,
+      SLOT(onEyesRecogStateChanged(int)), Qt::QueuedConnection);
   connect(ui.decimationCoeff_HorizontalSlider, SIGNAL(valueChanged(int)), this,
-      SLOT(onDecimationCoeffChanged(int)));
+      SLOT(onDecimationCoeffChanged(int)), Qt::QueuedConnection);
   //
-  connect(ui.snapButton, SIGNAL(clicked()), this, SLOT(onSnapClicked()));
-  connect(ui.startTimeLapse, SIGNAL(clicked()), this, SLOT(onStartTimeLapseClicked()));
-
-  previousResolutionButtonIndex = -1;
-  currentResolutionButtonIndex = -1;
-  numberOfResolutions = 5;
-  ResolutionButtonGroup.addButton(ui.res1600, 4);
-  ResolutionButtonGroup.addButton(ui.res1280, 3);
-  ResolutionButtonGroup.addButton(ui.res720, 2);
-  ResolutionButtonGroup.addButton(ui.res640, 1);
-  ResolutionButtonGroup.addButton(ui.res320, 0);
-  connect(&ResolutionButtonGroup, &QButtonGroup::idClicked, this,
-      &SettingsWidget::onResolutionSelection);
+  connect(ui.snapButton, SIGNAL(clicked()), this, SLOT(onSnapClicked()), Qt::QueuedConnection);
+  connect(ui.startTimeLapse, SIGNAL(clicked()), this, SLOT(onStartTimeLapseClicked()),
+      Qt::QueuedConnection);
 
   ImageButtonGroup.addButton(ui.cameraImage, 0);
   ImageButtonGroup.addButton(ui.movingAverage, 1);
@@ -75,17 +79,60 @@ SettingsWidget::SettingsWidget(QWidget* parent)
   ImageButtonGroup.addButton(ui.blendedImage, 3);
   ImageButtonGroup.addButton(ui.maskImage, 4);
   ImageButtonGroup.addButton(ui.noiseImage, 5);
-  connect(&ImageButtonGroup, &QButtonGroup::idClicked, this, &SettingsWidget::onImageSelection);
+  connect(&ImageButtonGroup, &QButtonGroup::idClicked, this, &SettingsWidget::onImageSelection,
+      Qt::QueuedConnection);
 
   RotateButtonGroup.addButton(ui.rotate0, 0);
   RotateButtonGroup.addButton(ui.rotate90, 1);
   RotateButtonGroup.addButton(ui.rotate90m, 2);
   RotateButtonGroup.addButton(ui.rotate180, 3);
-  connect(&RotateButtonGroup, &QButtonGroup::idClicked, this, &SettingsWidget::onRotateSelection);
+  connect(&RotateButtonGroup, &QButtonGroup::idClicked, this, &SettingsWidget::onRotateSelection,
+      Qt::QueuedConnection);
   //
   this->cameraForm = new IPCameraForm(this);
   this->setupCameraList();
 }
+
+//----------------------------------------------------------------------------
+void SettingsWidget::createCameraSelector()
+{
+  if (cameraSelectorWidget == nullptr)
+  {
+    // 1. Ensure your widget is created with the box as the explicit parent
+    cameraSelectorWidget = new CameraSelectorWidget(ui.camera_box);
+
+    // 2. Safely acquire or create the layout
+    QLayout* layout = ui.camera_box->layout();
+    if (!layout)
+    {
+      layout = new QVBoxLayout(ui.camera_box);
+      ui.camera_box->setLayout(layout);
+    }
+
+    // 3. Add the widget to the layout
+    layout->addWidget(cameraSelectorWidget);
+
+    // // // 4. THE CRITICAL STEP: Tell the layout system to re-evaluate geometries
+    // // cameraSelectorWidget->invalidate();     // Clears any cached sizes
+    // ui.camera_box->layout()->activate();    // Forces the layout to recalculate right now
+    // cameraSelectorWidget->refreshCameraList();
+
+    connect(
+        cameraSelectorWidget, &CameraSelectorWidget::cameraConfigChanged, this,
+        [this](int cameraIndex, cv::Size resolution, int fps, int fourcc) {
+          MARTY_LOG_INFO(settings_log,
+              "{:<20} Camera config changed: index={}, resolution={}x{}, fps={}, fourcc={}",
+              "SettingsWidget", cameraIndex, resolution.width, resolution.height, fps, fourCCToString(fourcc));
+          // Handle the camera configuration change here
+          // For example, you can emit signals or directly update the capture thread
+          // emit rotationChanged(0); // Example: Emit a signal to reset rotation
+          // emit resolutionSelected(resolution); // Emit the selected resolution
+          // emit CameraIndexChanged(cameraIndex, ""); // Emit the selected camera index
+        },
+        Qt::QueuedConnection);
+  }
+}
+
 //----------------------------------------------------------------------------
 void SettingsWidget::setThreads(CaptureThread_SP capthread, ProcessingThread_SP procthread)
 {
@@ -152,37 +199,37 @@ void SettingsWidget::onAddCameraClicked()
 //----------------------------------------------------------------------------
 void SettingsWidget::setupCameraList()
 {
-  disconnect(
-      this->ui.cameraSelect, SIGNAL(currentIndexChanged(int)), this, SLOT(onCameraSelection(int)));
-  int index = this->ui.cameraSelect->currentIndex();
-  this->ui.cameraSelect->blockSignals(true);
-  this->ui.cameraSelect->clear();
+  // disconnect(
+  //     this->ui.cameraSelect, SIGNAL(currentIndexChanged(int)), this, SLOT(onCameraSelection(int)));
+  // int index = this->ui.cameraSelect->currentIndex();
+  // this->ui.cameraSelect->blockSignals(true);
+  // this->ui.cameraSelect->clear();
   //
-#ifdef _WIN32
-  // use videoInput object to enumerate devices
-  this->NumDevices = videoInput::listDevices(true);
-  for (int i = 0; i < this->NumDevices; i++)
-  {
-    this->ui.cameraSelect->addItem(QString(videoInput::getDeviceName(i)));
-  }
-#else
-  this->NumDevices = 1;
-  this->ui.cameraSelect->addItem("standard camera");
-#endif
-  //
-  stringpairlist& cameras = this->cameraForm->getList();
-  for (stringpairlist::iterator it = cameras.begin(); it != cameras.end(); ++it)
-  {
-    this->ui.cameraSelect->addItem(it->first.c_str());
-  }
-  this->ui.cameraSelect->blockSignals(false);
-  connect(
-      this->ui.cameraSelect, SIGNAL(currentIndexChanged(int)), this, SLOT(onCameraSelection(int)));
-  if (index >= 0 && index < this->ui.cameraSelect->count())
-  {
-    this->ui.cameraSelect->setCurrentIndex(index);
-  }
-  else { this->ui.cameraSelect->setCurrentIndex(0); }
+  // #ifdef _WIN32
+  //   // use videoInput object to enumerate devices
+  //   this->NumDevices = videoInput::listDevices(true);
+  //   for (int i = 0; i < this->NumDevices; i++)
+  //   {
+  //     this->ui.cameraSelect->addItem(QString(videoInput::getDeviceName(i)));
+  //   }
+  // #else
+  //   this->NumDevices = 1;
+  //   this->ui.cameraSelect->addItem("standard camera");
+  // #endif
+  //   //
+  //   stringpairlist& cameras = this->cameraForm->getList();
+  //   for (stringpairlist::iterator it = cameras.begin(); it != cameras.end(); ++it)
+  //   {
+  //     this->ui.cameraSelect->addItem(it->first.c_str());
+  //   }
+  //   this->ui.cameraSelect->blockSignals(false);
+  //   connect(
+  //       this->ui.cameraSelect, SIGNAL(currentIndexChanged(int)), this, SLOT(onCameraSelection(int)));
+  //   if (index >= 0 && index < this->ui.cameraSelect->count())
+  //   {
+  //     this->ui.cameraSelect->setCurrentIndex(index);
+  //   }
+  //   else { this->ui.cameraSelect->setCurrentIndex(0); }
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::onWriteMotionAVIToggled(bool state) { this->RecordMotionAVI(state); }
@@ -213,12 +260,13 @@ void SettingsWidget::onTimer()
 //----------------------------------------------------------------------------
 int SettingsWidget::getCameraIndex(std::string& text)
 {
-  QString val = this->ui.cameraSelect->currentText();
-  int index = this->ui.cameraSelect->currentIndex();
-  // if this is not an autodetected webcam/internal camera, return the user name
-  if (index > NumDevices) { text = val.toStdString(); }
-  else { text = ""; }
-  return index;
+  return 0;
+  // QString val = this->ui.cameraSelect->currentText();
+  // int index = this->ui.cameraSelect->currentIndex();
+  // // if this is not an autodetected webcam/internal camera, return the user name
+  // if (index > NumDevices) { text = val.toStdString(); }
+  // else { text = ""; }
+  // return index;
 }
 //----------------------------------------------------------------------------
 MotionFilterParams SettingsWidget::getMotionFilterParams()
@@ -298,31 +346,31 @@ void SettingsWidget::onImageSelection(int btn) { this->processingthread->setDisp
 //----------------------------------------------------------------------------
 cv::Size SettingsWidget::getSelectedResolution()
 {
-  switch (this->ResolutionButtonGroup.checkedId())
-  {
-  case 4: return cv::Size(1600, 1200); break;
-  case 3: return cv::Size(1280, 720); break;
-  case 2: return cv::Size(720, 576); break;
-  case 1: return cv::Size(640, 480); break;
-  case 0: return cv::Size(320, 240); break;
-  }
-  return cv::Size(320, 240);
+  // switch (this->ResolutionButtonGroup.checkedId())
+  // {
+  // case 4: return cv::Size(1600, 1200); break;
+  // case 3: return cv::Size(1280, 720); break;
+  // case 2: return cv::Size(720, 576); break;
+  // case 1: return cv::Size(640, 480); break;
+  // case 0: return cv::Size(320, 240); break;
+  // }
+  // return cv::Size(320, 240);
 }
 //----------------------------------------------------------------------------
 int SettingsWidget::getSelectedResolutionButton()
 {
-  return this->ResolutionButtonGroup.checkedId();
+  // return this->ResolutionButtonGroup.checkedId();
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::onResolutionSelection(int btn)
 {
-  if (currentResolutionButtonIndex == -1)
-    currentResolutionButtonIndex = btn;
-  else
-  {
-    previousResolutionButtonIndex = currentResolutionButtonIndex;
-    currentResolutionButtonIndex = btn;
-  }
+  // if (currentResolutionButtonIndex == -1)
+  //   currentResolutionButtonIndex = btn;
+  // else
+  // {
+  //   previousResolutionButtonIndex = currentResolutionButtonIndex;
+  //   currentResolutionButtonIndex = btn;
+  // }
 
   emit(resolutionSelected(getSelectedResolution()));
 }
@@ -341,16 +389,16 @@ void SettingsWidget::onBlendChanged(int value)
 //----------------------------------------------------------------------------
 void SettingsWidget::onCameraSelection(int index)
 {
-  QString val = this->ui.cameraSelect->currentText();
-  // if index is a user supplied IP camera, get the URL from the map
-  if (index >= this->NumDevices)
-  {
-    stringpairlist& cameras = this->cameraForm->getList();
-    val = cameras[val.toLatin1().data()].c_str();
-  }
-  else { val = ""; }
-  //
-  emit(CameraIndexChanged(index, val));
+  // QString val = this->ui.cameraSelect->currentText();
+  // // if index is a user supplied IP camera, get the URL from the map
+  // if (index >= this->NumDevices)
+  // {
+  //   stringpairlist& cameras = this->cameraForm->getList();
+  //   val = cameras[val.toLatin1().data()].c_str();
+  // }
+  // else { val = ""; }
+  // //
+  // emit(CameraIndexChanged(index, val));
 }
 //----------------------------------------------------------------------------
 void SettingsWidget::saveSettings()
@@ -374,11 +422,11 @@ void SettingsWidget::saveSettings()
   settings.endGroup();
 
   settings.beginGroup("GeneralSettings");
-  settings.setValue("resolution", this->ResolutionButtonGroup.checkedId());
+  // settings.setValue("resolution", this->ResolutionButtonGroup.checkedId());
   settings.setValue("rotation", this->RotateButtonGroup.checkedId());
   settings.setValue("requestedFps", this->ui.requestedFps_HorizontalSlider->value());
   settings.setValue("processingType", this->ui.tabWidget->currentIndex());
-  settings.setValue("cameraIndex", this->ui.cameraSelect->currentIndex());
+  // settings.setValue("cameraIndex", this->ui.cameraSelect->currentIndex());
   settings.endGroup();
 
   settings.beginGroup("SavingStream");
@@ -429,11 +477,11 @@ void SettingsWidget::loadSettings()
       ->setValue(settings.value("requestedFps", 15).toInt());
   SilentCall(this->ui.requestedFps_ValueLabel)
       ->setText(settings.value("requestedFps", 15).toString());
-  SilentCall(&this->ResolutionButtonGroup)
-      ->button(settings.value("resolution", 0).toInt())
-      ->click();
+  // SilentCall(&this->ResolutionButtonGroup)
+  // ->button(settings.value("resolution", 0).toInt())
+  // ->click();
   SilentCall(&this->RotateButtonGroup)->button(settings.value("rotation", 0).toInt())->click();
-  SilentCall(this->ui.cameraSelect)->setCurrentIndex(settings.value("cameraIndex", 0).toInt());
+  // SilentCall(this->ui.cameraSelect)->setCurrentIndex(settings.value("cameraIndex", 0).toInt());
   SilentCall(this->ui.tabWidget)->setCurrentIndex(settings.value("processingType", 0).toInt());
   //
   settings.endGroup();
@@ -528,18 +576,21 @@ ProcessingType SettingsWidget::getCurentProcessingType()
 //---------------------------------------------------------------------------
 void SettingsWidget::switchToNextResolution()
 {
-  int currentIndex = this->ResolutionButtonGroup.checkedId();
-  int newIndex = (currentIndex + 1) % 5;
-  SilentCall(&this->ResolutionButtonGroup)->button(newIndex)->click();
+  // int currentIndex = this->ResolutionButtonGroup.checkedId();
+  // int newIndex = (currentIndex + 1) % 5;
+  // SilentCall(&this->ResolutionButtonGroup)->button(newIndex)->click();
 }
 //---------------------------------------------------------------------------
 void SettingsWidget::switchToPreviousResolution()
 {
-  if (this->previousResolutionButtonIndex >= 0)
-    this->ResolutionButtonGroup.button(previousResolutionButtonIndex)->click();
+  // if (this->previousResolutionButtonIndex >= 0)
+  //   this->ResolutionButtonGroup.button(previousResolutionButtonIndex)->click();
 }
 //---------------------------------------------------------------------------
-int SettingsWidget::getNumOfResolutions() { return this->numberOfResolutions; }
+int SettingsWidget::getNumOfResolutions()
+{    //return this->numberOfResolutions;
+  return 0;
+}
 //---------------------------------------------------------------------------
 QString SettingsWidget::decimationCoeffToQString(int sliderVal)
 {
