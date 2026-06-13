@@ -4,6 +4,7 @@
 #include <QApplication>
 #include <QButtonGroup>
 #include <QCameraDevice>
+#include <QComboBox>
 #include <QDebug>
 #include <QEventLoop>
 #include <QLabel>
@@ -13,7 +14,6 @@
 #include <QProgressDialog>
 #include <QRadioButton>
 #include <QScreen>
-#include <QTabWidget>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QVariant>
@@ -259,7 +259,7 @@ namespace {
       QString resName = QString::fromStdString(pair.first);
       ResolutionConfig const& config = pair.second;
 
-      QRadioButton* radioButton = new QRadioButton(resName, parent);
+      QRadioButton* radioButton = new QRadioButton(resName);
       radioButton->setProperty("supported_fps", config.fpsList);
       radioButton->setProperty("supported_fourcc", config.fourcc);
       radioButton->setProperty("camera_index", targetSystemIndex);
@@ -296,7 +296,8 @@ CameraSelectorWidget::CameraSelectorWidget(QWidget* parent)
   : QWidget(parent)
   , m_mainLayout(new QVBoxLayout(this))
   , m_camerasContainerLayout(new QVBoxLayout())
-  , m_cameraTabs(nullptr)
+  , m_cameraComboBox(nullptr)
+  , m_resolutionButtonsContainer(nullptr)
   , m_hasSelection(false)
   , m_selectedCameraIndex(-1)
   , m_selectedResolution(0, 0)
@@ -338,6 +339,17 @@ int CameraSelectorWidget::selectedFourCC() const { return m_selectedFourCC; }
 void CameraSelectorWidget::clearCameraWidgets()
 {
   MARTY_LOG_SCOPE(cam_log, "{} {}", (void*) (this), __func__);
+
+  // Clear button groups first (before deleting the container that owns the buttons)
+  for (auto& pair : m_cameraButtonGroups)
+  {
+    // Reparent buttons to nullptr so they don't get double-deleted
+    for (QAbstractButton* button : pair.second->buttons()) { button->setParent(nullptr); }
+    delete pair.second;
+  }
+  m_cameraButtonGroups.clear();
+
+  // Now delete the layout items (container widgets)
   QLayoutItem* item = nullptr;
   while ((item = m_camerasContainerLayout->takeAt(0)) != nullptr)
   {
@@ -345,7 +357,8 @@ void CameraSelectorWidget::clearCameraWidgets()
     delete item;
   }
 
-  m_cameraTabs = nullptr;
+  m_cameraComboBox = nullptr;
+  m_resolutionButtonsContainer = nullptr;
 }
 
 // --------------------------------------------------------------------
@@ -413,7 +426,11 @@ void CameraSelectorWidget::refreshCameraList()
   progressDialog.setLabelText(QString("Querying Cameras (%1 detected)").arg(cameras.size()));
   QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
 
-  m_cameraTabs = new QTabWidget(this);
+  m_cameraComboBox = new QComboBox(this);
+  m_resolutionButtonsContainer = new QWidget(this);
+  QVBoxLayout* containerLayout = new QVBoxLayout(m_resolutionButtonsContainer);
+  containerLayout->setContentsMargins(0, 0, 0, 0);
+
   bool hasUsableCamera = false;
   int currentGlobalProgressCounter = 0;
 
@@ -422,22 +439,11 @@ void CameraSelectorWidget::refreshCameraList()
     QString const cameraName = cameras[i].description();
     int const systemIndex = parseActualCameraIndex(cameras[i].id(), i);
 
-    QWidget* cameraTab = new QWidget(m_cameraTabs);
-    QVBoxLayout* tabLayout = new QVBoxLayout(cameraTab);
-
-    QLabel* deviceInfoLabel = new QLabel(QString("Device: %1\nNode: /dev/video%2\nID: %3")
-                                             .arg(cameraName)
-                                             .arg(systemIndex)
-                                             .arg(cameras[i].id()),
-        cameraTab);
-    deviceInfoLabel->setWordWrap(true);
-    tabLayout->addWidget(deviceInfoLabel);
-
     progressDialog.setLabelText(QString("Querying Cameras: %1").arg(cameraName));
     QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
 
-    QButtonGroup* resGroup = createCameraResolutionGroup(
-        cameraTab, systemIndex, [&](int probeWidth, int probeHeight, int probeFps) {
+    QButtonGroup* resGroup = createCameraResolutionGroup(m_resolutionButtonsContainer, systemIndex,
+        [&](int probeWidth, int probeHeight, int probeFps) {
           ++currentGlobalProgressCounter;
           progressDialog.setLabelText(
               QString("Querying Cameras: %1/%2 - %3\nTesting %4x%5 @ %6 FPS")
@@ -457,30 +463,36 @@ void CameraSelectorWidget::refreshCameraList()
 
     if (resGroup->buttons().isEmpty())
     {
-      delete cameraTab;
+      delete resGroup;
       continue;
     }
-
-    for (QAbstractButton* button : resGroup->buttons()) { tabLayout->addWidget(button); }
-    tabLayout->addStretch();
 
     connect(resGroup, &QButtonGroup::buttonClicked, this,
         &CameraSelectorWidget::onResolutionSelected, Qt::QueuedConnection);
 
-    m_cameraTabs->addTab(cameraTab, cameraName);
+    m_cameraComboBox->addItem(cameraName, systemIndex);
+    m_cameraButtonGroups[systemIndex] = resGroup;
     hasUsableCamera = true;
   }
 
   if (hasUsableCamera)
   {
-    m_camerasContainerLayout->addWidget(m_cameraTabs);
-    connect(m_cameraTabs, &QTabWidget::currentChanged, this,
-        &CameraSelectorWidget::onCurrentTabChanged, Qt::QueuedConnection);
+    m_camerasContainerLayout->addWidget(m_cameraComboBox);
+    m_camerasContainerLayout->addWidget(m_resolutionButtonsContainer);
+    m_camerasContainerLayout->addStretch();
+
+    connect(m_cameraComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+        &CameraSelectorWidget::onCameraComboBoxChanged, Qt::QueuedConnection);
+
+    // Trigger initial population of resolution buttons
+    onCameraComboBoxChanged(0);
   }
   else
   {
-    delete m_cameraTabs;
-    m_cameraTabs = nullptr;
+    delete m_cameraComboBox;
+    delete m_resolutionButtonsContainer;
+    m_cameraComboBox = nullptr;
+    m_resolutionButtonsContainer = nullptr;
     m_camerasContainerLayout->addWidget(
         new QLabel("No cameras with supported resolutions were detected.", this));
     m_hasSelection = false;
@@ -488,8 +500,6 @@ void CameraSelectorWidget::refreshCameraList()
 
   progressDialog.setValue(progressDialog.maximum());
   progressDialog.hide();
-
-  emitCurrentSelection();
 
   m_isRefreshing = false;
   if (m_refreshPending)
@@ -506,44 +516,72 @@ void CameraSelectorWidget::onResolutionSelected(QAbstractButton* button)
   emitCurrentSelection();
 }
 
-void CameraSelectorWidget::onCurrentTabChanged(int index)
+void CameraSelectorWidget::onCameraComboBoxChanged(int index)
 {
   MARTY_LOG_SCOPE(cam_log, "{} {}", (void*) (this), __func__);
   Q_UNUSED(index);
-  emitCurrentSelection();
+
+  if (!m_cameraComboBox || !m_resolutionButtonsContainer) { return; }
+
+  int systemIndex = m_cameraComboBox->currentData().toInt();
+  auto it = m_cameraButtonGroups.find(systemIndex);
+  if (it == m_cameraButtonGroups.end()) { return; }
+
+  QButtonGroup* buttonGroup = it->second;
+
+  // Hide all buttons from all groups
+  for (auto const& pair : m_cameraButtonGroups)
+  {
+    for (QAbstractButton* button : pair.second->buttons()) { button->hide(); }
+  }
+
+  // Clear previous buttons from container
+  QVBoxLayout* containerLayout = qobject_cast<QVBoxLayout*>(m_resolutionButtonsContainer->layout());
+  if (!containerLayout)
+  {
+    containerLayout = new QVBoxLayout(m_resolutionButtonsContainer);
+    containerLayout->setContentsMargins(0, 0, 0, 0);
+  }
+
+  QLayoutItem* item = nullptr;
+  while ((item = containerLayout->takeAt(0)) != nullptr) { delete item; }
+
+  // Add and show buttons from the selected camera's group
+  for (QAbstractButton* button : buttonGroup->buttons())
+  {
+    containerLayout->addWidget(button);
+    button->show();
+  }
+  containerLayout->addStretch();
 }
 
 void CameraSelectorWidget::emitCurrentSelection()
 {
   MARTY_LOG_SCOPE(cam_log, "{} {}", (void*) (this), __func__);
-  if (!m_cameraTabs)
+  if (!m_cameraComboBox || !m_resolutionButtonsContainer)
   {
     m_hasSelection = false;
     return;
   }
 
-  QWidget* currentTab = m_cameraTabs->currentWidget();
-  if (!currentTab)
+  int systemIndex = m_cameraComboBox->currentData().toInt();
+  auto it = m_cameraButtonGroups.find(systemIndex);
+  if (it == m_cameraButtonGroups.end())
   {
     m_hasSelection = false;
     return;
   }
 
-  QList<QRadioButton*> buttons = currentTab->findChildren<QRadioButton*>();
-  QRadioButton* checkedButton = nullptr;
-  for (QRadioButton* button : buttons)
+  QButtonGroup* buttonGroup = it->second;
+  QAbstractButton* checkedButton = buttonGroup->checkedButton();
+
+  if (!checkedButton && !buttonGroup->buttons().isEmpty())
   {
-    if (button->isChecked())
+    checkedButton = buttonGroup->buttons().first();
+    if (qobject_cast<QRadioButton*>(checkedButton))
     {
-      checkedButton = button;
-      break;
+      qobject_cast<QRadioButton*>(checkedButton)->setChecked(true);
     }
-  }
-
-  if (!checkedButton && !buttons.isEmpty())
-  {
-    checkedButton = buttons.first();
-    checkedButton->setChecked(true);
   }
 
   if (!checkedButton)

@@ -5,9 +5,13 @@
 
 #include <opencv2/core.hpp>
 
+#include <unordered_map>
+
 class QAbstractButton;
-class QTabWidget;
+class QButtonGroup;
+class QComboBox;
 class QVBoxLayout;
+class QWidget;
 
 std::string fourCCToString(int fourcc);
 
@@ -32,7 +36,7 @@ class CameraSelectorWidget : public QWidget
 
   private slots:
   void onResolutionSelected(QAbstractButton* button);
-  void onCurrentTabChanged(int index);
+  void onCameraComboBoxChanged(int index);
 
   private:
   void clearCameraWidgets();
@@ -40,7 +44,9 @@ class CameraSelectorWidget : public QWidget
 
   QVBoxLayout* m_mainLayout;
   QVBoxLayout* m_camerasContainerLayout;
-  QTabWidget* m_cameraTabs;
+  QComboBox* m_cameraComboBox;
+  QWidget* m_resolutionButtonsContainer;
+  std::unordered_map<int, QButtonGroup*> m_cameraButtonGroups;
 
   bool m_hasSelection;
   int m_selectedCameraIndex;
