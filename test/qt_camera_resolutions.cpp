@@ -26,13 +26,13 @@ int main(int argc, char* argv[])
   QObject::connect(closeButton, &QPushButton::clicked, &dialog, &QDialog::accept);
 
   dialog.show();
-  QObject::connect(selectorWidget, &CameraSelectorWidget::cameraConfigChanged, [](int cameraIndex,
-      cv::Size resolution, int fps, int fourcc) {
-    qDebug() << "Selected Camera Index:" << cameraIndex;
-    qDebug() << "Selected Resolution:" << resolution.width << "x" << resolution.height;
-    qDebug() << "Selected FPS:" << fps;
-    qDebug() << "Selected FOURCC:" << fourCCToString(fourcc).c_str();
-  });
+  QObject::connect(selectorWidget, &CameraSelectorWidget::cameraConfigChanged,
+      [](QString cameraPath, cv::Size resolution, int fps, int fourcc) {
+        qDebug() << "Selected Camera Path:" << cameraPath;
+        qDebug() << "Selected Resolution:" << resolution.width << "x" << resolution.height;
+        qDebug() << "Selected FPS:" << fps;
+        qDebug() << "Selected FOURCC:" << fourCCToString(fourcc).c_str();
+      });
 
   return app.exec();
 }

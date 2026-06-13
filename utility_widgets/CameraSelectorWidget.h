@@ -23,7 +23,7 @@ class CameraSelectorWidget : public QWidget
   explicit CameraSelectorWidget(QWidget* parent = nullptr);
 
   bool hasSelection() const;
-  int selectedCameraIndex() const;
+  QString selectedCameraPath() const;
   cv::Size selectedResolution() const;
   int selectedFps() const;
   int selectedFourCC() const;
@@ -32,7 +32,7 @@ class CameraSelectorWidget : public QWidget
   void refreshCameraList();
 
   signals:
-  void cameraConfigChanged(int cameraIndex, cv::Size resolution, int fps, int fourcc);
+  void cameraConfigChanged(QString cameraPath, cv::Size resolution, int fps, int fourcc);
 
   private slots:
   void onResolutionSelected(QAbstractButton* button);
@@ -46,10 +46,10 @@ class CameraSelectorWidget : public QWidget
   QVBoxLayout* m_camerasContainerLayout;
   QComboBox* m_cameraComboBox;
   QWidget* m_resolutionButtonsContainer;
-  std::unordered_map<int, QButtonGroup*> m_cameraButtonGroups;
+  std::unordered_map<std::string, QButtonGroup*> m_cameraButtonGroups;
 
   bool m_hasSelection;
-  int m_selectedCameraIndex;
+  std::string m_selectedCameraPath;
   cv::Size m_selectedResolution;
   int m_selectedFps;
   int m_selectedFourCC;

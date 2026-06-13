@@ -96,14 +96,13 @@ namespace {
   // --------------------------------------------------------------------
   // probe the camera for supported FOURCC codes
   // --------------------------------------------------------------------
-  std::vector<int> getSupportedFourCCs(int cameraIndex)
+  std::vector<int> getSupportedFourCCs(std::string device_url)
   {
     std::vector<int> supportedCodes;
 
 #ifdef __linux__
-    std::string devicePath = "/dev/video" + std::to_string(cameraIndex);
 
-    int fd = open(devicePath.c_str(), O_RDONLY | O_NONBLOCK);
+    int fd = open(device_url.c_str(), O_RDONLY | O_NONBLOCK);
     if (fd < 0) { return supportedCodes; }
 
     v4l2_fmtdesc fmtdesc;
@@ -128,7 +127,7 @@ namespace {
 
     close(fd);
 #else
-    Q_UNUSED(cameraIndex);
+    Q_UNUSED(device_url);
     supportedCodes.push_back(cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
 #endif
 
@@ -196,12 +195,13 @@ namespace {
   // Create a group of radio buttons for selecting camera resolutions, based on probing the camera capabilities.
   // --------------------------------------------------------------------
   QButtonGroup* createCameraResolutionGroup(QWidget* parent, int targetSystemIndex,
+      std::string const& cameraPath,
       std::function<void(int, int, int)> const& onProbeStepProgress = nullptr)
   {
     QButtonGroup* buttonGroup = new QButtonGroup(parent);
     buttonGroup->setExclusive(true);
 
-    std::vector<int> hardwareCodecs = getSupportedFourCCs(targetSystemIndex);
+    std::vector<int> hardwareCodecs = getSupportedFourCCs(cameraPath);
     std::vector<int> targetFourCCs = getOpenCvProbeFourCCs(hardwareCodecs);
 
     if (targetFourCCs.empty()) { return buttonGroup; }
@@ -262,7 +262,7 @@ namespace {
       QRadioButton* radioButton = new QRadioButton(resName);
       radioButton->setProperty("supported_fps", config.fpsList);
       radioButton->setProperty("supported_fourcc", config.fourcc);
-      radioButton->setProperty("camera_index", targetSystemIndex);
+      radioButton->setProperty("camera_path", QString::fromStdString(cameraPath));
       buttonGroup->addButton(radioButton);
     }
 
@@ -299,7 +299,7 @@ CameraSelectorWidget::CameraSelectorWidget(QWidget* parent)
   , m_cameraComboBox(nullptr)
   , m_resolutionButtonsContainer(nullptr)
   , m_hasSelection(false)
-  , m_selectedCameraIndex(-1)
+  , m_selectedCameraPath("")
   , m_selectedResolution(0, 0)
   , m_selectedFps(30)
   , m_selectedFourCC(0)
@@ -310,32 +310,37 @@ CameraSelectorWidget::CameraSelectorWidget(QWidget* parent)
   // setMinimumWidth(450);
   m_mainLayout->addLayout(m_camerasContainerLayout);
 
-  // // Defer first scan until the event loop is active, avoiding processEvents during construction.
-  // // MartyCam will initialize threads when the first cameraConfigChanged signal arrives.
-  QTimer::singleShot(0, this, &CameraSelectorWidget::refreshCameraList);
-
+  // deleted by Qt on close of this widget, no need to manage lifetime
   QMediaDevices* mediaDevices = new QMediaDevices(this);
-  // QTimer* refreshDebounceTimer = new QTimer(this);
-  // refreshDebounceTimer->setSingleShot(true);
-  // refreshDebounceTimer->setInterval(250);
-
+  // when a new camera is plugged in or unplugged, rescan camera
   connect(
       mediaDevices, &QMediaDevices::videoInputsChanged, this, [this]() { refreshCameraList(); },
       Qt::QueuedConnection);
-  // connect(refreshDebounceTimer, &QTimer::timeout, this, &CameraSelectorWidget::refreshCameraList,
-  //     Qt::QueuedConnection);
+
+  // Trigger a scan of camera once the event processing loop is up and running
+  // (MartyCam will initialize threads when the first cameraConfigChanged signal arrives.)
+  QTimer::singleShot(0, this, &CameraSelectorWidget::refreshCameraList);
 }
 
+// --------------------------------------------------------------------
 bool CameraSelectorWidget::hasSelection() const { return m_hasSelection; }
 
-int CameraSelectorWidget::selectedCameraIndex() const { return m_selectedCameraIndex; }
+// --------------------------------------------------------------------
+QString CameraSelectorWidget::selectedCameraPath() const
+{
+  return QString::fromStdString(m_selectedCameraPath);
+}
 
+// --------------------------------------------------------------------
 cv::Size CameraSelectorWidget::selectedResolution() const { return m_selectedResolution; }
 
+// --------------------------------------------------------------------
 int CameraSelectorWidget::selectedFps() const { return m_selectedFps; }
 
+// --------------------------------------------------------------------
 int CameraSelectorWidget::selectedFourCC() const { return m_selectedFourCC; }
 
+// --------------------------------------------------------------------
 void CameraSelectorWidget::clearCameraWidgets()
 {
   MARTY_LOG_SCOPE(cam_log, "{} {}", (void*) (this), __func__);
@@ -437,13 +442,15 @@ void CameraSelectorWidget::refreshCameraList()
   for (int i = 0; i < cameras.size(); ++i)
   {
     QString const cameraName = cameras[i].description();
-    int const systemIndex = parseActualCameraIndex(cameras[i].id(), i);
+    QString const cameraPath = cameras[i].id();
+    std::string const cameraPathStr = cameraPath.toStdString();
+    int const systemIndex = parseActualCameraIndex(cameraPath, i);
 
     progressDialog.setLabelText(QString("Querying Cameras: %1").arg(cameraName));
     QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
 
     QButtonGroup* resGroup = createCameraResolutionGroup(m_resolutionButtonsContainer, systemIndex,
-        [&](int probeWidth, int probeHeight, int probeFps) {
+        cameraPathStr, [&](int probeWidth, int probeHeight, int probeFps) {
           ++currentGlobalProgressCounter;
           progressDialog.setLabelText(
               QString("Querying Cameras: %1/%2 - %3\nTesting %4x%5 @ %6 FPS")
@@ -470,8 +477,8 @@ void CameraSelectorWidget::refreshCameraList()
     connect(resGroup, &QButtonGroup::buttonClicked, this,
         &CameraSelectorWidget::onResolutionSelected, Qt::QueuedConnection);
 
-    m_cameraComboBox->addItem(cameraName, systemIndex);
-    m_cameraButtonGroups[systemIndex] = resGroup;
+    m_cameraComboBox->addItem(cameraName, QString::fromStdString(cameraPathStr));
+    m_cameraButtonGroups[cameraPathStr] = resGroup;
     hasUsableCamera = true;
   }
 
@@ -523,8 +530,8 @@ void CameraSelectorWidget::onCameraComboBoxChanged(int index)
 
   if (!m_cameraComboBox || !m_resolutionButtonsContainer) { return; }
 
-  int systemIndex = m_cameraComboBox->currentData().toInt();
-  auto it = m_cameraButtonGroups.find(systemIndex);
+  std::string cameraPath = m_cameraComboBox->currentData().toString().toStdString();
+  auto it = m_cameraButtonGroups.find(cameraPath);
   if (it == m_cameraButtonGroups.end()) { return; }
 
   QButtonGroup* buttonGroup = it->second;
@@ -555,6 +562,7 @@ void CameraSelectorWidget::onCameraComboBoxChanged(int index)
   containerLayout->addStretch();
 }
 
+// --------------------------------------------------------------------
 void CameraSelectorWidget::emitCurrentSelection()
 {
   MARTY_LOG_SCOPE(cam_log, "{} {}", (void*) (this), __func__);
@@ -564,8 +572,8 @@ void CameraSelectorWidget::emitCurrentSelection()
     return;
   }
 
-  int systemIndex = m_cameraComboBox->currentData().toInt();
-  auto it = m_cameraButtonGroups.find(systemIndex);
+  std::string cameraPath = m_cameraComboBox->currentData().toString().toStdString();
+  auto it = m_cameraButtonGroups.find(cameraPath);
   if (it == m_cameraButtonGroups.end())
   {
     m_hasSelection = false;
@@ -591,13 +599,13 @@ void CameraSelectorWidget::emitCurrentSelection()
   }
 
   m_selectedResolution = parseResolution(checkedButton->text());
-  m_selectedCameraIndex = checkedButton->property("camera_index").toInt();
+  m_selectedCameraPath = checkedButton->property("camera_path").toString().toStdString();
   m_selectedFourCC = checkedButton->property("supported_fourcc").toInt();
   m_selectedFps = choosePreferredFps(checkedButton->property("supported_fps").toList());
   m_hasSelection = (m_selectedResolution.width > 0 && m_selectedResolution.height > 0);
 
   if (!m_hasSelection) { return; }
 
-  emit cameraConfigChanged(
-      m_selectedCameraIndex, m_selectedResolution, m_selectedFps, m_selectedFourCC);
+  emit cameraConfigChanged(QString::fromStdString(m_selectedCameraPath), m_selectedResolution,
+      m_selectedFps, m_selectedFourCC);
 }

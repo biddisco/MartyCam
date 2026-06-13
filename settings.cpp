@@ -7,9 +7,9 @@
 #include <QSettings>
 //
 #include "IPCameraForm.h"
+#include "debug/logging.hpp"
 #include "renderwidget.h"
 #include "utility_widgets/CameraSelectorWidget.h"
-#include "debug/logging.hpp"
 //
 #ifdef WIN32
 # include "videoInput.h"
@@ -119,15 +119,16 @@ void SettingsWidget::createCameraSelector()
 
     connect(
         cameraSelectorWidget, &CameraSelectorWidget::cameraConfigChanged, this,
-        [this](int cameraIndex, cv::Size resolution, int fps, int fourcc) {
+        [this](QString cameraPath, cv::Size resolution, int fps, int fourcc) {
           MARTY_LOG_INFO(settings_log,
-              "{:<20} Camera config changed: index={}, resolution={}x{}, fps={}, fourcc={}",
-              "SettingsWidget", cameraIndex, resolution.width, resolution.height, fps, fourCCToString(fourcc));
+              "{:<20} Camera config changed: path={}, resolution={}x{}, fps={}, fourcc={}",
+              "SettingsWidget", cameraPath.toStdString(), resolution.width, resolution.height, fps,
+              fourCCToString(fourcc));
           // Handle the camera configuration change here
           // For example, you can emit signals or directly update the capture thread
           // emit rotationChanged(0); // Example: Emit a signal to reset rotation
           // emit resolutionSelected(resolution); // Emit the selected resolution
-          // emit CameraIndexChanged(cameraIndex, ""); // Emit the selected camera index
+          // emit CameraPathChanged(cameraPath); // Emit the selected camera path
         },
         Qt::QueuedConnection);
   }
