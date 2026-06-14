@@ -1,3 +1,8 @@
+// [UserCameras]
+// 1\CameraName=MartyCamGarden
+// 1\URL=rtsp://gardencam:gardencam@192.168.1.34:554/stream1
+// size=1
+
 #include "CameraSelectorWidget.h"
 
 #include <QAbstractButton>
@@ -14,280 +19,43 @@
 #include <QProgressDialog>
 #include <QRadioButton>
 #include <QScreen>
+#include <QSettings>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QVariant>
 
-#include <opencv2/videoio.hpp>
+#include <opencv2/core.hpp>
 
-#include <functional>
-#include <regex>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-#ifdef __linux__
-# include <cstring>
-# include <fcntl.h>
-# include <linux/videodev2.h>
-# include <sys/ioctl.h>
-# include <unistd.h>
-#endif
-
+#include "camera_utils.h"
 #include "debug/logging.hpp"
 
 // ----------------------------------------------------------------------------
 static auto cam_log = martycam::log::create("Camera");
 
-// --------------------------------------------------------------------
-// Convenience function to convert FOURCC int to string for debugging
-// --------------------------------------------------------------------
-std::string fourCCToString(int fourcc)
+std::vector<std::pair<std::string, std::string>> load_ip_camerasettings()
 {
-  std::string code;
-  code += static_cast<char>(fourcc & 0xFF);            // 1st byte
-  code += static_cast<char>((fourcc >> 8) & 0xFF);     // 2nd byte
-  code += static_cast<char>((fourcc >> 16) & 0xFF);    // 3rd byte
-  code += static_cast<char>((fourcc >> 24) & 0xFF);    // 4th byte
-  return code;
+  QString settingsFileName = QCoreApplication::applicationDirPath() + "/MartyCam.ini";
+  QSettings settings(settingsFileName, QSettings::IniFormat);
+  //
+  std::vector<std::pair<std::string, std::string>> cameras;
+  int size = settings.beginReadArray("UserCameras");
+  for (int i = 0; i < size; ++i)
+  {
+    settings.setArrayIndex(i);
+    std::pair<std::string, std::string> camera;
+    camera.first = settings.value("CameraName").toString().toLatin1().data();
+    camera.second = settings.value("URL").toString().toLatin1().data();
+    MARTY_LOG_INFO(
+        cam_log, "{:<20} Camera: {}={}", "ip_camerasettings", camera.first, camera.second);
+    cameras.push_back(camera);
+  }
+  settings.endArray();
+  return cameras;
 }
-
-namespace {
-  struct ResCheck
-  {
-    int width;
-    int height;
-  };
-
-  struct ResolutionConfig
-  {
-    int fourcc;
-    QVariantList fpsList;
-  };
-
-  // List of FPS to test when probing cameras
-  std::vector<int> testFPS = {15, 30, 60};
-
-  // Common resolutions to test when probing cameras
-  std::vector<ResCheck> const testResolutions = {    //
-      {320, 240},                                    // QVGA
-      {640, 480},                                    // VGA
-      {640, 360},                                    // IR camera friendly
-      {800, 600},                                    // SVGA
-      {1024, 768},                                   // XGA
-      {1280, 720},                                   // HD
-      {1920, 1080},                                  // 1080p
-      {2560, 1440},                                  // QHD
-      {3840, 2160}};                                 // 4K UHD
-
-  // --------------------------------------------------------------------
-  // get the number from the end of a qt camera device string like "/dev/video0"
-  // --------------------------------------------------------------------
-  int parseActualCameraIndex(QString const& qtDeviceId, int fallbackIndex)
-  {
-    std::string idStr = qtDeviceId.toStdString();
-    std::regex videoRegex("video(\\d+)");
-    std::smatch match;
-
-    if (std::regex_search(idStr, match, videoRegex)) { return std::stoi(match[1].str()); }
-    return fallbackIndex;
-  }
-
-  // --------------------------------------------------------------------
-  // probe the camera for supported FOURCC codes
-  // --------------------------------------------------------------------
-  std::vector<int> getSupportedFourCCs(std::string device_url)
-  {
-    std::vector<int> supportedCodes;
-
-#ifdef __linux__
-
-    int fd = open(device_url.c_str(), O_RDONLY | O_NONBLOCK);
-    if (fd < 0) { return supportedCodes; }
-
-    v4l2_fmtdesc fmtdesc;
-    std::memset(&fmtdesc, 0, sizeof(fmtdesc));
-    fmtdesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-
-    int enumGuard = 0;
-    int lastPixelFormat = -1;
-    while (ioctl(fd, VIDIOC_ENUM_FMT, &fmtdesc) == 0)
-    {
-      int pixelFormat = static_cast<int>(fmtdesc.pixelformat);
-      supportedCodes.push_back(pixelFormat);
-
-      // Some buggy drivers can ignore fmtdesc.index and keep returning success forever.
-      if (pixelFormat == lastPixelFormat && fmtdesc.index > 0) { break; }
-      lastPixelFormat = pixelFormat;
-
-      ++fmtdesc.index;
-      ++enumGuard;
-      if (enumGuard > 64) { break; }
-    }
-
-    close(fd);
-#else
-    Q_UNUSED(device_url);
-    supportedCodes.push_back(cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
-#endif
-
-    return supportedCodes;
-  }
-
-  // --------------------------------------------------------------------
-  // unused: check if camera mask in bitset
-  // --------------------------------------------------------------------
-  bool isSupportedProbeCodec(int codec)
-  {
-#ifdef __linux__
-    return codec == V4L2_PIX_FMT_MJPEG || codec == V4L2_PIX_FMT_GREY;
-#else
-    Q_UNUSED(codec);
-    return true;
-#endif
-  }
-
-  // --------------------------------------------------------------------
-  // Get the fourCC codes supported by OpenCV for a given resolution and camera index.
-  // --------------------------------------------------------------------
-  std::vector<int> getOpenCvProbeFourCCs(std::vector<int> const& hardwareCodecs)
-  {
-    std::vector<int> targetFourCCs;
-
-#ifdef __linux__
-    bool hasMJPEG = false;
-    bool hasGREY = false;
-    for (int codec : hardwareCodecs)
-    {
-      if (codec == V4L2_PIX_FMT_MJPEG) hasMJPEG = true;
-      if (codec == V4L2_PIX_FMT_GREY) hasGREY = true;
-    }
-
-    if (hasMJPEG) targetFourCCs.push_back(cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
-    if (hasGREY) targetFourCCs.push_back(cv::VideoWriter::fourcc('G', 'R', 'E', 'Y'));
-#else
-    Q_UNUSED(hardwareCodecs);
-    targetFourCCs.push_back(cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
-#endif
-
-    return targetFourCCs;
-  }
-
-  // --------------------------------------------------------------------
-  // Get a preferred FPS value from a list of supported values, defaulting to 30 if available.
-  // --------------------------------------------------------------------
-  int choosePreferredFps(QVariantList const& fpsValues)
-  {
-    if (fpsValues.isEmpty()) return 30;
-
-    if (fpsValues.contains(30)) return 30;
-
-    int best = fpsValues.first().toInt();
-    for (QVariant const& fps : fpsValues)
-    {
-      int value = fps.toInt();
-      if (value > best) best = value;
-    }
-    return best;
-  }
-
-  // --------------------------------------------------------------------
-  // Create a group of radio buttons for selecting camera resolutions, based on probing the camera capabilities.
-  // --------------------------------------------------------------------
-  QButtonGroup* createCameraResolutionGroup(QWidget* parent, int targetSystemIndex,
-      std::string const& cameraPath,
-      std::function<void(int, int, int)> const& onProbeStepProgress = nullptr)
-  {
-    QButtonGroup* buttonGroup = new QButtonGroup(parent);
-    buttonGroup->setExclusive(true);
-
-    std::vector<int> hardwareCodecs = getSupportedFourCCs(cameraPath);
-    std::vector<int> targetFourCCs = getOpenCvProbeFourCCs(hardwareCodecs);
-
-    if (targetFourCCs.empty()) { return buttonGroup; }
-
-    std::unordered_map<std::string, ResolutionConfig> resolutionMap;
-
-    cv::VideoCapture cap(targetSystemIndex, cv::CAP_V4L2);
-    if (!cap.isOpened()) { return buttonGroup; }
-
-    for (int currentFourCC : targetFourCCs)
-    {
-      for (auto const& res : testResolutions)
-      {
-        for (int fps : testFPS)
-        {
-          cap.set(cv::CAP_PROP_CONVERT_RGB, 0);
-          cap.set(cv::CAP_PROP_FOURCC, currentFourCC);
-          cap.set(cv::CAP_PROP_FPS, fps);
-          cap.set(cv::CAP_PROP_FRAME_WIDTH, res.width);
-          cap.set(cv::CAP_PROP_FRAME_HEIGHT, res.height);
-
-          int actualWidth = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_WIDTH));
-          int actualHeight = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_HEIGHT));
-
-          if (actualWidth == res.width && actualHeight == res.height)
-          {
-            std::string resKey = std::to_string(res.width) + " x " + std::to_string(res.height);
-
-            if (resolutionMap.find(resKey) == resolutionMap.end())
-            {
-              resolutionMap[resKey] = ResolutionConfig{currentFourCC, QVariantList()};
-            }
-
-            if (resolutionMap[resKey].fourcc != currentFourCC)
-            {
-              // Keep fps values tied to the codec selected for this resolution key.
-              continue;
-            }
-
-            if (!resolutionMap[resKey].fpsList.contains(fps))
-            {
-              resolutionMap[resKey].fpsList.append(fps);
-            }
-          }
-
-          if (onProbeStepProgress) onProbeStepProgress(res.width, res.height, fps);
-        }
-      }
-    }
-
-    cap.release();
-
-    for (auto const& pair : resolutionMap)
-    {
-      QString resName = QString::fromStdString(pair.first);
-      ResolutionConfig const& config = pair.second;
-
-      QRadioButton* radioButton = new QRadioButton(resName);
-      radioButton->setProperty("supported_fps", config.fpsList);
-      radioButton->setProperty("supported_fourcc", config.fourcc);
-      radioButton->setProperty("camera_path", QString::fromStdString(cameraPath));
-      buttonGroup->addButton(radioButton);
-    }
-
-    if (!buttonGroup->buttons().isEmpty()) { buttonGroup->buttons().first()->setChecked(true); }
-
-    return buttonGroup;
-  }
-
-  // --------------------------------------------------------------------
-  // Parse a resolution string like "1280 x 720" into a cv::Size object.
-  // --------------------------------------------------------------------
-  cv::Size parseResolution(QString const& resolutionText)
-  {
-    QStringList const parts = resolutionText.split("x", Qt::SkipEmptyParts);
-    if (parts.size() != 2) { return cv::Size(0, 0); }
-
-    bool widthOk = false;
-    bool heightOk = false;
-    int const width = parts[0].trimmed().toInt(&widthOk);
-    int const height = parts[1].trimmed().toInt(&heightOk);
-
-    if (!widthOk || !heightOk) { return cv::Size(0, 0); }
-    return cv::Size(width, height);
-  }
-}    // namespace
 
 // --------------------------------------------------------------------
 // Constructor for the CameraSelectorWidget, initializing the UI and connecting signals for dynamic camera detection.
@@ -332,7 +100,7 @@ QString CameraSelectorWidget::selectedCameraPath() const
 }
 
 // --------------------------------------------------------------------
-cv::Size CameraSelectorWidget::selectedResolution() const { return m_selectedResolution; }
+camera_utils::cam_res CameraSelectorWidget::selectedResolution() const { return m_selectedResolution; }
 
 // --------------------------------------------------------------------
 int CameraSelectorWidget::selectedFps() const { return m_selectedFps; }
@@ -401,8 +169,21 @@ void CameraSelectorWidget::refreshCameraList()
 
   clearCameraWidgets();
 
-  QList<QCameraDevice> const cameras = QMediaDevices::videoInputs();
-  if (cameras.empty())
+  std::vector<std::pair<std::string, std::string>> ip_cameras = load_ip_camerasettings();
+  MARTY_LOG_INFO(cam_log, "{:<20} Loaded {} IP cameras from settings.", "CameraSelectorWidget",
+      ip_cameras.size());
+  std::vector<std::pair<std::string, std::string>> all_cameras = ip_cameras;
+  QList<QCameraDevice> const qcameras = QMediaDevices::videoInputs();
+  for (int i = 0; i < qcameras.size(); ++i)
+  {
+    QString const cameraName = qcameras[i].description();
+    QString const cameraPath = qcameras[i].id();
+    all_cameras.push_back(std::make_pair(cameraName.toStdString(), cameraPath.toStdString()));
+  }
+  MARTY_LOG_INFO(cam_log, "{:<20} Loaded {} cameras from QMediaDevices.", "CameraSelectorWidget",
+      qcameras.size());
+
+  if (all_cameras.empty())
   {
     m_camerasContainerLayout->addWidget(new QLabel("No active video devices detected.", this));
     m_hasSelection = false;
@@ -417,18 +198,15 @@ void CameraSelectorWidget::refreshCameraList()
     return;
   }
 
-  //
-  int const totalFPSCount = 3;
-
   // Use estimated progress maximum based on up to 2 probe codecs (MJPEG + GREY) per camera.
-  int totalGlobalProbeSteps = static_cast<int>(cameras.size()) *
-      static_cast<int>(testResolutions.size()) * totalFPSCount * 2;
+  int totalGlobalProbeSteps = static_cast<int>(all_cameras.size()) *
+      static_cast<int>(camera_utils::testResolutions.size()) * camera_utils::testFPS.size() * 2;
   if (totalGlobalProbeSteps <= 0) totalGlobalProbeSteps = 1;
 
   // init progress bar
   progressDialog.setRange(0, totalGlobalProbeSteps > 0 ? totalGlobalProbeSteps : 1);
   progressDialog.setValue(0);
-  progressDialog.setLabelText(QString("Querying Cameras (%1 detected)").arg(cameras.size()));
+  progressDialog.setLabelText(QString("Querying Cameras (%1 detected)").arg(all_cameras.size()));
   QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
 
   m_cameraComboBox = new QComboBox(this);
@@ -439,23 +217,24 @@ void CameraSelectorWidget::refreshCameraList()
   bool hasUsableCamera = false;
   int currentGlobalProgressCounter = 0;
 
-  for (int i = 0; i < cameras.size(); ++i)
+  for (int i = 0; i < all_cameras.size(); ++i)
   {
-    QString const cameraName = cameras[i].description();
-    QString const cameraPath = cameras[i].id();
+    QString const cameraName = QString::fromStdString(all_cameras[i].first);
+    QString const cameraPath = QString::fromStdString(all_cameras[i].second);
     std::string const cameraPathStr = cameraPath.toStdString();
-    int const systemIndex = parseActualCameraIndex(cameraPath, i);
+    MARTY_LOG_INFO(cam_log, "{:<20} Probing camera {}: {}", "CameraSelectorWidget",
+        all_cameras[i].first, all_cameras[i].second);
 
     progressDialog.setLabelText(QString("Querying Cameras: %1").arg(cameraName));
     QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
 
-    QButtonGroup* resGroup = createCameraResolutionGroup(m_resolutionButtonsContainer, systemIndex,
+    QButtonGroup* resGroup = camera_utils::createCameraResolutionGroup(m_resolutionButtonsContainer,
         cameraPathStr, [&](int probeWidth, int probeHeight, int probeFps) {
           ++currentGlobalProgressCounter;
           progressDialog.setLabelText(
               QString("Querying Cameras: %1/%2 - %3\nTesting %4x%5 @ %6 FPS")
                   .arg(i + 1)
-                  .arg(cameras.size())
+                  .arg(all_cameras.size())
                   .arg(cameraName)
                   .arg(probeWidth)
                   .arg(probeHeight)
@@ -474,8 +253,15 @@ void CameraSelectorWidget::refreshCameraList()
       continue;
     }
 
-    connect(resGroup, &QButtonGroup::buttonClicked, this,
-        &CameraSelectorWidget::onResolutionSelected, Qt::QueuedConnection);
+    // when a resolution button is clicked, emit the config changed signal with the selected camera path, resolution, fps, and fourcc
+    connect(
+        resGroup, &QButtonGroup::buttonClicked, this,
+        [this, resGroup](QAbstractButton* button) {
+          MARTY_LOG_SCOPE(cam_log, "{} {}", (void*) (this), __func__);
+          Q_UNUSED(button);
+          emitConfigChanged();
+        },
+        Qt::QueuedConnection);
 
     m_cameraComboBox->addItem(cameraName, QString::fromStdString(cameraPathStr));
     m_cameraButtonGroups[cameraPathStr] = resGroup;
@@ -514,13 +300,6 @@ void CameraSelectorWidget::refreshCameraList()
     m_refreshPending = false;
     QTimer::singleShot(0, this, &CameraSelectorWidget::refreshCameraList);
   }
-}
-
-void CameraSelectorWidget::onResolutionSelected(QAbstractButton* button)
-{
-  MARTY_LOG_SCOPE(cam_log, "{} {}", (void*) (this), __func__);
-  Q_UNUSED(button);
-  emitCurrentSelection();
 }
 
 void CameraSelectorWidget::onCameraComboBoxChanged(int index)
@@ -563,7 +342,7 @@ void CameraSelectorWidget::onCameraComboBoxChanged(int index)
 }
 
 // --------------------------------------------------------------------
-void CameraSelectorWidget::emitCurrentSelection()
+void CameraSelectorWidget::emitConfigChanged()
 {
   MARTY_LOG_SCOPE(cam_log, "{} {}", (void*) (this), __func__);
   if (!m_cameraComboBox || !m_resolutionButtonsContainer)
@@ -598,14 +377,19 @@ void CameraSelectorWidget::emitCurrentSelection()
     return;
   }
 
-  m_selectedResolution = parseResolution(checkedButton->text());
+  auto res = checkedButton->property("supported_resolution").toString();
+  m_selectedResolution = camera_utils::parseResolution(res);
   m_selectedCameraPath = checkedButton->property("camera_path").toString().toStdString();
   m_selectedFourCC = checkedButton->property("supported_fourcc").toInt();
-  m_selectedFps = choosePreferredFps(checkedButton->property("supported_fps").toList());
+  auto fpslist = checkedButton->property("supported_fps").toList();
+  m_selectedFps = fpslist[0].toInt();
   m_hasSelection = (m_selectedResolution.width > 0 && m_selectedResolution.height > 0);
 
+  MARTY_LOG_INFO(cam_log, "{:<20} Selection changed: path={}, resolution={}x{}, fps={}, fourcc={}",
+      "CameraSelectorWidget", m_selectedCameraPath, m_selectedResolution.width,
+      m_selectedResolution.height, m_selectedFps, ::fourCCToString(m_selectedFourCC));
   if (!m_hasSelection) { return; }
 
-  emit cameraConfigChanged(QString::fromStdString(m_selectedCameraPath), m_selectedResolution,
+  emit cameraConfigChanged(QString::fromStdString(m_selectedCameraPath), m_selectedResolution.width, m_selectedResolution.height,
       m_selectedFps, m_selectedFourCC);
 }

@@ -60,12 +60,11 @@ MartyCam::MartyCam(hpx::execution::parallel_executor const& defaultExec,
   settingsDock->setWidget(this->settingsWidget.get());
   settingsDock->setMinimumWidth(300);
   addDockWidget(Qt::RightDockWidgetArea, settingsDock.get());
-  // connect(this->settingsWidget.get(), SIGNAL(resolutionSelected(cv::Size)), this,
-  //     SLOT(onResolutionSelected(cv::Size)));
+  //
+  connect(this->settingsWidget.get(), SIGNAL(cameraConfigChanged(QString, int, int, int, int)), this,
+      SLOT(onCameraConfigChanged(QString, int, int, int, int)));
   connect(
       this->settingsWidget.get(), SIGNAL(rotationChanged(int)), this, SLOT(onRotationChanged(int)));
-  connect(this->settingsWidget.get(), SIGNAL(CameraIndexChanged(int, QString)), this,
-      SLOT(onCameraChanged(int, QString)));
   connect(this->ui.actionQuit, SIGNAL(triggered()), this, SLOT(close()));
   //
   // not all controls could fit on the settings dock, trackval + graphs are
@@ -133,13 +132,13 @@ void MartyCam::closeEvent(QCloseEvent*)
   this->deleteProcessingThread();
 }
 //----------------------------------------------------------------------------
-void MartyCam::createCaptureThread(cv::Size& size, int camera, std::string const& cameraname,
+void MartyCam::createCaptureThread(cv::Size size, std::string const& cameraUTL, int fps,
     hpx::execution::parallel_executor exec)
 {
   MARTY_LOG_SCOPE(marty_log, "{} {}", (void*) (this), __func__);
   this->captureThread = std::make_shared<CaptureThread>(imageBuffer, size,
-      this->settingsWidget->getSelectedRotation(), camera, cameraname, this->blockingExecutor,
-      this->settingsWidget->getRequestedFps());
+      this->settingsWidget->getSelectedRotation(), cameraUTL, this->blockingExecutor,
+      fps);
   this->captureThread->startCapture();
   this->settingsWidget->setThreads(this->captureThread, this->processingThread);
 }
@@ -180,35 +179,7 @@ void MartyCam::deleteProcessingThread()
   this->settingsWidget->unsetProcessingThread();
   this->processingThread = nullptr;
 }
-//----------------------------------------------------------------------------
-void MartyCam::onCameraChanged(int index, QString URL)
-{
-  MARTY_LOG_SCOPE(marty_log, "{} {}", (void*) (this), __func__);
-  if (this->cameraIndex == index) { return; }
-  //
-  this->cameraIndex = index;
-  this->captureThread->connectCamera(index, URL.toStdString());
-  this->imageBuffer->clear();
-  this->clearGraphs();
-}
-//----------------------------------------------------------------------------
-// void MartyCam::onResolutionSelected(cv::Size newSize)
-// {
-// if (this->captureThread->setResolution(newSize))
-//   // Update GUI renderwidget size
-//   this->renderWidget->setCVSize(newSize);
-// else
-// {
-//   QMessageBox::warning(this, tr("Unsupported Resolution."),
-//       tr(qPrintable(QString("Requested Resolution %1 x %2 is unsupported by "
-//                             "your webcam. \n")
-//                         .arg(newSize.width)
-//                         .arg(newSize.height))) +
-//           QString("Keeping the current resolution."));
-//   this->settingsWidget->switchToPreviousResolution();
-// }
-// this->clearGraphs();
-// }
+
 //----------------------------------------------------------------------------
 void MartyCam::onRotationChanged(int rotation)
 {
@@ -384,3 +355,23 @@ void MartyCam::showEvent(QShowEvent* event)
     m_isFirstShow = true;
   }
 }
+
+//----------------------------------------------------------------------------
+void MartyCam::onCameraConfigChanged(QString cameraPath, int width, int height, int fps, int fourcc)
+{
+  MARTY_LOG_SCOPE(marty_log, "{} {}", (void*) (this), __func__);
+  if (this->captureThread)
+  {
+    this->deleteCaptureThread();
+    this->deleteProcessingThread();
+  }
+  this->createCaptureThread(cv::Size(width, height),  cameraPath.toStdString(), fps, blockingExecutor);
+  this->renderWidget->setCVSize(this->captureThread->getImageSize());
+  this->createProcessingThread(
+      nullptr, defaultExecutor, this->settingsWidget->getCurentProcessingType());
+      //
+  this->imageBuffer->clear();
+  this->clearGraphs();
+  this->initChart();
+}
+

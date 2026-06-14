@@ -2,18 +2,18 @@
 #define CAMERA_SELECTOR_WIDGET_H
 
 #include <QWidget>
-
-#include <opencv2/core.hpp>
-
+//
+#include <string>
 #include <unordered_map>
-
+//
 class QAbstractButton;
 class QButtonGroup;
 class QComboBox;
 class QVBoxLayout;
 class QWidget;
-
-std::string fourCCToString(int fourcc);
+class IPCameraForm;
+//
+#include "utility_widgets/camera_utils.h"
 
 class CameraSelectorWidget : public QWidget
 {
@@ -24,7 +24,7 @@ class CameraSelectorWidget : public QWidget
 
   bool hasSelection() const;
   QString selectedCameraPath() const;
-  cv::Size selectedResolution() const;
+  camera_utils::cam_res selectedResolution() const;
   int selectedFps() const;
   int selectedFourCC() const;
 
@@ -32,15 +32,15 @@ class CameraSelectorWidget : public QWidget
   void refreshCameraList();
 
   signals:
-  void cameraConfigChanged(QString cameraPath, cv::Size resolution, int fps, int fourcc);
+  // we do not emit a cv::Size as that is not a Qt type, instead we emit width and height separately
+  void cameraConfigChanged(QString cameraPath, int width, int height, int fps, int fourcc);
 
   private slots:
-  void onResolutionSelected(QAbstractButton* button);
   void onCameraComboBoxChanged(int index);
 
   private:
   void clearCameraWidgets();
-  void emitCurrentSelection();
+  void emitConfigChanged();
 
   QVBoxLayout* m_mainLayout;
   QVBoxLayout* m_camerasContainerLayout;
@@ -48,9 +48,11 @@ class CameraSelectorWidget : public QWidget
   QWidget* m_resolutionButtonsContainer;
   std::unordered_map<std::string, QButtonGroup*> m_cameraButtonGroups;
 
+  IPCameraForm* m_cameraForm;
+
   bool m_hasSelection;
   std::string m_selectedCameraPath;
-  cv::Size m_selectedResolution;
+  camera_utils::cam_res m_selectedResolution;
   int m_selectedFps;
   int m_selectedFourCC;
   bool m_isRefreshing;

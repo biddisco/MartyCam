@@ -16,6 +16,12 @@
 #include <hpx/future.hpp>
 #include <hpx/include/async.hpp>
 #include <utility>
+
+#include "debug/logging.hpp"
+
+// ----------------------------------------------------------------------------
+static auto process_log = martycam::log::create("Processor");
+
 //----------------------------------------------------------------------------
 ProcessingThread::ProcessingThread(ImageBuffer buffer, hpx::execution::parallel_executor exec,
     ProcessingType processingType, MotionFilterParams mfp, FaceRecogFilterParams frfp)
@@ -30,13 +36,16 @@ ProcessingThread::ProcessingThread(ImageBuffer buffer, hpx::execution::parallel_
   , processingTime_ms(0)
   , QObject(nullptr)
 {
+  MARTY_LOG_SCOPE(process_log, "{} {}", (void*) (this), __func__);
   this->graphFilter = new GraphUpdateFilter();
 }
 //----------------------------------------------------------------------------
-ProcessingThread::~ProcessingThread() { delete this->graphFilter; }
+ProcessingThread::~ProcessingThread() {   MARTY_LOG_SCOPE(process_log, "{} {}", (void*) (this), __func__);
+delete this->graphFilter; }
 //----------------------------------------------------------------------------
 void ProcessingThread::CopySettings(ProcessingThread* thread)
 {
+  MARTY_LOG_SCOPE(process_log, "{} {}", (void*) (this), __func__);
   this->motionFilter->triggerLevel = thread->motionFilter->triggerLevel;
   this->motionFilter->threshold = thread->motionFilter->threshold;
   this->motionFilter->average = thread->motionFilter->average;
@@ -49,15 +58,18 @@ void ProcessingThread::CopySettings(ProcessingThread* thread)
 //----------------------------------------------------------------------------
 void ProcessingThread::setMotionDetectionProcessing()
 {
+  MARTY_LOG_SCOPE(process_log, "{} {}", (void*) (this), __func__);
   this->processingType = ProcessingType::motionDetection;
 }
 void ProcessingThread::setFaceRecognitionProcessing()
 {
+  MARTY_LOG_SCOPE(process_log, "{} {}", (void*) (this), __func__);
   this->processingType = ProcessingType::faceRecognition;
 }
 //----------------------------------------------------------------------------
 void ProcessingThread::run()
 {
+  MARTY_LOG_SCOPE(process_log, "{} {}", (void*) (this), __func__);
   int framenum = 0;
   QElapsedTimer processingTime;
   processingTime.start();
@@ -100,12 +112,13 @@ void ProcessingThread::run()
 //----------------------------------------------------------------------------
 bool ProcessingThread::startProcessing()
 {
+  MARTY_LOG_SCOPE(process_log, "{} {}", (void*) (this), __func__);
   if (!processingActive)
   {
     processingActive = true;
     abort = false;
 
-    // hpx::async(this->executor, &ProcessingThread::run, this);
+    hpx::async(this->executor, &ProcessingThread::run, this);
 
     return true;
   }
@@ -114,6 +127,7 @@ bool ProcessingThread::startProcessing()
 //----------------------------------------------------------------------------
 bool ProcessingThread::stopProcessing()
 {
+  MARTY_LOG_SCOPE(process_log, "{} {}", (void*) (this), __func__);
   bool wasActive = this->processingActive;
   if (wasActive)
   {
@@ -128,6 +142,7 @@ bool ProcessingThread::stopProcessing()
 //----------------------------------------------------------------------------
 void ProcessingThread::updateProcessingTime(int time_ms)
 {
+  MARTY_LOG_SCOPE(process_log, "{} {}", (void*) (this), __func__);
   processingTimes.push_back(time_ms);
 
   processingTime_ms = static_cast<int>(
@@ -137,6 +152,7 @@ void ProcessingThread::updateProcessingTime(int time_ms)
 //----------------------------------------------------------------------------
 cv::Scalar ProcessingThread::getMSSIM(cv::Mat const& i1, cv::Mat const& i2)
 {
+  MARTY_LOG_SCOPE(process_log, "{} {}", (void*) (this), __func__);
   double const C1 = 6.5025, C2 = 58.5225;
   /***************************** INITS **********************************/
   int d = CV_32F;

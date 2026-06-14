@@ -89,8 +89,7 @@ SettingsWidget::SettingsWidget(QWidget* parent)
   connect(&RotateButtonGroup, &QButtonGroup::idClicked, this, &SettingsWidget::onRotateSelection,
       Qt::QueuedConnection);
   //
-  this->cameraForm = new IPCameraForm(this);
-  this->setupCameraList();
+  // this->cameraForm = new IPCameraForm(this);
 }
 
 //----------------------------------------------------------------------------
@@ -119,11 +118,12 @@ void SettingsWidget::createCameraSelector()
 
     connect(
         cameraSelectorWidget, &CameraSelectorWidget::cameraConfigChanged, this,
-        [this](QString cameraPath, cv::Size resolution, int fps, int fourcc) {
+        [this](QString cameraPath, int width, int height, int fps, int fourcc) {
           MARTY_LOG_INFO(settings_log,
               "{:<20} Camera config changed: path={}, resolution={}x{}, fps={}, fourcc={}",
-              "SettingsWidget", cameraPath.toStdString(), resolution.width, resolution.height, fps,
+              "SettingsWidget", cameraPath.toStdString(), width, height, fps,
               fourCCToString(fourcc));
+          emit cameraConfigChanged(cameraPath, width, height, fps, fourcc);
           // Handle the camera configuration change here
           // For example, you can emit signals or directly update the capture thread
           // emit rotationChanged(0); // Example: Emit a signal to reset rotation
@@ -184,54 +184,21 @@ void SettingsWidget::onBrowseClicked()
     this->capturethread->setWriteMotionAVIDir(fileName.toStdString().c_str());
   }
 }
+
 //----------------------------------------------------------------------------
 void SettingsWidget::onAddCameraClicked()
 {
   // TODO implement this or delete the GUI element
   QMessageBox::warning(this, tr("Not implemented warning."),
       tr("Switching camera from the default is not currently available."));
-  this->cameraForm->seupModelView();
-  if (this->cameraForm->exec())
-  {
-    this->cameraForm->saveSettings();
-    this->setupCameraList();
-  }
+  // this->cameraForm->seupModelView();
+  // if (this->cameraForm->exec())
+  // {
+  //   this->cameraForm->saveSettings();
+  //   this->setupCameraList();
+  // }
 }
-//----------------------------------------------------------------------------
-void SettingsWidget::setupCameraList()
-{
-  // disconnect(
-  //     this->ui.cameraSelect, SIGNAL(currentIndexChanged(int)), this, SLOT(onCameraSelection(int)));
-  // int index = this->ui.cameraSelect->currentIndex();
-  // this->ui.cameraSelect->blockSignals(true);
-  // this->ui.cameraSelect->clear();
-  //
-  // #ifdef _WIN32
-  //   // use videoInput object to enumerate devices
-  //   this->NumDevices = videoInput::listDevices(true);
-  //   for (int i = 0; i < this->NumDevices; i++)
-  //   {
-  //     this->ui.cameraSelect->addItem(QString(videoInput::getDeviceName(i)));
-  //   }
-  // #else
-  //   this->NumDevices = 1;
-  //   this->ui.cameraSelect->addItem("standard camera");
-  // #endif
-  //   //
-  //   stringpairlist& cameras = this->cameraForm->getList();
-  //   for (stringpairlist::iterator it = cameras.begin(); it != cameras.end(); ++it)
-  //   {
-  //     this->ui.cameraSelect->addItem(it->first.c_str());
-  //   }
-  //   this->ui.cameraSelect->blockSignals(false);
-  //   connect(
-  //       this->ui.cameraSelect, SIGNAL(currentIndexChanged(int)), this, SLOT(onCameraSelection(int)));
-  //   if (index >= 0 && index < this->ui.cameraSelect->count())
-  //   {
-  //     this->ui.cameraSelect->setCurrentIndex(index);
-  //   }
-  //   else { this->ui.cameraSelect->setCurrentIndex(0); }
-}
+
 //----------------------------------------------------------------------------
 void SettingsWidget::onWriteMotionAVIToggled(bool state) { this->RecordMotionAVI(state); }
 //----------------------------------------------------------------------------
@@ -258,17 +225,7 @@ void SettingsWidget::onTimer()
   }
   else { this->ui.WriteMotionAVI->setChecked(false); }
 }
-//----------------------------------------------------------------------------
-int SettingsWidget::getCameraIndex(std::string& text)
-{
-  return 0;
-  // QString val = this->ui.cameraSelect->currentText();
-  // int index = this->ui.cameraSelect->currentIndex();
-  // // if this is not an autodetected webcam/internal camera, return the user name
-  // if (index > NumDevices) { text = val.toStdString(); }
-  // else { text = ""; }
-  // return index;
-}
+
 //----------------------------------------------------------------------------
 MotionFilterParams SettingsWidget::getMotionFilterParams()
 {
@@ -284,6 +241,7 @@ MotionFilterParams SettingsWidget::getMotionFilterParams()
 
   return motionFilterParams;
 }
+
 //----------------------------------------------------------------------------
 FaceRecogFilterParams SettingsWidget::getFaceRecogFilterParams()
 {
@@ -294,6 +252,7 @@ FaceRecogFilterParams SettingsWidget::getFaceRecogFilterParams()
 
   return faceRecogFilterParams;
 }
+
 //----------------------------------------------------------------------------
 void SettingsWidget::SetupAVIStrings()
 {
@@ -304,6 +263,7 @@ void SettingsWidget::SetupAVIStrings()
   QString fileName2 = "TimeLapse" + QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
   this->capturethread->setWriteTimeLapseAVIName(fileName2.toLatin1().constData());
 }
+
 //----------------------------------------------------------------------------
 void SettingsWidget::RecordMotionAVI(bool state)
 {
@@ -342,39 +302,10 @@ void SettingsWidget::RecordMotionAVI(bool state)
     this->onTimer();
   }
 }
+
 //----------------------------------------------------------------------------
 void SettingsWidget::onImageSelection(int btn) { this->processingthread->setDisplayImage(btn); }
-//----------------------------------------------------------------------------
-cv::Size SettingsWidget::getSelectedResolution()
-{
-  // switch (this->ResolutionButtonGroup.checkedId())
-  // {
-  // case 4: return cv::Size(1600, 1200); break;
-  // case 3: return cv::Size(1280, 720); break;
-  // case 2: return cv::Size(720, 576); break;
-  // case 1: return cv::Size(640, 480); break;
-  // case 0: return cv::Size(320, 240); break;
-  // }
-  // return cv::Size(320, 240);
-}
-//----------------------------------------------------------------------------
-int SettingsWidget::getSelectedResolutionButton()
-{
-  // return this->ResolutionButtonGroup.checkedId();
-}
-//----------------------------------------------------------------------------
-void SettingsWidget::onResolutionSelection(int btn)
-{
-  // if (currentResolutionButtonIndex == -1)
-  //   currentResolutionButtonIndex = btn;
-  // else
-  // {
-  //   previousResolutionButtonIndex = currentResolutionButtonIndex;
-  //   currentResolutionButtonIndex = btn;
-  // }
 
-  emit(resolutionSelected(getSelectedResolution()));
-}
 //----------------------------------------------------------------------------
 int SettingsWidget::getSelectedRotation() { return this->RotateButtonGroup.checkedId(); }
 int SettingsWidget::getRequestedFps() { return this->ui.requestedFps_HorizontalSlider->value(); }
@@ -387,20 +318,7 @@ void SettingsWidget::onBlendChanged(int value)
   this->processingthread->setBlendRatios(
       this->ui.blendRatio->value() / 100.0, this->ui.noiseBlend->value() / 100.0);
 }
-//----------------------------------------------------------------------------
-void SettingsWidget::onCameraSelection(int index)
-{
-  // QString val = this->ui.cameraSelect->currentText();
-  // // if index is a user supplied IP camera, get the URL from the map
-  // if (index >= this->NumDevices)
-  // {
-  //   stringpairlist& cameras = this->cameraForm->getList();
-  //   val = cameras[val.toLatin1().data()].c_str();
-  // }
-  // else { val = ""; }
-  // //
-  // emit(CameraIndexChanged(index, val));
-}
+
 //----------------------------------------------------------------------------
 void SettingsWidget::saveSettings()
 {

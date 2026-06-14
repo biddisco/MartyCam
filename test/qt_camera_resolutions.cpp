@@ -4,6 +4,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
+#include "utility_widgets/camera_utils.h"
 #include "utility_widgets/CameraSelectorWidget.h"
 
 int main(int argc, char* argv[])
@@ -27,9 +28,9 @@ int main(int argc, char* argv[])
 
   dialog.show();
   QObject::connect(selectorWidget, &CameraSelectorWidget::cameraConfigChanged,
-      [](QString cameraPath, cv::Size resolution, int fps, int fourcc) {
+      [](QString cameraPath, int width, int height, int fps, int fourcc) {
         qDebug() << "Selected Camera Path:" << cameraPath;
-        qDebug() << "Selected Resolution:" << resolution.width << "x" << resolution.height;
+        qDebug() << "Selected Resolution:" << width << "x" << height;
         qDebug() << "Selected FPS:" << fps;
         qDebug() << "Selected FOURCC:" << fourCCToString(fourcc).c_str();
       });

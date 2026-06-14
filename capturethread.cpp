@@ -14,6 +14,12 @@
 #include <hpx/include/async.hpp>
 #include <utility>
 
+#include "debug/logging.hpp"
+#include "utility_widgets/camera_utils.h"
+
+// ----------------------------------------------------------------------------
+static auto cap_log = martycam::log::create("Capture");
+//
 typedef std::shared_ptr<ConcurrentCircularBuffer<cv::Mat>> ImageBuffer;
 
 //
@@ -54,11 +60,11 @@ cv::Mat Deinterlace(cv::Mat& src)
 
 //----------------------------------------------------------------------------
 CaptureThread::CaptureThread(ImageBuffer imageBuffer, cv::Size const& size, int rotation,
-    int device, std::string const& URL, hpx::execution::parallel_executor exec, int requestedFps)
+    std::string const& URL, hpx::execution::parallel_executor exec, int requestedFps)
   : imageBuffer(std::move(imageBuffer))
-  , imageSize(cv::Size(0, 0))
-  , rotation(rotation)
-  , deviceIndex(device)
+  , imageSize(size)
+  , rotation(-360)
+  , CameraURL(URL)
   , executor(std::move(exec))
   , requestedFps(requestedFps)
   , requestedSizeCorrect(false)
@@ -74,97 +80,51 @@ CaptureThread::CaptureThread(ImageBuffer imageBuffer, cv::Size const& size, int 
   , rotatedImage()
   , rotatedSize(cv::Size(0, 0))
 {
+  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   // initialize font and precompute text size
   QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
   this->text_size =
       cv::getTextSize(timestring.toUtf8().constData(), CV_FONT_HERSHEY_PLAIN, 1.0, 1, NULL);
-
+  //
   // Connect to camera and use its default resolution
-  this->connectCamera(this->deviceIndex, this->CameraURL);
-  // Overwrite the default camera settings
-  this->requestedSizeCorrect = this->setResolution(size);
+  this->connectCamera(this->CameraURL);
+  //
   this->setRotation(rotation);
 }
+
 //----------------------------------------------------------------------------
 CaptureThread::~CaptureThread()
 {
+  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   this->closeAVI();
   // Release our stream capture object, not necessary with openCV 2
   this->capture.release();
 }
+
 //----------------------------------------------------------------------------
-bool CaptureThread::connectCamera(int index, std::string const& URL)
+bool CaptureThread::connectCamera(std::string const& URL)
 {
+  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   bool wasActive = this->stopCapture();
   if (this->capture.isOpened()) { this->capture.release(); }
 
-  //
-  // start this->capture device driver
-  //
-  if (URL == "NULL")
+  capture = camera_utils::createVideoCapture(
+      URL, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), this->requestedFps, this->imageSize);
+
+  if (!this->capture.isOpened())
   {
-    // null camera, dummy
+    std::cout << "Camera connection failed" << std::endl;
+    return false;
   }
-  else
-  {
-    if (URL.size() > 0)
-    {
-      this->CameraURL = URL;
-      std::cout << "Attempting IP camera connection " << this->CameraURL.c_str() << std::endl;
-      // using an IP camera, assume default string to access martycam
-      // this->capture = cvCaptureFromFile("http://192.168.1.21/videostream.asf?user=admin&pwd=1234");
-      // this->capture = cvCaptureFromFile("http://admin:1234@192.168.1.21/videostream.cgi?req_fps=30&.mjpg");
-      this->capture.open(URL);
-    }
-    else
-    {
-      std::cout << "opening device " << index << std::endl;
-#ifdef _WIN32
-      this->capture.open(CV_CAP_DSHOW + index);
-#else
-      //      CvCapture* camera = cvCaptureFromCAM(CV_CAP_ANY);
-      if (index == 0)
-      {
-        std::cout << "Opening capture" << std::endl;
-        //        capture.open(CV_CAP_ANY);
-        capture.open("/dev/video0");
-        std::cout << "Done opening capture" << std::endl;
-      }
-      else { capture.open(index); }
-#endif
-    }
-    if (!this->capture.isOpened())
-    {
-      std::cout << "Camera connection failed" << std::endl;
-      return false;
-    }
-  }
+
   if (wasActive) { return this->startCapture(); }
   return true;
 }
-//----------------------------------------------------------------------------
-// Returns true if the resolution was actually changed and false if not.
-bool CaptureThread::setResolution(cv::Size const& res)
-{
-  if (this->imageSize == res) { return true; }
 
-  bool wasActive = this->stopCapture();
-  this->imageBuffer->clear();
-
-  bool resolutionUpdated = this->tryResolutionUpdate(res);
-  if (resolutionUpdated)
-  {
-    this->imageSize = res;
-    this->rotatedSize = cv::Size(this->imageSize.height, this->imageSize.width);
-  }
-
-  if (wasActive) this->startCapture();
-
-  return resolutionUpdated;
-}
 //----------------------------------------------------------------------------
 void CaptureThread::setRotation(int value)
 {
+  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   if (this->rotation == value) { return; }
   bool wasActive = this->stopCapture();
   this->rotation = value;
@@ -178,6 +138,7 @@ void CaptureThread::setRotation(int value)
 //----------------------------------------------------------------------------
 void CaptureThread::run()
 {
+  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   // Clear the frameTimes circular buffer to ensure actualFps is computed
   // correctly from the first frame
   this->frameTimes.clear();
@@ -246,8 +207,7 @@ void CaptureThread::run()
     // rotate image if necessary, makes a copy which we can pass to queue
     this->rotateImage(frame, this->rotatedImage);
 
-    // always write the frame out if saving movie or in the process of closing
-    // AVI
+    // always write the frame out if saving movie or in the process of closing AVI
     if (this->MotionAVI_Writing || this->MotionAVI_Writer.isOpened())
     {
       // add date time stamp if enabled
@@ -273,6 +233,7 @@ void CaptureThread::run()
 //----------------------------------------------------------------------------
 bool CaptureThread::startCapture()
 {
+  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   if (!captureActive)
   {
     if (this->imageSize.width > 0)
@@ -315,6 +276,7 @@ bool CaptureThread::startCapture()
 //----------------------------------------------------------------------------
 bool CaptureThread::stopCapture()
 {
+  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   bool wasActive = this->captureActive;
   if (wasActive)
   {
@@ -329,6 +291,7 @@ bool CaptureThread::stopCapture()
 //----------------------------------------------------------------------------
 void CaptureThread::updateTimeLapse()
 {
+  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   // always write the frame out if saving movie or in the process of closing AVI
   if (this->TimeLapseAVI_Writer.isOpened())
   {
@@ -339,12 +302,14 @@ void CaptureThread::updateTimeLapse()
 //----------------------------------------------------------------------------
 void CaptureThread::saveTimeLapseAVI(cv::Mat const& image)
 {
+  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   if (!this->TimeLapseAVI_Writing) { this->TimeLapseAVI_Writer.release(); }
   else if (this->TimeLapseAVI_Writer.isOpened()) { this->TimeLapseAVI_Writer.write(image); }
 }
 //----------------------------------------------------------------------------
 void CaptureThread::startTimeLapse(double fps)
 {
+  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   std::string path = this->AVI_Directory + "/" + this->TimeLapseAVI_Name + std::string(".avi");
   if (!this->TimeLapseAVI_Writer.isOpened())
   {
@@ -363,18 +328,21 @@ void CaptureThread::startTimeLapse(double fps)
 //----------------------------------------------------------------------------
 void CaptureThread::stopTimeLapse()
 {
+  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   this->TimeLapseAVI_Writing = false;
   //    emit(RecordingState(true));
 }
 //----------------------------------------------------------------------------
 void CaptureThread::setRequestedFps(int value)
 {
+  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   this->requestedFps = value;
   this->frameTimes.clear();
 }
 //----------------------------------------------------------------------------
 void CaptureThread::updateActualFps(int time)
 {
+  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   frameTimes.push_back(time);
   if (frameTimes.size() > 1)
   {
@@ -386,6 +354,7 @@ void CaptureThread::updateActualFps(int time)
 //----------------------------------------------------------------------------
 void CaptureThread::updateCaptureTime(int time_ms)
 {
+  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   captureTimes.push_back(time_ms);
 
   captureTime_ms = static_cast<int>(
@@ -394,6 +363,7 @@ void CaptureThread::updateCaptureTime(int time_ms)
 //----------------------------------------------------------------------------
 void CaptureThread::saveAVI(cv::Mat const& image)
 {
+  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   // CV_FOURCC('M', 'J', 'P', 'G'),
   // CV_FOURCC('M', 'P', '4', '2') = MPEG-4.2 codec
   // CV_FOURCC('D', 'I', 'V', '3') = MPEG-4.3 codec
@@ -433,6 +403,7 @@ void CaptureThread::setWriteTimeLapseAVIName(char const* name) { this->TimeLapse
 //----------------------------------------------------------------------------
 void CaptureThread::rotateImage(cv::Mat const& source, cv::Mat& rotated)
 {
+  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   switch (this->rotation)
   {
   case 0: source.copyTo(rotated); break;
@@ -453,7 +424,8 @@ void CaptureThread::rotateImage(cv::Mat const& source, cv::Mat& rotated)
 //----------------------------------------------------------------------------
 void CaptureThread::captionImage(cv::Mat& image)
 {
-  QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
+  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
+  QString timestring = QDateTime::currentDateTime().toString("HELLO dd/MM/yyyy hh:mm:ss");
   cv::putText(image, timestring.toLatin1().data(),
       cvPoint(image.size().width - text_size.width - 4, text_size.height + 4),
       CV_FONT_HERSHEY_PLAIN, 1.0, cv::Scalar(255, 255, 255, 0), 1);
@@ -463,6 +435,7 @@ void CaptureThread::captionImage(cv::Mat& image)
 // Otherwise leaves the current resolution and returns false
 bool CaptureThread::tryResolutionUpdate(cv::Size requestedResolution)
 {
+  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   this->capture.set(CV_CAP_PROP_FRAME_WIDTH, requestedResolution.width);
   this->capture.set(CV_CAP_PROP_FRAME_HEIGHT, requestedResolution.height);
   auto width = static_cast<int>(capture.get(CV_CAP_PROP_FRAME_WIDTH));

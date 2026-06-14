@@ -1,4 +1,5 @@
-set(utility_widgets_SRCS CameraSelectorWidget.cpp CameraSelectorWidget.h)
+set(utility_widgets_SRCS CameraSelectorWidget.cpp CameraSelectorWidget.h
+    camera_utils.cpp camera_utils.h)
 
 add_library(utility_widgets ${utility_widgets_SRCS})
 

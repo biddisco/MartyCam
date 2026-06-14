@@ -147,17 +147,23 @@ void MotionFilter::process(cv::Mat const& image)
       // Add current changing pixels to our noise map
       this->updateNoiseMap(this->thresholdImage, this->noiseBlendRatio);
 
-      // Erode and Dilate to denoise and produce blobs
-      if (this->erodeIterations > 0)
-      {
-        cv::erode(this->thresholdImage, this->thresholdImage, cv::Mat(), cv::Point(-1, -1),
-            this->erodeIterations);
-      }
-      if (this->dilateIterations > 0)
-      {
-        cv::dilate(this->thresholdImage, this->thresholdImage, cv::Mat(), cv::Point(-1, -1),
-            this->dilateIterations);
-      }
+      // 3. Morphological Open to delete isolated 8x8 block artifacts
+      int openclose = std::max(1, this->erodeIterations);
+      cv::Mat element = cv::getStructuringElement(
+          cv::MORPH_RECT, cv::Size(openclose, openclose));
+      cv::morphologyEx(this->thresholdImage, this->thresholdImage, cv::MORPH_OPEN, element);
+
+      // // Erode and Dilate to denoise and produce blobs
+      // if (this->erodeIterations > 0)
+      // {
+      //   cv::erode(this->thresholdImage, this->thresholdImage, cv::Mat(), cv::Point(-1, -1),
+      //       this->erodeIterations);
+      // }
+      // if (this->dilateIterations > 0)
+      // {
+      //   cv::dilate(this->thresholdImage, this->thresholdImage, cv::Mat(), cv::Point(-1, -1),
+      //       this->dilateIterations);
+      // }
 
       // Convert the image to grayscale.
       cv::cvtColor(this->thresholdImage, this->blendImage, CV_GRAY2BGR);

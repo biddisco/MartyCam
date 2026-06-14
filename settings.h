@@ -14,7 +14,6 @@
 #include "ui_settings.h"
 
 class RenderWidget;
-class IPCameraForm;
 
 class SettingsWidget;
 typedef std::shared_ptr<SettingsWidget> SettingsWidget_SP;
@@ -56,8 +55,6 @@ class SettingsWidget : public QWidget
   // Create the camera selector widget and add it to the settings widget layout
   void createCameraSelector();
 
-  cv::Size getSelectedResolution();
-  int getSelectedResolutionButton();
   int getSelectedRotation();
   int getRequestedFps();
   int getNumOfResolutions();
@@ -77,7 +74,6 @@ class SettingsWidget : public QWidget
   double TimeLapseFPS() { return this->ui.timeLapseFPS->value(); }
   bool TimeLapseEnabled() { return this->ui.timeLapseEnabled->isChecked(); }
 
-  int getCameraIndex(std::string& text);
   ProcessingType getCurentProcessingType();
   MotionFilterParams getMotionFilterParams();
   FaceRecogFilterParams getFaceRecogFilterParams();
@@ -93,7 +89,6 @@ class SettingsWidget : public QWidget
   void onTimer();
   void onImageSelection(int btn);
   void onRotateSelection(int btn);
-  void onResolutionSelection(int btn);
   void onBlendChanged(int value);
   //
   void onRequestedFpsChanged(int);
@@ -106,18 +101,15 @@ class SettingsWidget : public QWidget
   //
   void onTabChanged(int);
   //
-  void onCameraSelection(int index);
 
   void loadSettings();
   void saveSettings();
-  void setupCameraList();
   void SetupAVIStrings();
 
   signals:
-  void resolutionSelected(cv::Size);
+  void cameraConfigChanged(
+      QString cameraPath, int width, int height, int fps, int fourcc);
   void rotationChanged(int);
-
-  void CameraIndexChanged(int, QString);
 
   protected:
   QString decimationCoeffToQString(int sliderVal);
@@ -137,7 +129,6 @@ class SettingsWidget : public QWidget
   // int currentResolutionButtonIndex;
   // int previousResolutionButtonIndex;
   RenderWidget* renderWidget;
-  IPCameraForm* cameraForm;
   int NumDevices;
   //
   bool faceRecognitionAcitve;

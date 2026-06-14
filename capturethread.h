@@ -30,17 +30,15 @@ typedef std::shared_ptr<CaptureThread> CaptureThread_SP;
 class CaptureThread
 {
   public:
-  CaptureThread(ImageBuffer imageBuffer, cv::Size const& size, int rotation, int device,
+  CaptureThread(ImageBuffer imageBuffer, cv::Size const& size, int rotation, 
       std::string const& URL, hpx::execution::parallel_executor exec, int requestedFps);
   ~CaptureThread();
 
   void run();
   //
-  bool connectCamera(int index, std::string const& URL);
+  bool connectCamera(std::string const& URL);
   bool startCapture();
   bool stopCapture();
-  //
-  bool setResolution(cv::Size const& res);
   //
   void setRequestedFps(int value);
   double getActualFps() { return actualFps; }
@@ -113,7 +111,6 @@ class CaptureThread
   int captureTime_ms;
   IntCircBuff frameTimes;
   IntCircBuff captureTimes;
-  int deviceIndex;
   int rotation;
   int FrameCounter;
   ImageBuffer aviBuffer;

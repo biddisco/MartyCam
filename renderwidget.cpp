@@ -1,5 +1,3 @@
-#include "renderwidget.h"
-//
 #include <QDebug>
 #include <QMouseEvent>
 #include <QPainter>
@@ -8,6 +6,13 @@
 #include <iostream>
 //
 #include <opencv2/imgproc/imgproc.hpp>
+
+#include "debug/logging.hpp"
+#include "renderwidget.h"
+
+// ----------------------------------------------------------------------------
+static auto render_log = martycam::log::create("Renderer");
+
 //----------------------------------------------------------------------------
 /*
 cv::Mat QImage2IplImage(QImage *qimg)
@@ -68,6 +73,7 @@ RenderWidget::RenderWidget(QWidget* parent)
   , Filter()
   , imageValid(1)
 {
+  MARTY_LOG_SCOPE(render_log, "{} {}", (void*) (this), __func__);
   setAttribute(Qt::WA_OpaquePaintEvent, true);    // don't clear the area before the paintEvent
   //  setAttribute(Qt::WA_PaintOnScreen, true); // disable double buffering
   setFixedSize(720, 576);
@@ -84,6 +90,7 @@ void RenderWidget::onFrameSizeChanged(int width, int height) { this->setFixedSiz
 //----------------------------------------------------------------------------
 void RenderWidget::updatePixmap(cv::Mat const& frame)
 {
+  MARTY_LOG_SCOPE(render_log, "{} {}", (void*) (this), __func__);
   QImage* temp = this->bufferImage;
   imageValid.acquire();
 
@@ -100,6 +107,7 @@ void RenderWidget::updatePixmap(cv::Mat const& frame)
 //----------------------------------------------------------------------------
 void RenderWidget::process(cv::Mat const& image)
 {
+  MARTY_LOG_SCOPE(render_log, "{} {}", (void*) (this), __func__);
   // copy the image to the local pixmap and update the display
   this->updatePixmap(image);
   emit(update_signal(true, 12));
@@ -107,6 +115,7 @@ void RenderWidget::process(cv::Mat const& image)
 //----------------------------------------------------------------------------
 void RenderWidget::paintEvent(QPaintEvent*)
 {
+  MARTY_LOG_SCOPE(render_log, "{} {}", (void*) (this), __func__);
   QPainter painter(this);
   if (this->bufferImage)
   {
@@ -121,10 +130,15 @@ void RenderWidget::paintEvent(QPaintEvent*)
   }
 }
 //----------------------------------------------------------------------------
-void RenderWidget::UpdateTrigger(bool, int) { this->repaint(); }
+void RenderWidget::UpdateTrigger(bool, int)
+{
+  MARTY_LOG_SCOPE(render_log, "{} {}", (void*) (this), __func__);
+  this->repaint();
+}
 //----------------------------------------------------------------------------
 void RenderWidget::mouseDoubleClickEvent(QMouseEvent* event)
 {
+  MARTY_LOG_SCOPE(render_log, "{} {}", (void*) (this), __func__);
   QPoint const p = event->pos();
   emit mouseDblClicked(p);
 }

@@ -38,16 +38,16 @@ class MartyCam : public QMainWindow
   public slots:
   void updateGUI();
   void onRotationChanged(int rotation);
-  void onCameraChanged(int index, QString URL);
   void onUserTrackChanged(int value);
   void onRecordingStateChanged(bool state);
   //
   void onMouseDoubleClickEvent(QPoint const&);
+  void onCameraConfigChanged(QString cameraPath, int width, int height, int fps, int fourcc);
 
   protected:
   void closeEvent(QCloseEvent*);
   void deleteCaptureThread();
-  void createCaptureThread(cv::Size& size, int camera, std::string const& cameraname,
+  void createCaptureThread(cv::Size size, std::string const& cameraname, int fps,
       hpx::execution::parallel_executor exec);
   void deleteProcessingThread();
   void createProcessingThread(ProcessingThread* oldThread, hpx::execution::parallel_executor exec,
@@ -75,7 +75,6 @@ class MartyCam : public QMainWindow
   RenderWidget_SP renderWidget;
   QDockWidget_SP settingsDock;
   SettingsWidget_SP settingsWidget;
-  int cameraIndex;
 
   ImageBuffer imageBuffer;
 
