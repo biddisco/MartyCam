@@ -279,6 +279,7 @@ void CameraSelectorWidget::refreshCameraList()
 
     // Trigger initial population of resolution buttons
     onCameraComboBoxChanged(0);
+    emitConfigChanged();
   }
   else
   {

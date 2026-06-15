@@ -194,6 +194,7 @@ set(martycam_SRCS
     martycam.cpp
     main.cpp
     processingthread.cpp
+    rendercanvas.h
     renderwidget.cpp
     settings.cpp
     IPCameraForm.cpp

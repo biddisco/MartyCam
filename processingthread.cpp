@@ -40,8 +40,11 @@ ProcessingThread::ProcessingThread(ImageBuffer buffer, hpx::execution::parallel_
   this->graphFilter = new GraphUpdateFilter();
 }
 //----------------------------------------------------------------------------
-ProcessingThread::~ProcessingThread() {   MARTY_LOG_SCOPE(process_log, "{} {}", (void*) (this), __func__);
-delete this->graphFilter; }
+ProcessingThread::~ProcessingThread()
+{
+  MARTY_LOG_SCOPE(process_log, "{} {}", (void*) (this), __func__);
+  delete this->graphFilter;
+}
 //----------------------------------------------------------------------------
 void ProcessingThread::CopySettings(ProcessingThread* thread)
 {

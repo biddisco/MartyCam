@@ -149,8 +149,7 @@ void MotionFilter::process(cv::Mat const& image)
 
       // 3. Morphological Open to delete isolated 8x8 block artifacts
       int openclose = std::max(1, this->erodeIterations);
-      cv::Mat element = cv::getStructuringElement(
-          cv::MORPH_RECT, cv::Size(openclose, openclose));
+      cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(openclose, openclose));
       cv::morphologyEx(this->thresholdImage, this->thresholdImage, cv::MORPH_OPEN, element);
 
       // // Erode and Dilate to denoise and produce blobs
@@ -226,7 +225,7 @@ void MotionFilter::process(cv::Mat const& image)
     // Pass final image to GUI
     //
     if (renderer) { renderer->process(shownImage); }
-    //    std::cout << "Processed frame " << framenum++ << std::endl;
+    std::cout << "Processed frame " << timestring.toStdString() << std::endl;
   }
   //
   this->lastFrame = image;

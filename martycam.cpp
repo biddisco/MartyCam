@@ -61,8 +61,8 @@ MartyCam::MartyCam(hpx::execution::parallel_executor const& defaultExec,
   settingsDock->setMinimumWidth(300);
   addDockWidget(Qt::RightDockWidgetArea, settingsDock.get());
   //
-  connect(this->settingsWidget.get(), SIGNAL(cameraConfigChanged(QString, int, int, int, int)), this,
-      SLOT(onCameraConfigChanged(QString, int, int, int, int)));
+  connect(this->settingsWidget.get(), SIGNAL(cameraConfigChanged(QString, int, int, int, int)),
+      this, SLOT(onCameraConfigChanged(QString, int, int, int, int)));
   connect(
       this->settingsWidget.get(), SIGNAL(rotationChanged(int)), this, SLOT(onRotationChanged(int)));
   connect(this->ui.actionQuit, SIGNAL(triggered()), this, SLOT(close()));
@@ -132,13 +132,12 @@ void MartyCam::closeEvent(QCloseEvent*)
   this->deleteProcessingThread();
 }
 //----------------------------------------------------------------------------
-void MartyCam::createCaptureThread(cv::Size size, std::string const& cameraUTL, int fps,
-    hpx::execution::parallel_executor exec)
+void MartyCam::createCaptureThread(
+    cv::Size size, std::string const& cameraUTL, int fps, hpx::execution::parallel_executor exec)
 {
   MARTY_LOG_SCOPE(marty_log, "{} {}", (void*) (this), __func__);
   this->captureThread = std::make_shared<CaptureThread>(imageBuffer, size,
-      this->settingsWidget->getSelectedRotation(), cameraUTL, this->blockingExecutor,
-      fps);
+      this->settingsWidget->getSelectedRotation(), cameraUTL, this->blockingExecutor, fps);
   this->captureThread->startCapture();
   this->settingsWidget->setThreads(this->captureThread, this->processingThread);
 }
@@ -365,13 +364,21 @@ void MartyCam::onCameraConfigChanged(QString cameraPath, int width, int height, 
     this->deleteCaptureThread();
     this->deleteProcessingThread();
   }
-  this->createCaptureThread(cv::Size(width, height),  cameraPath.toStdString(), fps, blockingExecutor);
+  //
+  MARTY_LOG_INFO(marty_log, "{:<20} Clearing image buffer", "CameraConfigChanged");
+  this->imageBuffer->clear();
+  //
+  MARTY_LOG_INFO(marty_log, "{:<20} Creating capture thread", "CameraConfigChanged");
+  this->createCaptureThread(
+      cv::Size(width, height), cameraPath.toStdString(), fps, blockingExecutor);
+  MARTY_LOG_INFO(marty_log, "{:<20} Updating renderwidget size", "CameraConfigChanged");
   this->renderWidget->setCVSize(this->captureThread->getImageSize());
+  MARTY_LOG_INFO(marty_log, "{:<20} Creating processing thread", "CameraConfigChanged");
   this->createProcessingThread(
       nullptr, defaultExecutor, this->settingsWidget->getCurentProcessingType());
-      //
-  this->imageBuffer->clear();
+  //
+  MARTY_LOG_INFO(marty_log, "{:<20} Clearing graphs", "CameraConfigChanged");
   this->clearGraphs();
+  MARTY_LOG_INFO(marty_log, "{:<20} Initializing chart", "CameraConfigChanged");
   this->initChart();
 }
-
