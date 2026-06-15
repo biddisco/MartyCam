@@ -113,7 +113,8 @@ bool CaptureThread::connectCamera(std::string const& URL)
 
   if (!this->capture.isOpened())
   {
-    std::cout << "Camera connection failed" << std::endl;
+    MARTY_LOG_ERROR(cap_log, "{:<20} Camera connection failed",
+        "CaptureThread");
     return false;
   }
 
@@ -156,8 +157,9 @@ void CaptureThread::run()
   {
     if (!captureActive)
     {
-      std::cout << "WARN: CaptureThread::run() still running even though "
-                   "captureActive=false";
+      MARTY_LOG_WARN(cap_log, "{:<20} CaptureThread::run() still running even though "
+                                   "captureActive=false",
+          "CaptureThread");
       boost::this_thread::sleep(boost::posix_time::milliseconds(10));
       continue;
     }
@@ -167,16 +169,17 @@ void CaptureThread::run()
     captureWaitTime.restart();
     bool const grabbed = this->capture.grab();
     updateCaptureTime(captureWaitTime.elapsed());
+    int elapsedSinceLastOutput_ms = requestedFpsTime.elapsed();
 
     if (!grabbed)
     {
       this->setAbort(true);
-      std::cout << "Failed to grab camera image, aborting this->capture " << std::endl;
+      MARTY_LOG_ERROR(cap_log, "{:<20} Failed to grab camera image, aborting this->capture",
+          "CaptureThread");
       continue;
     }
 
     int requestedFrameTime_ms = (this->requestedFps > 0) ? (1000 / this->requestedFps) : 1000;
-    int elapsedSinceLastOutput_ms = requestedFpsTime.elapsed();
     this->sleepTime_ms = requestedFrameTime_ms - elapsedSinceLastOutput_ms;
     if (this->sleepTime_ms < 0) { this->sleepTime_ms = 0; }
 
@@ -187,14 +190,16 @@ void CaptureThread::run()
     if (!this->capture.retrieve(frame))
     {
       this->setAbort(true);
-      std::cout << "Failed to retrieve camera image, aborting this->capture " << std::endl;
+      MARTY_LOG_ERROR(cap_log, "{:<20} Failed to retrieve camera image, aborting this->capture",
+          "CaptureThread");
       continue;
     }
 
     if (frame.empty())
     {
       this->setAbort(true);
-      std::cout << "Empty camera image, aborting this->capture " << std::endl;
+      MARTY_LOG_ERROR(cap_log, "{:<20} Empty camera image, aborting this->capture",
+          "CaptureThread");
       continue;
     }
 
