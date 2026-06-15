@@ -168,6 +168,9 @@ namespace camera_utils {
   cv::VideoCapture createVideoCapture(
       std::string const& cameraPath, int fourcc, int fps, cv::Size resolution)
   {
+    // Define the timeout parameter (milliseconds)
+    std::vector<int> params = {cv::CAP_PROP_OPEN_TIMEOUT_MSEC, 2000};
+    //
     cv::VideoCapture cap;
     setupVideoCapture(cap, fourcc, fps, resolution);
 
@@ -177,7 +180,7 @@ namespace camera_utils {
       int deviceIdx = std::stoi(cameraPath.substr(cameraPath.find_last_of("0123456789")));
       cap.open(deviceIdx, cv::CAP_V4L2);
     }
-    else { cap.open(cameraPath); }
+    else { cap.open(cameraPath, cv::CAP_ANY, params); }
 
     return cap;
   }

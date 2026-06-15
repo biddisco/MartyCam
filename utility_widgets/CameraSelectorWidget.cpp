@@ -169,10 +169,7 @@ void CameraSelectorWidget::refreshCameraList()
 
   clearCameraWidgets();
 
-  std::vector<std::pair<std::string, std::string>> ip_cameras = load_ip_camerasettings();
-  MARTY_LOG_INFO(cam_log, "{:<20} Loaded {} IP cameras from settings.", "CameraSelectorWidget",
-      ip_cameras.size());
-  std::vector<std::pair<std::string, std::string>> all_cameras = ip_cameras;
+  std::vector<std::pair<std::string, std::string>> all_cameras;
   QList<QCameraDevice> const qcameras = QMediaDevices::videoInputs();
   for (int i = 0; i < qcameras.size(); ++i)
   {
@@ -182,6 +179,11 @@ void CameraSelectorWidget::refreshCameraList()
   }
   MARTY_LOG_INFO(cam_log, "{:<20} Loaded {} cameras from QMediaDevices.", "CameraSelectorWidget",
       qcameras.size());
+
+  std::vector<std::pair<std::string, std::string>> ip_cameras = load_ip_camerasettings();
+  all_cameras.insert(all_cameras.end(), ip_cameras.begin(), ip_cameras.end());
+  MARTY_LOG_INFO(cam_log, "{:<20} Loaded {} IP cameras from settings.", "CameraSelectorWidget",
+      ip_cameras.size());
 
   if (all_cameras.empty())
   {
