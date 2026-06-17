@@ -377,8 +377,12 @@ void MartyCam::onCameraConfigChanged(QString cameraPath, int width, int height, 
   this->createProcessingThread(
       nullptr, defaultExecutor, this->settingsWidget->getCurentProcessingType());
   //
-  MARTY_LOG_INFO(marty_log, "{:<20} Clearing graphs", "CameraConfigChanged");
-  this->clearGraphs();
-  MARTY_LOG_INFO(marty_log, "{:<20} Initializing chart", "CameraConfigChanged");
-  this->initChart();
+  auto cleanup = [this]() {
+    MARTY_LOG_INFO(marty_log, "{:<20} Clearing graphs", "CameraConfigChanged");
+    this->clearGraphs();
+    MARTY_LOG_INFO(marty_log, "{:<20} Initializing chart", "CameraConfigChanged");
+    this->resetChart();
+    this->initChart();
+  };
+  QTimer::singleShot(10, this, cleanup);
 }
