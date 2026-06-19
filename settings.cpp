@@ -325,6 +325,8 @@ void SettingsWidget::saveSettings()
   QString settingsFileName = QCoreApplication::applicationDirPath() + "/MartyCam.ini";
   QSettings settings(settingsFileName, QSettings::IniFormat);
   //
+  if (cameraSelectorWidget) { cameraSelectorWidget->saveSelection(); }
+  //
   settings.beginGroup("MotionDetection");
   settings.setValue("threshold", this->ui.threshold->value());
   settings.setValue("average", this->ui.average->value());

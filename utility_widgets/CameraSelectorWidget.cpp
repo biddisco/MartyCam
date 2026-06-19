@@ -404,9 +404,8 @@ void CameraSelectorWidget::refreshCameraList()
     connect(m_cameraComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
         &CameraSelectorWidget::onCameraComboBoxChanged, Qt::QueuedConnection);
 
-    // Trigger initial population of resolution buttons
-    onCameraComboBoxChanged(0);
-    emitConfigChanged();
+    // Restore previous selection or default to first camera
+    restoreSelection();
   }
   else
   {
@@ -444,6 +443,71 @@ void CameraSelectorWidget::saveCameraConfig()
     settings.setValue("URL", QString::fromStdString(camera.second));
   }
   settings.endArray();
+}
+
+// --------------------------------------------------------------------
+void CameraSelectorWidget::saveSelection()
+{
+  QSettings settings(
+      QCoreApplication::applicationDirPath() + "/MartyCam.ini", QSettings::IniFormat);
+  settings.beginGroup("CameraSelection");
+  settings.setValue("cameraPath", QString::fromStdString(m_selectedCameraPath));
+  settings.setValue("resolutionIndex", m_cameraComboBox ? m_cameraComboBox->currentIndex() : 0);
+  settings.endGroup();
+}
+
+// --------------------------------------------------------------------
+void CameraSelectorWidget::restoreSelection()
+{
+  if (!m_cameraComboBox || m_cameraButtonGroups.empty()) { return; }
+
+  QSettings settings(
+      QCoreApplication::applicationDirPath() + "/MartyCam.ini", QSettings::IniFormat);
+  settings.beginGroup("CameraSelection");
+  QString savedPath = settings.value("cameraPath").toString();
+  int savedResolutionIndex = settings.value("resolutionIndex", 0).toInt();
+  settings.endGroup();
+
+  if (savedPath.isEmpty()) { return; }
+
+  // Find the combo box index for the saved camera path
+  int cameraIndex = -1;
+  for (int i = 0; i < m_cameraComboBox->count(); ++i)
+  {
+    if (m_cameraComboBox->itemData(i).toString() == savedPath)
+    {
+      cameraIndex = i;
+      break;
+    }
+  }
+
+  if (cameraIndex < 0) { return; }
+
+  // Block signals to prevent premature emission while restoring
+  bool oldState = m_cameraComboBox->blockSignals(true);
+  m_cameraComboBox->setCurrentIndex(cameraIndex);
+  m_cameraComboBox->blockSignals(oldState);
+
+  // Update the resolution buttons for this camera
+  onCameraComboBoxChanged(cameraIndex);
+
+  // Find the button group for this camera and check the saved resolution
+  auto it = m_cameraButtonGroups.find(savedPath.toStdString());
+  if (it != m_cameraButtonGroups.end())
+  {
+    QButtonGroup* buttonGroup = it->second;
+    for (QAbstractButton* button : buttonGroup->buttons())
+    {
+      int resIdx = button->property("resolution_index").toInt();
+      if (resIdx == savedResolutionIndex)
+      {
+        qobject_cast<QRadioButton*>(button)->setChecked(true);
+        break;
+      }
+    }
+  }
+
+  emitConfigChanged();
 }
 
 void CameraSelectorWidget::onCameraComboBoxChanged(int index)

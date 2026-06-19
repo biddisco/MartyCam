@@ -33,6 +33,10 @@ class CameraSelectorWidget : public QWidget
       std::string const& cameraPath, std::optional<CameraConfig> const& cachedConfig,
       std::function<void(int, int, int)> const& onProbeStepProgress);
 
+  // Save/restore the current camera and resolution selection to QSettings
+  void saveSelection();
+  void restoreSelection();
+
   public slots:
   void refreshCameraList();
   void saveCameraConfig();
