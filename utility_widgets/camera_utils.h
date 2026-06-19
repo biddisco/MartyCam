@@ -2,35 +2,81 @@
 #define CAMERA_UTILS_H
 
 #include <opencv2/opencv.hpp>
-
+//
 #include <array>
 #include <functional>
 #include <string>
 #include <vector>
-
-#include <QVariant>
+//
+#include <nlohmann/json.hpp>
 
 class QAbstractButton;
 class QButtonGroup;
 class QString;
 class QWidget;
 
+//----------------------------------------------------------------------------
+struct camera_resolution
+{
+  cv::Size resolution;
+  int fourcc;
+  std::vector<int> fpsList;
+};
+
+//----------------------------------------------------------------------------
+struct CameraConfig
+{
+  std::string camera_name;
+  std::string camera_path;
+  std::vector<camera_resolution> resolutions;
+  //
+  std::string to_json() const
+  {
+    nlohmann::json json;
+    json["camera_name"] = camera_name;
+    json["camera_path"] = camera_path;
+    json["resolutions"] = nlohmann::json::array();
+
+    for (auto const& res : resolutions)
+    {
+      json["resolutions"].push_back({{"width", res.resolution.width},
+          {"height", res.resolution.height}, {"fourcc", res.fourcc}, {"fpsList", res.fpsList}});
+    }
+
+    return json.dump();
+  }
+
+  //----------------------------------------------------------------------------
+  static CameraConfig from_json(std::string const& json)
+  {
+    CameraConfig config;
+    auto j = nlohmann::json::parse(json);
+    config.camera_name = j["camera_name"].get<std::string>();
+    config.camera_path = j["camera_path"].get<std::string>();
+    for (auto const& res : j["resolutions"])
+    {
+      camera_resolution camRes;
+      camRes.resolution.width = res["width"].get<int>();
+      camRes.resolution.height = res["height"].get<int>();
+      camRes.fourcc = res["fourcc"].get<int>();
+      camRes.fpsList = res["fpsList"].get<std::vector<int>>();
+      config.resolutions.push_back(camRes);
+    }
+    return config;
+  }
+};
+
+//----------------------------------------------------------------------------
 // Convenience function to convert FOURCC int to string for debugging
 std::string fourCCToString(int fourcc);
 
-// Resolution configuration data structure
-struct ResolutionConfig
-{
-  int fourcc;
-  QVariantList fpsList;
-};
-
+//----------------------------------------------------------------------------
 namespace camera_utils {
 
   using cam_res = cv::Size;
 
   // List of FPS to test when probing cameras
-  inline std::array<int, 3> testFPS = {15, 30, 60};
+  inline std::array<int, 5> testFPS = {15, 20, 25, 30, 60};
 
   // Common resolutions to test when probing cameras
   inline std::array<cam_res, 9> const testResolutions = {
@@ -55,13 +101,7 @@ namespace camera_utils {
   // Parse a resolution string like "1280 x 720" into a cam_res object
   cam_res parseResolution(QString const& resolutionText);
 
-  // Get a preferred FPS value from a list of supported values
-  int choosePreferredFps(QVariantList const& fpsValues);
-
-  // Create a group of radio buttons for selecting camera resolutions
-  // by probing the camera capabilities via OpenCV
-  QButtonGroup* createCameraResolutionGroup(QWidget* parent, std::string const& cameraPath,
-      std::function<void(int, int, int)> const& onProbeStepProgress = nullptr);
+  CameraConfig ProbeCameraConfig(std::string const& cameraName, std::string const& cameraPath);
 
   void setupVideoCapture(cv::VideoCapture& cap, int fourcc, int fps, cv::Size resolution);
 

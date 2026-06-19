@@ -57,6 +57,54 @@ std::vector<std::pair<std::string, std::string>> load_ip_camerasettings()
   return cameras;
 }
 
+// ----------------------------------------------------------------------------
+std::unordered_map<std::string, CameraConfig> load_cached_camera_configs()
+{
+  QString settingsFileName = QCoreApplication::applicationDirPath() + "/MartyCam.ini";
+  QSettings settings(settingsFileName, QSettings::IniFormat);
+  std::unordered_map<std::string, CameraConfig> configs;
+
+  int size = settings.beginReadArray("CachedCameraConfigs");
+  for (int i = 0; i < size; ++i)
+  {
+    settings.setArrayIndex(i);
+    std::string cameraName = settings.value("CameraName").toString().toStdString();
+    std::string json = settings.value("ConfigJson").toString().toStdString();
+    if (!cameraName.empty() && !json.empty())
+    {
+      try
+      {
+        CameraConfig config = CameraConfig::from_json(json);
+        configs[cameraName] = std::move(config);
+        MARTY_LOG_INFO(cam_log, "{:<20} Loaded cached config for {}", "CameraCache", cameraName);
+      }
+      catch (...)
+      {
+        MARTY_LOG_WARN(
+            cam_log, "{:<20} Failed to parse cached config for {}", "CameraCache", cameraName);
+      }
+    }
+  }
+  settings.endArray();
+  return configs;
+}
+
+// ----------------------------------------------------------------------------
+void save_cached_camera_configs(std::vector<CameraConfig> const& configs)
+{
+  QString settingsFileName = QCoreApplication::applicationDirPath() + "/MartyCam.ini";
+  QSettings settings(settingsFileName, QSettings::IniFormat);
+
+  settings.beginWriteArray("CachedCameraConfigs");
+  for (size_t i = 0; i < configs.size(); ++i)
+  {
+    settings.setArrayIndex(static_cast<int>(i));
+    settings.setValue("CameraName", QString::fromStdString(configs[i].camera_name));
+    settings.setValue("ConfigJson", QString::fromStdString(configs[i].to_json()));
+  }
+  settings.endArray();
+}
+
 // --------------------------------------------------------------------
 // Constructor for the CameraSelectorWidget, initializing the UI and connecting signals for dynamic camera detection.
 // --------------------------------------------------------------------
@@ -100,7 +148,10 @@ QString CameraSelectorWidget::selectedCameraPath() const
 }
 
 // --------------------------------------------------------------------
-camera_utils::cam_res CameraSelectorWidget::selectedResolution() const { return m_selectedResolution; }
+camera_utils::cam_res CameraSelectorWidget::selectedResolution() const
+{
+  return m_selectedResolution;
+}
 
 // --------------------------------------------------------------------
 int CameraSelectorWidget::selectedFps() const { return m_selectedFps; }
@@ -132,6 +183,57 @@ void CameraSelectorWidget::clearCameraWidgets()
 
   m_cameraComboBox = nullptr;
   m_resolutionButtonsContainer = nullptr;
+}
+
+//----------------------------------------------------------------------------
+// Create a group of radio buttons for selecting camera resolutions
+// by probing the camera capabilities via OpenCV
+QButtonGroup* CameraSelectorWidget::createCameraResolutionGroup(QWidget* parent,
+    std::string const& cameraName, std::string const& cameraPath,
+    std::optional<CameraConfig> const& cachedConfig,
+    std::function<void(int, int, int)> const& onProbeStepProgress)
+{
+  // button group to hold settings for this camera, will be returned to caller
+  QButtonGroup* buttonGroup = new QButtonGroup(parent);
+  buttonGroup->setExclusive(true);
+
+  CameraConfig camera_config;
+  if (cachedConfig.has_value())
+  {
+    camera_config = cachedConfig.value();
+    MARTY_LOG_INFO(
+        cam_log, "{:<20} Using cached config for {}", "CameraSelectorWidget", cameraName);
+  }
+  else { camera_config = camera_utils::ProbeCameraConfig(cameraName, cameraPath); }
+
+  QString configJson = QString::fromStdString(camera_config.to_json());
+  int resolutionIndex = 0;
+  for (auto const& camRes : camera_config.resolutions)
+  {
+    QString res = QString::fromStdString(std::to_string(camRes.resolution.width) + " x " +
+        std::to_string(camRes.resolution.height) + " [" + fourCCToString(camRes.fourcc) + "]");
+    //
+    QString text = res + (camRes.fpsList.size() > 1 ? " (" : " @");
+    for (size_t i = 0; i < camRes.fpsList.size(); ++i)
+    {
+      text += QString::number(camRes.fpsList[i]);
+      if (i < camRes.fpsList.size() - 1) { text += ", "; }
+    }
+    text += camRes.fpsList.size() > 1 ? " fps)" : " fps";
+
+    QRadioButton* radioButton = new QRadioButton(text);
+    radioButton->setProperty("camera_config_json", configJson);
+    radioButton->setProperty("resolution_index", resolutionIndex);
+    MARTY_LOG_INFO(cam_log, "{:<20} Adding resolution button: {} @ {} FPS", "CameraSelectorWidget",
+        res.toStdString(),
+        camRes.fpsList.size() > 1 ? "multiple" : std::to_string(camRes.fpsList[0]));
+    buttonGroup->addButton(radioButton);
+    ++resolutionIndex;
+  }
+
+  if (!buttonGroup->buttons().isEmpty()) { buttonGroup->buttons().first()->setChecked(true); }
+
+  return buttonGroup;
 }
 
 // --------------------------------------------------------------------
@@ -218,6 +320,8 @@ void CameraSelectorWidget::refreshCameraList()
 
   bool hasUsableCamera = false;
   int currentGlobalProgressCounter = 0;
+  std::vector<CameraConfig> probedConfigs;
+  auto cachedConfigs = load_cached_camera_configs();
 
   for (int i = 0; i < all_cameras.size(); ++i)
   {
@@ -230,24 +334,29 @@ void CameraSelectorWidget::refreshCameraList()
     progressDialog.setLabelText(QString("Querying Cameras: %1").arg(cameraName));
     QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
 
-    QButtonGroup* resGroup = camera_utils::createCameraResolutionGroup(m_resolutionButtonsContainer,
-        cameraPathStr, [&](int probeWidth, int probeHeight, int probeFps) {
-          ++currentGlobalProgressCounter;
-          progressDialog.setLabelText(
-              QString("Querying Cameras: %1/%2 - %3\nTesting %4x%5 @ %6 FPS")
-                  .arg(i + 1)
-                  .arg(all_cameras.size())
-                  .arg(cameraName)
-                  .arg(probeWidth)
-                  .arg(probeHeight)
-                  .arg(probeFps));
-          if (currentGlobalProgressCounter > progressDialog.maximum())
-          {
-            progressDialog.setMaximum(currentGlobalProgressCounter);
-          }
-          progressDialog.setValue(currentGlobalProgressCounter);
-          QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
-        });
+    std::optional<CameraConfig> cachedConfig;
+    auto cacheIt = cachedConfigs.find(cameraName.toStdString());
+    if (cacheIt != cachedConfigs.end()) { cachedConfig = cacheIt->second; }
+
+    QButtonGroup* resGroup =
+        createCameraResolutionGroup(m_resolutionButtonsContainer, cameraName.toStdString(),
+            cameraPathStr, cachedConfig, [&](int probeWidth, int probeHeight, int probeFps) {
+              ++currentGlobalProgressCounter;
+              progressDialog.setLabelText(
+                  QString("Querying Cameras: %1/%2 - %3\nTesting %4x%5 @ %6 FPS")
+                      .arg(i + 1)
+                      .arg(all_cameras.size())
+                      .arg(cameraName)
+                      .arg(probeWidth)
+                      .arg(probeHeight)
+                      .arg(probeFps));
+              if (currentGlobalProgressCounter > progressDialog.maximum())
+              {
+                progressDialog.setMaximum(currentGlobalProgressCounter);
+              }
+              progressDialog.setValue(currentGlobalProgressCounter);
+              QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+            });
 
     if (resGroup->buttons().isEmpty())
     {
@@ -268,7 +377,23 @@ void CameraSelectorWidget::refreshCameraList()
     m_cameraComboBox->addItem(cameraName, QString::fromStdString(cameraPathStr));
     m_cameraButtonGroups[cameraPathStr] = resGroup;
     hasUsableCamera = true;
+
+    // Collect config for caching (from first button's property)
+    if (!resGroup->buttons().isEmpty())
+    {
+      QString configJson = resGroup->buttons().first()->property("camera_config_json").toString();
+      try
+      {
+        CameraConfig config = CameraConfig::from_json(configJson.toStdString());
+        probedConfigs.push_back(std::move(config));
+      }
+      catch (...)
+      {
+      }
+    }
   }
+
+  save_cached_camera_configs(probedConfigs);
 
   if (hasUsableCamera)
   {
@@ -303,6 +428,22 @@ void CameraSelectorWidget::refreshCameraList()
     m_refreshPending = false;
     QTimer::singleShot(0, this, &CameraSelectorWidget::refreshCameraList);
   }
+}
+
+// --------------------------------------------------------------------
+void CameraSelectorWidget::saveCameraConfig()
+{
+  QSettings settings(
+      QCoreApplication::applicationDirPath() + "/MartyCam.ini", QSettings::IniFormat);
+  settings.beginWriteArray("UserCameras");
+  int i = 0;
+  for (auto const& camera : load_ip_camerasettings())
+  {
+    settings.setArrayIndex(i++);
+    settings.setValue("CameraName", QString::fromStdString(camera.first));
+    settings.setValue("URL", QString::fromStdString(camera.second));
+  }
+  settings.endArray();
 }
 
 void CameraSelectorWidget::onCameraComboBoxChanged(int index)
@@ -380,12 +521,21 @@ void CameraSelectorWidget::emitConfigChanged()
     return;
   }
 
-  auto res = checkedButton->property("supported_resolution").toString();
-  m_selectedResolution = camera_utils::parseResolution(res);
-  m_selectedCameraPath = checkedButton->property("camera_path").toString().toStdString();
-  m_selectedFourCC = checkedButton->property("supported_fourcc").toInt();
-  auto fpslist = checkedButton->property("supported_fps").toList();
-  m_selectedFps = fpslist[0].toInt();
+  QString configJson = checkedButton->property("camera_config_json").toString();
+  int resolutionIndex = checkedButton->property("resolution_index").toInt();
+
+  CameraConfig config = CameraConfig::from_json(configJson.toStdString());
+  if (resolutionIndex < 0 || resolutionIndex >= static_cast<int>(config.resolutions.size()))
+  {
+    m_hasSelection = false;
+    return;
+  }
+
+  camera_resolution const& camRes = config.resolutions[resolutionIndex];
+  m_selectedCameraPath = config.camera_path;
+  m_selectedResolution = camRes.resolution;
+  m_selectedFourCC = camRes.fourcc;
+  m_selectedFps = camRes.fpsList.empty() ? 30 : camRes.fpsList[0];
   m_hasSelection = (m_selectedResolution.width > 0 && m_selectedResolution.height > 0);
 
   MARTY_LOG_INFO(cam_log, "{:<20} Selection changed: path={}, resolution={}x{}, fps={}, fourcc={}",
@@ -393,6 +543,6 @@ void CameraSelectorWidget::emitConfigChanged()
       m_selectedResolution.height, m_selectedFps, ::fourCCToString(m_selectedFourCC));
   if (!m_hasSelection) { return; }
 
-  emit cameraConfigChanged(QString::fromStdString(m_selectedCameraPath), m_selectedResolution.width, m_selectedResolution.height,
-      m_selectedFps, m_selectedFourCC);
+  emit cameraConfigChanged(QString::fromStdString(m_selectedCameraPath), m_selectedResolution.width,
+      m_selectedResolution.height, m_selectedFps, m_selectedFourCC);
 }

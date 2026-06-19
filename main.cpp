@@ -187,8 +187,6 @@ std::string qt_pool_name = "Qt:pool";
 //----------------------------------------------------------------------------
 int hpx_main(hpx::program_options::variables_map& vm)
 {
-  martycam::log::init_from_env();
-
   namespace ex = hpx::execution::experimental;
   namespace tt = hpx::this_thread::experimental;
 
@@ -254,6 +252,9 @@ int main(int argc, char* argv[])
   // fix: Qt: Session management error: Could not open network socket
   // TODO: Find a real fix
   unsetenv("SESSION_MANAGER");
+
+  martycam::log::init_from_env();
+
   //
   ::argc = argc;
   ::argv = argv;

@@ -1,5 +1,6 @@
 #include "camera_utils.h"
-
+#include "debug/logging.hpp"
+//
 #include <QButtonGroup>
 #include <QRadioButton>
 #include <QString>
@@ -8,9 +9,9 @@
 
 #include <opencv2/videoio.hpp>
 
+#include <algorithm>
 #include <cstring>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #ifdef __linux__
@@ -19,6 +20,9 @@
 # include <sys/ioctl.h>
 # include <unistd.h>
 #endif
+
+// ----------------------------------------------------------------------------
+static auto camutil_log = martycam::log::create("Capture");
 
 // Convenience function to convert FOURCC int to string for debugging
 std::string fourCCToString(int fourcc)
@@ -142,14 +146,13 @@ namespace camera_utils {
 
   //----------------------------------------------------------------------------
   // Get a preferred FPS value from a list of supported values
-  int choosePreferredFps(QVariantList const& fpsValues)
+  int choosePreferredFps(std::vector<int> const& fpsValues)
   {
-    if (fpsValues.isEmpty()) return 30;
-    int best = fpsValues.first().toInt();
-    for (QVariant const& fps : fpsValues)
+    if (fpsValues.empty()) return 15;
+    int best = fpsValues.front();
+    for (int const fps : fpsValues)
     {
-      int value = fps.toInt();
-      if (value > best) best = value;
+      if (fps > best) best = fps;
     }
     return best;
   }
@@ -185,25 +188,19 @@ namespace camera_utils {
     return cap;
   }
 
-  //----------------------------------------------------------------------------
-  // Create a group of radio buttons for selecting camera resolutions
-  // by probing the camera capabilities via OpenCV
-  QButtonGroup* createCameraResolutionGroup(QWidget* parent, std::string const& cameraPath,
-      std::function<void(int, int, int)> const& onProbeStepProgress)
+  CameraConfig ProbeCameraConfig(std::string const& cameraName, std::string const& cameraPath)
   {
+    CameraConfig camera_config;
+    camera_config.camera_name = cameraName;
+    camera_config.camera_path = cameraPath;
+
     cv::VideoCapture cap = createVideoCapture(
-        cameraPath, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), 30, cv::Size(640, 480));
+        cameraPath, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), 15, cv::Size(640, 480));
 
-    QButtonGroup* buttonGroup = new QButtonGroup(parent);
-    if (!cap.isOpened()) { return buttonGroup; }
+    if (!cap.isOpened()) { return camera_config; }
 
-    buttonGroup->setExclusive(true);
     std::vector<int> hardwareCodecs = getSupportedFourCCs(cameraPath);
     std::vector<int> targetFourCCs = getOpenCvProbeFourCCs(hardwareCodecs);
-
-    if (targetFourCCs.empty()) { return buttonGroup; }
-
-    std::unordered_map<std::string, ResolutionConfig> resolutionMap;
 
     for (int currentFourCC : targetFourCCs)
     {
@@ -212,62 +209,19 @@ namespace camera_utils {
         for (int fps : testFPS)
         {
           setupVideoCapture(cap, currentFourCC, fps, res);
-
           int actualWidth = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_WIDTH));
           int actualHeight = static_cast<int>(cap.get(cv::CAP_PROP_FRAME_HEIGHT));
-
-          if (actualWidth == res.width && actualHeight == res.height)
+          int actualFPS = static_cast<int>(cap.get(cv::CAP_PROP_FPS));
+          if ((actualWidth == res.width) && (actualHeight == res.height) && (actualFPS == fps))
           {
-            std::string resKey = std::to_string(res.width) + " x " + std::to_string(res.height);
-
-            if (resolutionMap.find(resKey) == resolutionMap.end())
-            {
-              resolutionMap[resKey] = ResolutionConfig{currentFourCC, QVariantList()};
-            }
-
-            if (resolutionMap[resKey].fourcc != currentFourCC)
-            {
-              // Keep fps values tied to the codec selected for this resolution key.
-              continue;
-            }
-
-            if (!resolutionMap[resKey].fpsList.contains(fps))
-            {
-              resolutionMap[resKey].fpsList.append(fps);
-            }
+            camera_resolution camRes{res, currentFourCC, {fps}};
+            camera_config.resolutions.push_back(std::move(camRes));
           }
-
-          if (onProbeStepProgress) onProbeStepProgress(res.width, res.height, fps);
         }
       }
     }
-
     cap.release();
-
-    for (auto const& pair : resolutionMap)
-    {
-      QString res = QString::fromStdString(pair.first);
-      ResolutionConfig const& config = pair.second;
-
-      QString text = res + (config.fpsList.size() > 1 ? " (" : " @");
-      for (int i = 0; i < config.fpsList.size(); ++i)
-      {
-        text += QString::number(config.fpsList[i].toInt());
-        if (i < config.fpsList.size() - 1) { text += ", "; }
-      }
-      text += config.fpsList.size() > 1 ? " fps)" : " fps";
-
-      QRadioButton* radioButton = new QRadioButton(text);
-      radioButton->setProperty("supported_resolution", res);
-      radioButton->setProperty("supported_fps", config.fpsList);
-      radioButton->setProperty("supported_fourcc", config.fourcc);
-      radioButton->setProperty("camera_path", QString::fromStdString(cameraPath));
-      buttonGroup->addButton(radioButton);
-    }
-
-    if (!buttonGroup->buttons().isEmpty()) { buttonGroup->buttons().first()->setChecked(true); }
-
-    return buttonGroup;
+    return camera_config;
   }
 
 }    // namespace camera_utils

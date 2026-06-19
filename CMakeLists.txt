@@ -93,6 +93,7 @@ find_package(Qt6 REQUIRED COMPONENTS ${qtcomponents})
 # ------------------------------------------------------------------------------
 find_package(fmt REQUIRED)
 message(STATUS "Found fmt: ${fmt_VERSION}")
+
 # ------------------------------------------------------------------------------
 # spdlog logging library
 # ------------------------------------------------------------------------------
@@ -102,6 +103,12 @@ if(NOT "${MARTYCAM_LOG_LEVEL_UPPERCASE}" MATCHES "OFF")
   message(STATUS "Found spdlog: ${spdlog_VERSION}")
   set(MARTYCAM_LOG_LIBS martycam_debug spdlog::spdlog fmt::fmt)
 endif()
+
+# ------------------------------------------------------------------------------
+# spdlog nlohmannn_json library
+# ------------------------------------------------------------------------------
+find_package(nlohmann_json REQUIRED)
+message(STATUS "Found nlohmann_json: ${nlohmann_json_VERSION}")
 
 # -----------------------------------------------------------------------------
 # Find HPX
@@ -254,6 +261,7 @@ target_link_libraries(
   ${OpenCV_LIBS}
   ${Boost_LIBRARIES}
   HPX::hpx
+  nlohmann_json::nlohmann_json
   Fontconfig::Fontconfig
 )
 

@@ -16,6 +16,7 @@ class RenderCanvas : public QWidget
     , bufferImage(nullptr)
     , imageValid(1)
   {
+    setAttribute(Qt::WA_OpaquePaintEvent, true);    // don't clear the area before the paintEvent
   }
 
   void setImage(QImage* img)
@@ -38,7 +39,7 @@ class RenderCanvas : public QWidget
       painter.drawImage(rect(), *bufferImage);
       imageValid.release();
     }
-    else { painter.fillRect(rect(), Qt::black); }
+    else { painter.fillRect(rect(), Qt::lightGray); }
   }
 
   private:

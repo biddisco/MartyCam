@@ -78,7 +78,6 @@ RenderWidget::RenderWidget(QWidget* parent)
   , idealSize(640, 480)
 {
   MARTY_LOG_SCOPE(render_log, "{} {}", (void*) (this), __func__);
-  setAttribute(Qt::WA_OpaquePaintEvent, true);    // don't clear the area before the paintEvent
 
   // 1. Tell parent layouts that this widget wants to expand freely
   setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -149,8 +148,10 @@ void RenderWidget::process(cv::Mat const& image)
 void RenderWidget::UpdateTrigger(bool, int)
 {
   MARTY_LOG_SCOPE(render_log, "{} {}", (void*) (this), __func__);
-  this->repaint();
-}
+  // force repaint to happen on the gui thread
+  canvas->update();
+ }
+ 
 //----------------------------------------------------------------------------
 void RenderWidget::mouseDoubleClickEvent(QMouseEvent* event)
 {

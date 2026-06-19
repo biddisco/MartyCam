@@ -3,6 +3,7 @@
 
 #include <QWidget>
 //
+#include <optional>
 #include <string>
 #include <unordered_map>
 //
@@ -28,8 +29,13 @@ class CameraSelectorWidget : public QWidget
   int selectedFps() const;
   int selectedFourCC() const;
 
+  QButtonGroup* createCameraResolutionGroup(QWidget* parent, std::string const& cameraName,
+      std::string const& cameraPath, std::optional<CameraConfig> const& cachedConfig,
+      std::function<void(int, int, int)> const& onProbeStepProgress);
+
   public slots:
   void refreshCameraList();
+  void saveCameraConfig();
 
   signals:
   // we do not emit a cv::Size as that is not a Qt type, instead we emit width and height separately

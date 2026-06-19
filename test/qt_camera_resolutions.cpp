@@ -2,10 +2,11 @@
 #include <QDialog>
 #include <QHBoxLayout>
 #include <QPushButton>
+#include <QRadioButton>
 #include <QVBoxLayout>
 
-#include "utility_widgets/camera_utils.h"
 #include "utility_widgets/CameraSelectorWidget.h"
+#include "utility_widgets/camera_utils.h"
 
 int main(int argc, char* argv[])
 {
@@ -24,16 +25,32 @@ int main(int argc, char* argv[])
   actionLayout->addWidget(closeButton);
   dialogLayout->addLayout(actionLayout);
 
-  QObject::connect(closeButton, &QPushButton::clicked, &dialog, &QDialog::accept);
+  QObject::connect(closeButton, &QPushButton::clicked, [&]() {
+    QList<QRadioButton*> radios = selectorWidget->findChildren<QRadioButton*>();
+    for (QRadioButton* radio : radios)
+    {
+      if (radio->isChecked())
+      {
+        QString configJson = radio->property("camera_config_json").toString();
+        int resolutionIndex = radio->property("resolution_index").toInt();
+
+        CameraConfig config = CameraConfig::from_json(configJson.toStdString());
+        if (resolutionIndex >= 0 && resolutionIndex < static_cast<int>(config.resolutions.size()))
+        {
+          camera_resolution const& camRes = config.resolutions[resolutionIndex];
+          qDebug() << "Selected Camera Path:" << QString::fromStdString(config.camera_path);
+          qDebug() << "Selected Resolution:" << camRes.resolution.width << "x"
+                   << camRes.resolution.height;
+          qDebug() << "Selected FPS:" << (camRes.fpsList.empty() ? 30 : camRes.fpsList[0]);
+          qDebug() << "Selected FOURCC:" << fourCCToString(camRes.fourcc).c_str();
+        }
+        break;
+      }
+    }
+    dialog.accept();
+  });
 
   dialog.show();
-  QObject::connect(selectorWidget, &CameraSelectorWidget::cameraConfigChanged,
-      [](QString cameraPath, int width, int height, int fps, int fourcc) {
-        qDebug() << "Selected Camera Path:" << cameraPath;
-        qDebug() << "Selected Resolution:" << width << "x" << height;
-        qDebug() << "Selected FPS:" << fps;
-        qDebug() << "Selected FOURCC:" << fourCCToString(fourcc).c_str();
-      });
 
   return app.exec();
 }
