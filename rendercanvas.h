@@ -22,9 +22,11 @@ class RenderCanvas : public QWidget
   void setImage(QImage* img)
   {
     imageValid.acquire();
+    QImage* old = bufferImage;
     bufferImage = img;
     imageValid.release();
-    update();    // Triggers a repaint
+    delete old;    // Safe: paintEvent cannot run while we hold the semaphore
+    update();      // Triggers a repaint
   }
 
   protected:

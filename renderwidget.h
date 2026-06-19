@@ -20,13 +20,14 @@ class RenderWidget
 
   public:
   RenderWidget(QWidget* parent);
-  void process(cv::Mat const& image) override; 
+  void process(cv::Mat const& image) override;
 
   virtual void mouseDoubleClickEvent(QMouseEvent* event) override;
 
   // provide a convenience function for cv::Size
   void setCVSize(cv::Size const& size);
   void resizeEvent(QResizeEvent* event) override;
+  QSize sizeHint() const override;
 
   public slots:
   // void onFrameSizeChanged(int width, int height);

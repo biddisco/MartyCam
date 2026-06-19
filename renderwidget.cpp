@@ -8,8 +8,8 @@
 #include <opencv2/imgproc/imgproc.hpp>
 
 #include "debug/logging.hpp"
-#include "renderwidget.h"
 #include "rendercanvas.h"
+#include "renderwidget.h"
 
 // ----------------------------------------------------------------------------
 static auto render_log = martycam::log::create("Renderer");
@@ -69,7 +69,6 @@ QImage* cvMat2QImage(cv::Mat const& mat)
   return qimg;
 }
 
-
 //----------------------------------------------------------------------------
 RenderWidget::RenderWidget(QWidget* parent)
   : QWidget(parent)
@@ -89,19 +88,24 @@ RenderWidget::RenderWidget(QWidget* parent)
   // This is the container/wrapper. Your actual content goes inside 'canvas'.
   canvas = new RenderCanvas(this);
   canvas->setStyleSheet("background-color: blue;");    // For visualization
-  canvas->setGeometry(0, 0, idealSize.width, idealSize.height);}
+  canvas->setGeometry(0, 0, idealSize.width, idealSize.height);
+}
 
 //----------------------------------------------------------------------------
 void RenderWidget::resizeEvent(QResizeEvent* event)
 {
   MARTY_LOG_SCOPE(render_log, "{} {}", (void*) (this), __func__);
-  // 1. Define target aspect ratio (640.0 / 480.0 = 1.3333)
+  Q_UNUSED(event);
+
+  if (idealSize.width <= 0 || idealSize.height <= 0 || !canvas) { return; }
+
+  // 1. Define target aspect ratio
   double targetRatio = idealSize.width / static_cast<double>(idealSize.height);
 
   int newWidth = this->width();
   int newHeight = this->height();
 
-  // 2. Calculate best fit
+  // 2. Calculate best fit while maintaining aspect ratio
   if (newWidth / targetRatio <= newHeight) { newHeight = qRound(newWidth / targetRatio); }
   else { newWidth = qRound(newHeight * targetRatio); }
 
@@ -116,24 +120,31 @@ void RenderWidget::resizeEvent(QResizeEvent* event)
 void RenderWidget::setCVSize(cv::Size const& size)
 {
   this->idealSize = size;
-  this->resize(idealSize.width, idealSize.height);
+  // Update the canvas geometry immediately in case no resize event fires
+  resizeEvent(nullptr);
+  update();
 }
+
+//----------------------------------------------------------------------------
+QSize RenderWidget::sizeHint() const { return QSize(idealSize.width, idealSize.height); }
 
 //----------------------------------------------------------------------------
 void RenderWidget::updatePixmap(cv::Mat const& frame)
 {
   MARTY_LOG_SCOPE(render_log, "{} {}", (void*) (this), __func__);
 
+  if (frame.empty() || !canvas) { return; }
+
   int bytes = frame.elemSize();
   int bytes_per_channel = bytes / frame.channels();
 
-  QImage *temp = nullptr;
+  QImage* temp = nullptr;
   if (bytes_per_channel == 1) { temp = cvMat2QImage<unsigned char>(frame); }
   else if (bytes_per_channel == 2) { temp = cvMat2QImage<short>(frame); }
   else if (bytes_per_channel == 4) { temp = cvMat2QImage<float>(frame); }
   else if (bytes_per_channel == 8) { temp = cvMat2QImage<double>(frame); }
 
-  canvas->setImage(temp);
+  if (temp) { canvas->setImage(temp); }
 }
 //----------------------------------------------------------------------------
 void RenderWidget::process(cv::Mat const& image)
@@ -150,8 +161,8 @@ void RenderWidget::UpdateTrigger(bool, int)
   MARTY_LOG_SCOPE(render_log, "{} {}", (void*) (this), __func__);
   // force repaint to happen on the gui thread
   canvas->update();
- }
- 
+}
+
 //----------------------------------------------------------------------------
 void RenderWidget::mouseDoubleClickEvent(QMouseEvent* event)
 {
