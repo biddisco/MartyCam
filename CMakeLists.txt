@@ -51,6 +51,7 @@ set_property(
 # Include GitExternal for cloning other repos internally
 # -----------------------------------------------------------------------------
 include(GitExternal)
+include(ExternalProject)
 
 # -----------------------------------------------------------------------------
 # Include Subproject for building other cmake projects as subdirs
@@ -105,10 +106,22 @@ if(NOT "${MARTYCAM_LOG_LEVEL_UPPERCASE}" MATCHES "OFF")
 endif()
 
 # ------------------------------------------------------------------------------
-# spdlog nlohmannn_json library
+# nlohmannn_json library
 # ------------------------------------------------------------------------------
 find_package(nlohmann_json REQUIRED)
 message(STATUS "Found nlohmann_json: ${nlohmann_json_VERSION}")
+
+# ------------------------------------------------------------------------------
+# Build/Download qwt
+# ------------------------------------------------------------------------------
+get_external_project(
+  PROJECT_NAME
+  "qwt"
+  GIT_REPO
+  "$ENV{HOME}/git-repos/qwt"
+  GIT_TAG
+  "candle-fixes"
+)
 
 # -----------------------------------------------------------------------------
 # Find HPX
@@ -174,13 +187,9 @@ endif()
 # ${martycam_QT_MOC_HDRS} )
 
 # -----------------------------------------------------------------------------
-# Analogue widgets library used for graph plotting
-# -----------------------------------------------------------------------------
-add_subdirectory(AnalogWidgets)
-
-# -----------------------------------------------------------------------------
 # Setup libs
 # -----------------------------------------------------------------------------
+# QWT is fetched via get_external_project() earlier in this file
 set(MARTYCAM_INCLUDE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_BINARY_DIR}/src)
 
 add_subdirectory(src/debug)
@@ -198,6 +207,7 @@ set(martycam_SRCS
     MotionFilter.cpp
     DecayFilter.cpp
     GraphUpdateFilter.cpp
+    martyplot.cpp
     martycam.cpp
     main.cpp
     processingthread.cpp
@@ -248,19 +258,18 @@ target_include_directories(
           "${MARTYCAM_INCLUDE_ROOT}"
           "${CMAKE_CURRENT_BINARY_DIR}"
           "${CMAKE_CURRENT_BINARY_DIR}/src"
-          "${CMAKE_CURRENT_SOURCE_DIR}/AnalogWidgets/analogwidgets"
-          "${CMAKE_CURRENT_SOURCE_DIR}/AnalogWidgets/analogwidgets/analogwidgets"
+          "${qwt_SOURCE_DIR}/src"
           ${HPX_INCLUDE_DIRS}
 )
 
 target_link_libraries(
   martycam
-  analogue
   utility_widgets
   ${MARTYCAM_LOG_LIBS}
   ${OpenCV_LIBS}
   ${Boost_LIBRARIES}
   HPX::hpx
+  qwt
   nlohmann_json::nlohmann_json
   Fontconfig::Fontconfig
 )

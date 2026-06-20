@@ -4,7 +4,9 @@
 //
 #include <QDockWidget>
 #include <QSettings>
+#include <QSizePolicy>
 #include <QToolBar>
+#include <QVBoxLayout>
 //
 #include <QtWidgets/QMessageBox>
 #include <hpx/future.hpp>
@@ -36,8 +38,12 @@ MartyCam::MartyCam(hpx::execution::parallel_executor const& defaultExec,
   restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
   //
   this->renderWidget = std::make_shared<RenderWidget>(this);
-  this->ui.gridLayout->addWidget(this->renderWidget.get(), 0, Qt::AlignHCenter || Qt::AlignTop);
-
+  this->renderWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  ui.central_layout->insertWidget(0, this->renderWidget.get(), 1);
+  ui.motionGroup->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+  ui.central_layout->setStretch(0, 1);
+  ui.central_layout->setStretch(1, 0);
+  //
   this->imageBuffer = ImageBuffer(new ConcurrentCircularBuffer<cv::Mat>(IMAGE_BUFF_CAPACITY));
 
   //
@@ -295,7 +301,7 @@ void MartyCam::onRecordingStateChanged(bool state)
 void MartyCam::resetChart()
 {
   MARTY_LOG_SCOPE(marty_log, "{} {}", (void*) (this), __func__);
-  this->ui.chart->channels().clear();
+  this->ui.chart->clearCurves();
 }
 //----------------------------------------------------------------------------
 void MartyCam::initChart()
