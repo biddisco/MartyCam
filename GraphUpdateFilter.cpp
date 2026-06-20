@@ -119,6 +119,13 @@ void GraphUpdateFilter::updateChart(MartyCamPlot* plot)
   plot->updateThresholdLine(
       thresholdTime[0], thresholdLevel[0], thresholdTime[1], thresholdLevel[1]);
 
+  // Continuous scrolling: keep the newest data point at a fixed position
+  // by sliding the x-axis window. The window width is fixed at
+  // CIRCULAR_BUFF_SIZE + GRAPH_EXTENSION, anchored at the right edge.
+  double xMax = frameNumber.back() + GRAPH_EXTENSION;
+  double xMin = xMax - (CIRCULAR_BUFF_SIZE + GRAPH_EXTENSION);
+  plot->setXAxisRange(xMin, xMax);
+
   plot->replot();
 }
 //----------------------------------------------------------------------------

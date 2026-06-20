@@ -43,6 +43,7 @@ class MartyCamPlot : public QwtPlot
   void updateCurveData(int curveId, double const* xData, double const* yData, int count);
   void updateThresholdLine(double x1, double y1, double x2, double y2);
   void clearCurves();
+  void setXAxisRange(double min, double max);
 
   private:
   QwtPlotCurve* m_curves[NumCurves];

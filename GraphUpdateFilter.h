@@ -10,7 +10,7 @@
 
 //
 #define CIRCULAR_BUFF_SIZE 500
-#define GRAPH_EXTENSION 50
+#define GRAPH_EXTENSION 20
 //
 //----------------------------------------------------------------------------
 // Forward declaration

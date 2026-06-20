@@ -30,8 +30,8 @@ MartyCamPlot::MartyCamPlot(QWidget* parent)
   insertLegend(legend, QwtPlot::RightLegend);
 
   // Axis labels
-  setAxisTitle(QwtAxis::XBottom, "Frame");
-  setAxisTitle(QwtAxis::YLeft, "Value");
+//   setAxisTitle(QwtAxis::XBottom, "Frame");
+//   setAxisTitle(QwtAxis::YLeft, "Value");
   setAxisScale(QwtAxis::YLeft, -5.0, 105.0);
 
   setCanvasBackground(Qt::black);
@@ -114,4 +114,10 @@ void MartyCamPlot::clearCurves()
     }
   }
   replot();
+}
+
+//----------------------------------------------------------------------------
+void MartyCamPlot::setXAxisRange(double min, double max)
+{
+  setAxisScale(QwtAxis::XBottom, min, max);
 }
