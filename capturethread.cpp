@@ -1,7 +1,10 @@
 #include "capturethread.h"
 
 #include <QDateTime>
+#include <QDir>
 #include <QElapsedTimer>
+//
+#include <wordexp.h>
 //
 #include <iomanip>
 #include <iostream>
@@ -21,6 +24,19 @@
 static auto cap_log = martycam::log::create("Capture");
 //
 typedef std::shared_ptr<ConcurrentCircularBuffer<cv::Mat>> ImageBuffer;
+
+// Expand shell-style variables and ~ in a path (e.g. $HOME/wildlife -> /home/user/wildlife)
+static std::string expandPath(std::string const& path)
+{
+  wordexp_t p;
+  if (wordexp(path.c_str(), &p, WRDE_NOCMD) == 0)
+  {
+    std::string result(p.we_wordv[0]);
+    wordfree(&p);
+    return result;
+  }
+  return path;
+}
 
 //
 // May 2012.
@@ -113,8 +129,7 @@ bool CaptureThread::connectCamera(std::string const& URL)
 
   if (!this->capture.isOpened())
   {
-    MARTY_LOG_ERROR(cap_log, "{:<20} Camera connection failed",
-        "CaptureThread");
+    MARTY_LOG_ERROR(cap_log, "{:<20} Camera connection failed", "CaptureThread");
     return false;
   }
 
@@ -157,8 +172,9 @@ void CaptureThread::run()
   {
     if (!captureActive)
     {
-      MARTY_LOG_WARN(cap_log, "{:<20} CaptureThread::run() still running even though "
-                                   "captureActive=false",
+      MARTY_LOG_WARN(cap_log,
+          "{:<20} CaptureThread::run() still running even though "
+          "captureActive=false",
           "CaptureThread");
       boost::this_thread::sleep(boost::posix_time::milliseconds(10));
       continue;
@@ -174,8 +190,8 @@ void CaptureThread::run()
     if (!grabbed)
     {
       this->setAbort(true);
-      MARTY_LOG_ERROR(cap_log, "{:<20} Failed to grab camera image, aborting this->capture",
-          "CaptureThread");
+      MARTY_LOG_ERROR(
+          cap_log, "{:<20} Failed to grab camera image, aborting this->capture", "CaptureThread");
       continue;
     }
 
@@ -198,8 +214,8 @@ void CaptureThread::run()
     if (frame.empty())
     {
       this->setAbort(true);
-      MARTY_LOG_ERROR(cap_log, "{:<20} Empty camera image, aborting this->capture",
-          "CaptureThread");
+      MARTY_LOG_ERROR(
+          cap_log, "{:<20} Empty camera image, aborting this->capture", "CaptureThread");
       continue;
     }
 
@@ -315,17 +331,49 @@ void CaptureThread::saveTimeLapseAVI(cv::Mat const& image)
 void CaptureThread::startTimeLapse(double fps)
 {
   MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
-  std::string path = this->AVI_Directory + "/" + this->TimeLapseAVI_Name + std::string(".avi");
+  if (this->AVI_Directory.empty() || this->TimeLapseAVI_Name.empty())
+  {
+    std::cout << "Cannot create time-lapse writer: directory or filename is empty" << std::endl;
+    this->TimeLapseAVI_Writing = false;
+    return;
+  }
+
+  QDir dir(QString::fromStdString(this->AVI_Directory));
+  if (!dir.exists())
+  {
+    if (!dir.mkpath("."))
+    {
+      std::cout << "Cannot create time-lapse writer: failed to create directory "
+                << this->AVI_Directory << std::endl;
+      this->TimeLapseAVI_Writing = false;
+      return;
+    }
+  }
+
+  std::string path =
+      expandPath(this->AVI_Directory) + "/" + this->TimeLapseAVI_Name + std::string(".mp4");
+  cv::Size frameSize = this->getImageSize();
+  if (frameSize.width <= 0 || frameSize.height <= 0)
+  {
+    std::cout << "Cannot create time-lapse writer: invalid frame size " << frameSize.width << "x"
+              << frameSize.height << std::endl;
+    this->TimeLapseAVI_Writing = false;
+    return;
+  }
+
   if (!this->TimeLapseAVI_Writer.isOpened())
   {
-    this->TimeLapseAVI_Writer.open(
-        path.c_str(), CV_FOURCC('X', 'V', 'I', 'D'), fps, this->getImageSize());
+    this->TimeLapseAVI_Writer.open(path.c_str(), CV_FOURCC('a', 'v', 'c', '1'), fps, frameSize);
+    if (!this->TimeLapseAVI_Writer.isOpened())
+    {
+      this->TimeLapseAVI_Writer.open(path.c_str(), CV_FOURCC('m', 'p', '4', 'v'), fps, frameSize);
+    }
     //    emit(RecordingState(true));
   }
 
   if (!this->TimeLapseAVI_Writer.isOpened())
   {
-    std::cout << "Failed to open Time Lapse AVI writer : " << path.c_str() << std::endl;
+    std::cout << "Failed to open Time Lapse video writer : " << path.c_str() << std::endl;
     this->TimeLapseAVI_Writing = false;
   }
   else { this->TimeLapseAVI_Writing = true; }
@@ -369,16 +417,51 @@ void CaptureThread::updateCaptureTime(int time_ms)
 void CaptureThread::saveAVI(cv::Mat const& image)
 {
   MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
-  // CV_FOURCC('M', 'J', 'P', 'G'),
-  // CV_FOURCC('M', 'P', '4', '2') = MPEG-4.2 codec
-  // CV_FOURCC('D', 'I', 'V', '3') = MPEG-4.3 codec
-  // CV_FOURCC('D', 'I', 'V', 'X') = MPEG-4 codec
-  // CV_FOURCC('X', 'V', 'I', 'D')
+  // CV_FOURCC('a', 'v', 'c', '1') = H.264 (best for MP4)
+  // CV_FOURCC('m', 'p', '4', 'v') = MPEG-4 Part 2 (fallback)
+  // CV_FOURCC('M', 'J', 'P', 'G') = Motion JPEG (AVI only)
+  // CV_FOURCC('X', 'V', 'I', 'D') = XviD (legacy)
   if (!this->MotionAVI_Writer.isOpened())
   {
-    std::string path = this->AVI_Directory + "/" + this->MotionAVI_Name + std::string(".avi");
-    this->MotionAVI_Writer.open(
-        path.c_str(), CV_FOURCC('X', 'V', 'I', 'D'), this->getActualFps(), image.size());
+    if (this->AVI_Directory.empty() || this->MotionAVI_Name.empty())
+    {
+      std::cout << "Cannot create video writer: directory or filename is empty" << std::endl;
+      this->MotionAVI_Writing = false;
+      return;
+    }
+
+    std::string expandedDir = expandPath(this->AVI_Directory);
+    QDir dir(QString::fromStdString(expandedDir));
+    if (!dir.exists())
+    {
+      if (!dir.mkpath("."))
+      {
+        std::cout << "Cannot create video writer: failed to create directory " << expandedDir
+                  << std::endl;
+        this->MotionAVI_Writing = false;
+        return;
+      }
+    }
+
+    std::string path = expandedDir + "/" + this->MotionAVI_Name + std::string(".mp4");
+    double fps = this->getActualFps();
+    if (fps <= 0.0) { fps = static_cast<double>(this->requestedFps); }
+    if (fps <= 0.0) { fps = 15.0; }
+
+    cv::Size frameSize = image.size();
+    if (frameSize.width <= 0 || frameSize.height <= 0)
+    {
+      std::cout << "Cannot create video writer: invalid frame size " << frameSize.width << "x"
+                << frameSize.height << std::endl;
+      this->MotionAVI_Writing = false;
+      return;
+    }
+
+    this->MotionAVI_Writer.open(path.c_str(), CV_FOURCC('a', 'v', 'c', '1'), fps, frameSize);
+    if (!this->MotionAVI_Writer.isOpened())
+    {
+      this->MotionAVI_Writer.open(path.c_str(), CV_FOURCC('m', 'p', '4', 'v'), fps, frameSize);
+    }
     // emit(RecordingState(true));
   }
   if (this->MotionAVI_Writer.isOpened())
@@ -393,7 +476,8 @@ void CaptureThread::saveAVI(cv::Mat const& image)
   }
   else
   {
-    std::cout << "Failed to create AVI writer" << std::endl;
+    std::cout << "Failed to create video writer" << std::endl;
+    this->MotionAVI_Writing = false;
     return;
   }
 }
