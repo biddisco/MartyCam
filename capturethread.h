@@ -9,6 +9,8 @@
 //
 #include <QMutex>
 #include <QWaitCondition>
+#include <atomic>
+#include <mutex>
 //
 #include <boost/lockfree/spsc_queue.hpp>
 #include <memory>
@@ -30,8 +32,8 @@ typedef std::shared_ptr<CaptureThread> CaptureThread_SP;
 class CaptureThread
 {
   public:
-  CaptureThread(ImageBuffer imageBuffer, cv::Size const& size, int rotation, 
-      std::string const& URL, hpx::execution::parallel_executor exec, int requestedFps);
+  CaptureThread(ImageBuffer imageBuffer, cv::Size const& size, int rotation, std::string const& URL,
+      hpx::execution::parallel_executor exec, int requestedFps);
   ~CaptureThread();
 
   void run();
@@ -60,7 +62,7 @@ class CaptureThread
   //
   // Time Lapse film
   //
-  void addNextFrameToTimeLapse(bool write) { this->MotionAVI_Writing = write; }
+  void addNextFrameToTimeLapse(bool write) { this->TimeLapseAVI_Writing = write; }
   void setWriteTimeLapseAVIName(char const* name);
 
   //
@@ -78,7 +80,7 @@ class CaptureThread
   void setRotation(int value);
   //
   void rotateImage(cv::Mat const& source, cv::Mat& rotated);
-  void captionImage(cv::Mat& image);
+  static void captionImage(cv::Mat& image);
 
   cv::Size getImageSize() { return this->imageSize; }
   cv::Size getRotatedSize() { return this->rotatedSize; }
@@ -94,6 +96,7 @@ class CaptureThread
 
   //
   QMutex stopLock;
+  std::mutex aviLock;
   QWaitCondition stopWait;
   hpx::execution::parallel_executor executor;
   //
@@ -113,11 +116,13 @@ class CaptureThread
   IntCircBuff captureTimes;
   int rotation;
   int FrameCounter;
+  int motion_video_FrameCounter;
   ImageBuffer aviBuffer;
   //
   cv::VideoWriter MotionAVI_Writer;
   cv::VideoWriter TimeLapseAVI_Writer;
-  bool MotionAVI_Writing;
+  std::atomic<bool> MotionAVI_Writing;
+  std::atomic<bool> aviWriterActive;
   std::string AVI_Directory;
   std::string MotionAVI_Name;
   std::string TimeLapseAVI_Name;
@@ -129,7 +134,7 @@ class CaptureThread
   cv::Mat rotatedImage;
 
   public:
-  bool TimeLapseAVI_Writing;
+  std::atomic<bool> TimeLapseAVI_Writing;
 };
 
 #endif

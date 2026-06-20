@@ -1,8 +1,8 @@
 #include "capturethread.h"
 
 #include <QDateTime>
-#include <QDir>
 #include <QElapsedTimer>
+#include <filesystem>
 //
 #include <wordexp.h>
 //
@@ -92,6 +92,7 @@ CaptureThread::CaptureThread(ImageBuffer imageBuffer, cv::Size const& size, int 
   , captureActive(false)
   , deInterlace(false)
   , MotionAVI_Writing(false)
+  , aviWriterActive(false)
   , capture()
   , rotatedImage()
   , rotatedSize(cv::Size(0, 0))
@@ -338,10 +339,10 @@ void CaptureThread::startTimeLapse(double fps)
     return;
   }
 
-  QDir dir(QString::fromStdString(this->AVI_Directory));
-  if (!dir.exists())
+  std::filesystem::path dirPath(this->AVI_Directory);
+  if (!std::filesystem::exists(dirPath))
   {
-    if (!dir.mkpath("."))
+    if (!std::filesystem::create_directories(dirPath))
     {
       std::cout << "Cannot create time-lapse writer: failed to create directory "
                 << this->AVI_Directory << std::endl;
@@ -421,65 +422,96 @@ void CaptureThread::saveAVI(cv::Mat const& image)
   // CV_FOURCC('m', 'p', '4', 'v') = MPEG-4 Part 2 (fallback)
   // CV_FOURCC('M', 'J', 'P', 'G') = Motion JPEG (AVI only)
   // CV_FOURCC('X', 'V', 'I', 'D') = XviD (legacy)
-  if (!this->MotionAVI_Writer.isOpened())
-  {
-    if (this->AVI_Directory.empty() || this->MotionAVI_Name.empty())
-    {
-      std::cout << "Cannot create video writer: directory or filename is empty" << std::endl;
-      this->MotionAVI_Writing = false;
-      return;
-    }
 
-    std::string expandedDir = expandPath(this->AVI_Directory);
-    QDir dir(QString::fromStdString(expandedDir));
-    if (!dir.exists())
+  // Make a deep copy of the frame so the capture thread can continue
+  // immediately while encoding happens asynchronously on an HPX worker.
+  cv::Mat frameCopy = image.clone();
+
+  // Offload the blocking VideoWriter::write() to an HPX worker thread.
+  hpx::async(this->executor, [this, frameCopy]() mutable {
+    std::lock_guard<std::mutex> locker(this->aviLock);
+
+    // If recording was stopped and the writer is already closed, nothing to do.
+    if (!this->MotionAVI_Writing && !this->MotionAVI_Writer.isOpened()) { return; }
+
+    if (!this->MotionAVI_Writer.isOpened())
     {
-      if (!dir.mkpath("."))
+      motion_video_FrameCounter = 0;
+      MARTY_LOG_INFO(cap_log, "{:<20} Creating video writer for {}.mp4", "CaptureThread",
+          this->MotionAVI_Name);
+      if (this->AVI_Directory.empty() || this->MotionAVI_Name.empty())
       {
-        std::cout << "Cannot create video writer: failed to create directory " << expandedDir
-                  << std::endl;
+        MARTY_LOG_ERROR(cap_log,
+            "{:<20} Cannot create video writer: directory or filename is empty", "CaptureThread");
         this->MotionAVI_Writing = false;
         return;
       }
+
+      std::string expandedDir = expandPath(this->AVI_Directory);
+      std::filesystem::path dirPath(expandedDir);
+      if (!std::filesystem::exists(dirPath))
+      {
+        if (!std::filesystem::create_directories(dirPath))
+        {
+          MARTY_LOG_ERROR(cap_log,
+              "{:<20} Cannot create video writer: failed to create directory {}", "CaptureThread",
+              expandedDir);
+          this->MotionAVI_Writing = false;
+          return;
+        }
+      }
+
+      std::string path = expandedDir + "/" + this->MotionAVI_Name + std::string(".mp4");
+      double fps = this->getActualFps();
+      if (fps <= 0.0) { fps = static_cast<double>(this->requestedFps); }
+      if (fps <= 0.0) { fps = 15.0; }
+
+      cv::Size frameSize = frameCopy.size();
+      if (frameSize.width <= 0 || frameSize.height <= 0)
+      {
+        MARTY_LOG_ERROR(cap_log, "{:<20} Cannot create video writer: invalid frame size {}x{}",
+            "CaptureThread", frameSize.width, frameSize.height);
+        this->MotionAVI_Writing = false;
+        return;
+      }
+
+      std::vector<int> writerParams = {
+          cv::VIDEOWRITER_PROP_HW_ACCELERATION, cv::VIDEO_ACCELERATION_ANY};
+
+      MARTY_LOG_INFO(cap_log, "{:<20} Creating video writer for {}.mp4 with fps={} and size={}x{}",
+          "CaptureThread", this->MotionAVI_Name, fps, frameSize.width, frameSize.height);
+      this->MotionAVI_Writer.open(path.c_str(), cv::CAP_FFMPEG, CV_FOURCC('a', 'v', 'c', '1'), fps,
+          frameSize, writerParams);
+      if (!this->MotionAVI_Writer.isOpened())
+      {
+        MARTY_LOG_WARN(
+            cap_log, "{:<20} Failed to create H.264 writer, trying MPEG-4 Part 2", "CaptureThread");
+        this->MotionAVI_Writer.open(path.c_str(), cv::CAP_FFMPEG, CV_FOURCC('m', 'p', '4', 'v'),
+            fps, frameSize, writerParams);
+      }
+      // emit(RecordingState(true));
     }
 
-    std::string path = expandedDir + "/" + this->MotionAVI_Name + std::string(".mp4");
-    double fps = this->getActualFps();
-    if (fps <= 0.0) { fps = static_cast<double>(this->requestedFps); }
-    if (fps <= 0.0) { fps = 15.0; }
-
-    cv::Size frameSize = image.size();
-    if (frameSize.width <= 0 || frameSize.height <= 0)
+    if (this->MotionAVI_Writer.isOpened())
     {
-      std::cout << "Cannot create video writer: invalid frame size " << frameSize.width << "x"
-                << frameSize.height << std::endl;
+      motion_video_FrameCounter++;
+      MARTY_LOG_INFO(cap_log, "{:<20} Writing frame {:06d} to video writer", "CaptureThread",
+          motion_video_FrameCounter);
+      this->MotionAVI_Writer.write(frameCopy);
+      // if CloseAvi has been called, stop writing.
+      if (!this->MotionAVI_Writing)
+      {
+        this->MotionAVI_Writer.release();
+        // emit(RecordingState(false));
+      }
+    }
+    else
+    {
+      MARTY_LOG_ERROR(cap_log, "{:<20} Failed to create video writer", "CaptureThread");
       this->MotionAVI_Writing = false;
       return;
     }
-
-    this->MotionAVI_Writer.open(path.c_str(), CV_FOURCC('a', 'v', 'c', '1'), fps, frameSize);
-    if (!this->MotionAVI_Writer.isOpened())
-    {
-      this->MotionAVI_Writer.open(path.c_str(), CV_FOURCC('m', 'p', '4', 'v'), fps, frameSize);
-    }
-    // emit(RecordingState(true));
-  }
-  if (this->MotionAVI_Writer.isOpened())
-  {
-    this->MotionAVI_Writer.write(image);
-    // if CloseAvi has been called, stop writing.
-    if (!this->MotionAVI_Writing)
-    {
-      this->MotionAVI_Writer.release();
-      // emit(RecordingState(false));
-    }
-  }
-  else
-  {
-    std::cout << "Failed to create video writer" << std::endl;
-    this->MotionAVI_Writing = false;
-    return;
-  }
+  });
 }
 //----------------------------------------------------------------------------
 void CaptureThread::closeAVI() { this->MotionAVI_Writing = false; }
@@ -513,11 +545,30 @@ void CaptureThread::rotateImage(cv::Mat const& source, cv::Mat& rotated)
 //----------------------------------------------------------------------------
 void CaptureThread::captionImage(cv::Mat& image)
 {
-  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
-  QString timestring = QDateTime::currentDateTime().toString("HELLO dd/MM/yyyy hh:mm:ss");
-  cv::putText(image, timestring.toLatin1().data(),
-      cvPoint(image.size().width - text_size.width - 4, text_size.height + 4),
-      CV_FONT_HERSHEY_PLAIN, 1.0, cv::Scalar(255, 255, 255, 0), 1);
+  MARTY_LOG_SCOPE(cap_log, "{}", __func__);
+  QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
+  std::string text = timestring.toLatin1().data();
+
+  // Scale the text so its width is a fixed fraction of the image width.
+  const double targetFraction = 0.20;    // 20 % of image width
+  const double minScale = 0.5;
+  const double maxScale = 4.0;
+  int baseline = 0;
+
+  cv::Size baseSize = cv::getTextSize(text, CV_FONT_HERSHEY_PLAIN, 1.0, 1, &baseline);
+  double scale = 1.0;
+  if (baseSize.width > 0)
+  {
+    scale = (image.size().width * targetFraction) / baseSize.width;
+    scale = std::max(minScale, std::min(scale, maxScale));
+  }
+
+  int thickness = std::max(1, static_cast<int>(scale));
+  cv::Size textSize = cv::getTextSize(text, CV_FONT_HERSHEY_PLAIN, scale, thickness, &baseline);
+
+  cv::Point origin(image.size().width - textSize.width - 4, textSize.height + 4);
+  cv::putText(image, text, origin, CV_FONT_HERSHEY_PLAIN, scale,
+      cv::Scalar(255, 255, 255, 0), thickness);
 }
 //----------------------------------------------------------------------------
 // If the requested resolution is available switches to it and returns true.

@@ -291,8 +291,8 @@ int main(int argc, char* argv[])
   init_args.rp_callback = &init_resource_partitioner_handler;
   // tell the scheduler to sleep quickly when there are no tasks to work on
   init_args.cfg = {
-      "hpx.max_idle_loop_count=10",       // go into idle after 10 loops with no work
-      "hpx.os_threads=4",                 // use 4 cores
+      "hpx.max_idle_loop_count=500",      // go into idle after 10 loops with no work
+      "hpx.os_threads=6",                 // use 6 cores
       "hpx.stacks.small_size=0x80000",    // Increase stack size if needed
       "hpx.stacks.use_guard_pages=1"      // Enables hardware stack boundaries
   };

@@ -2,6 +2,7 @@
 #include "DecayFilter.h"
 #include "PSNRFilter.h"
 #include "filter.h"
+#include "capturethread.h"
 //
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -220,9 +221,7 @@ void MotionFilter::process(cv::Mat const& image)
     // Add time and data to image
     //
     QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
-    cv::putText(shownImage, timestring.toLatin1().data(),
-        cvPoint(shownImage.size().width - text_size.width - 4, text_size.height + 4),
-        CV_FONT_HERSHEY_PLAIN, 1.0, cv::Scalar(255, 255, 255, 0), 1);
+    CaptureThread::captionImage(shownImage);
     //
     // Pass final image to GUI
     //
