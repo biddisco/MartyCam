@@ -1,0 +1,50 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build default",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "options": {
+                "cwd": "/home/biddisco/build/martycam"
+            },
+            "type": "shell",
+            "command": "/usr/bin/ninja",
+            "presentation": {
+                "reveal": "always",
+                "clear": true,
+                "echo": true,
+                "revealProblems": "onProblem"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "Build martycam",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "options": {
+                "cwd": "/home/biddisco/build/martycam"
+            },
+            "type": "shell",
+            "command": "/usr/bin/ninja",
+            "args": [
+                "martycam"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "clear": true,
+                "echo": true,
+                "revealProblems": "onProblem"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        }
+    ]
+}

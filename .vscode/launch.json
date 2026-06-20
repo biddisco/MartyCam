@@ -1,0 +1,114 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Debug Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "args": []
+        },
+        {
+            "name": "Python: Debug benchmark-martycam",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/benchmarking/benchmark_martycam.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "args": []
+        },
+        {
+            "name": "Debug Active CMake Target",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${command:cmake.launchTargetPath}",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "visualizerFile": "/home/biddisco/.local/x86_64/config/Code/User/workspaceStorage/5db5ce25a7b4f1d6593e561324cb797a/tonka3000.qtvsctools/qt.natvis.xml"
+        },
+        {
+            "name": "Debug martycam",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${command:cmake.launchTargetPath}",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "/home/biddisco/build/martycam",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "visualizerFile": "/home/biddisco/.local/x86_64/config/Code/User/workspaceStorage/5db5ce25a7b4f1d6593e561324cb797a/tonka3000.qtvsctools/qt.natvis.xml"
+        },
+        {
+            "name": "Debug LandauDamping",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${command:cmake.launchTargetPath}",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "/home/biddisco/build/martycam",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "visualizerFile": "/home/biddisco/.local/x86_64/config/Code/User/workspaceStorage/5db5ce25a7b4f1d6593e561324cb797a/tonka3000.qtvsctools/qt.natvis.xml"
+        },
+        {
+            "name": "Debug PenningTrap",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${command:cmake.launchTargetPath}",
+            "args": [
+                "--particles",
+                "10000"
+            ],
+            "stopAtEntry": false,
+            "cwd": "/home/biddisco/build/martycam",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "visualizerFile": "/home/biddisco/.local/x86_64/config/Code/User/workspaceStorage/5db5ce25a7b4f1d6593e561324cb797a/tonka3000.qtvsctools/qt.natvis.xml"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "manualArgs",
+            "type": "promptString",
+            "description": "Enter arguments (will be split on spaces - quote multi-word values)",
+            "default": ""
+        }
+    ]
+}

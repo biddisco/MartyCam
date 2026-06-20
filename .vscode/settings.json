@@ -1,0 +1,86 @@
+{
+    // Python formatting and linting settings with Ruff
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.formatOnSave": true,
+        "editor.formatOnType": true,
+        "editor.formatOnPaste": true,
+        "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
+        }
+    },
+    "[yaml]": {
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true,
+        "files.trimFinalNewlines": true,
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true
+    },
+    // Ruff configuration - using native language server settings
+    "ruff.configuration": {
+        "line-length": 88,
+        "format": {
+            "quote-style": "double"
+        },
+        "lint": {
+            "select": [
+                "E",
+                "F",
+                "I"
+            ],
+            "ignore": []
+        }
+    },
+    // Enable Ruff linting and formatting
+    "ruff.enable": true,
+    // General editor settings for better Python development
+    "editor.rulers": [
+        88
+    ],
+    "python.formatting.provider": "none",
+    // Optional: Enable format on save for all file types
+    "editor.formatOnSave": true,
+    // Optional: Show format modifications in the editor
+    "editor.formatOnSaveMode": "file",
+    // Disable other Python linters to avoid conflicts with Ruff
+    "python.linting.enabled": false,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": false,
+    "cmake.sourceDirectory": "/home/biddisco/src/martycam",
+    "cmake.buildDirectory": "/home/biddisco/build/martycam",
+    "cmake.configureOnOpen": false,
+    "cmake.useCMakePresets": "never",
+    "[c]": {
+        "editor.defaultFormatter": "xaver.clang-format",
+        "editor.formatOnSave": true
+    },
+    "[cpp]": {
+        "editor.defaultFormatter": "xaver.clang-format",
+        "editor.formatOnSave": true
+    },
+    "clang-format.executable": "/usr/bin/clang-format-18",
+    "clang-format.style": "file",
+    "C_Cpp.intelliSenseEngine": "disabled",
+    "C_Cpp.errorSquiggles": "disabled",
+    "C_Cpp.default.compileCommands": "/home/biddisco/build/martycam/compile_commands.json",
+    "C_Cpp.default.compilerArgs": [
+        "-Wno-deprecated-declarations",
+        "-Wno-redundant-move",
+        "-Wno-missing-field-initializers",
+        "-Wno-unused-function"
+    ],
+    "clangd.arguments": [
+        "--compile-commands-dir=/home/biddisco/build/martycam"
+    ],
+    "folder-color.pathColors": [
+        {
+            "folderPath": "martycam/src/",
+            "color": "foldercolorizer.color_00ccff"
+        }
+    ],
+    "editor.wordWrapColumn": 100,
+    "qt-core.additionalQtPaths": [],
+    "qt-ui.customWidgetsDesignerExePath": "/opt/Qt/6.10.1/gcc_64/bin/designer",
+    "qt-core.qtInstallationRoot": "/opt/Qt/6.10.1/gcc_64/",
+}
