@@ -85,8 +85,10 @@ CaptureThread::CaptureThread(ImageBuffer imageBuffer, cv::Size const& size, int 
   , requestedFps(requestedFps)
   , requestedSizeCorrect(false)
   , actualFps(0.0)
+  , grabFps(0.0)
   , FrameCounter(0)
   , frameTimes(50)
+  , grabTimes(50)
   , captureTimes(15)
   , abort(false)
   , captureActive(false)
@@ -159,9 +161,13 @@ void CaptureThread::run()
   // Clear the frameTimes circular buffer to ensure actualFps is computed
   // correctly from the first frame
   this->frameTimes.clear();
+  this->grabTimes.clear();
 
   QElapsedTimer actualFpsTime;
   actualFpsTime.start();
+
+  QElapsedTimer grabFpsTime;
+  grabFpsTime.start();
 
   QElapsedTimer requestedFpsTime;
   requestedFpsTime.start();
@@ -186,6 +192,7 @@ void CaptureThread::run()
     captureWaitTime.restart();
     bool const grabbed = this->capture.grab();
     updateCaptureTime(captureWaitTime.elapsed());
+    updateGrabFps(grabFpsTime.elapsed());
     int elapsedSinceLastOutput_ms = requestedFpsTime.elapsed();
 
     if (!grabbed)
@@ -392,6 +399,7 @@ void CaptureThread::setRequestedFps(int value)
   MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   this->requestedFps = value;
   this->frameTimes.clear();
+  this->grabTimes.clear();
 }
 //----------------------------------------------------------------------------
 void CaptureThread::updateActualFps(int time)
@@ -400,10 +408,22 @@ void CaptureThread::updateActualFps(int time)
   frameTimes.push_back(time);
   if (frameTimes.size() > 1)
   {
-    actualFps = frameTimes.size() / ((double) time - frameTimes.front()) * 1000.0;
+    actualFps = (frameTimes.size() - 1) / ((double) time - frameTimes.front()) * 1000.0;
     actualFps = (static_cast<int>(actualFps * 10)) / 10.0;
   }
   else { actualFps = 0; }
+}
+//----------------------------------------------------------------------------
+void CaptureThread::updateGrabFps(int time)
+{
+  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
+  grabTimes.push_back(time);
+  if (grabTimes.size() > 1)
+  {
+    grabFps = (grabTimes.size() - 1) / ((double) time - grabTimes.front()) * 1000.0;
+    grabFps = (static_cast<int>(grabFps * 10)) / 10.0;
+  }
+  else { grabFps = 0; }
 }
 //----------------------------------------------------------------------------
 void CaptureThread::updateCaptureTime(int time_ms)

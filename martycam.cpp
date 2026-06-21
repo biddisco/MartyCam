@@ -147,6 +147,7 @@ void MartyCam::createCaptureThread(
   this->captureThread->startCapture();
   this->settingsWidget->setThreads(this->captureThread, this->processingThread);
 }
+
 //----------------------------------------------------------------------------
 void MartyCam::deleteCaptureThread()
 {
@@ -155,9 +156,10 @@ void MartyCam::deleteCaptureThread()
   this->imageBuffer->clear();
   this->settingsWidget->unsetCaptureThread();
   this->captureThread = nullptr;
-
+  // FIXME : doing this helps prevent lockups on shutdown.
   this->imageBuffer->send(cv::Mat());
 }
+
 //----------------------------------------------------------------------------
 void MartyCam::createProcessingThread(ProcessingThread* oldThread,
     hpx::execution::parallel_executor exec, ProcessingType processingType)
@@ -208,11 +210,13 @@ void MartyCam::updateGUI()
   if (!this->processingThread) return;
 
   statusBar()->showMessage(
-      QString("FPS : %1 | Frame Counter : %2 "
-              "| Image Buffer Occupancy : %3\% "
-              "| Sleep in CaptureThread: %4ms "
-              "| Capture Time: %5ms "
-              "| Processing Time: %6ms")
+      QString("Grab FPS: %1 | Req FPS: %2 | Actual FPS: %3 | Frame Counter : %4 "
+              "| Image Buffer Occupancy : %5\% "
+              "| Sleep in CaptureThread: %6ms "
+              "| Capture Time: %7ms "
+              "| Processing Time: %8ms")
+          .arg(this->captureThread->getGrabFps(), 5, 'f', 2)
+          .arg(this->captureThread->getRequestedFps(), 3)
           .arg(this->captureThread->getActualFps(), 5, 'f', 2)
           .arg(captureThread->GetFrameCounter(), 5)
           .arg(100 * (float) this->imageBuffer->size() / IMAGE_BUFF_CAPACITY, 4)

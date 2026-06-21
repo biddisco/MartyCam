@@ -43,7 +43,9 @@ class CaptureThread
   bool stopCapture();
   //
   void setRequestedFps(int value);
+  int getRequestedFps() { return requestedFps; }
   double getActualFps() { return actualFps; }
+  double getGrabFps() { return grabFps; }
   int getSleepTime() { return sleepTime_ms; }
   int getCaptureTime() { return captureTime_ms; }
   bool isCapturing() { return captureActive; }
@@ -90,6 +92,7 @@ class CaptureThread
 
   void setAbort(bool a) { this->abort = a; }
   void updateActualFps(int time_ms);
+  void updateGrabFps(int time_ms);
   void updateCaptureTime(int time_ms);
 
   void RecordingState(bool);
@@ -109,10 +112,12 @@ class CaptureThread
   cv::Size rotatedSize;
   cv::VideoCapture capture;
   double actualFps;
+  double grabFps;
   int requestedFps;
   int sleepTime_ms;
   int captureTime_ms;
   IntCircBuff frameTimes;
+  IntCircBuff grabTimes;
   IntCircBuff captureTimes;
   int rotation;
   int FrameCounter;
