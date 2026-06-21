@@ -153,11 +153,9 @@ void MartyCam::deleteCaptureThread()
 {
   MARTY_LOG_SCOPE(marty_log, "{} {}", (void*) (this), __func__);
   this->captureThread->stopCapture();
-  this->imageBuffer->clear();
+  this->imageBuffer->shutdown();
   this->settingsWidget->unsetCaptureThread();
   this->captureThread = nullptr;
-  // FIXME : doing this helps prevent lockups on shutdown.
-  this->imageBuffer->send(cv::Mat());
 }
 
 //----------------------------------------------------------------------------
@@ -375,8 +373,8 @@ void MartyCam::onCameraConfigChanged(QString cameraPath, int width, int height, 
     this->deleteProcessingThread();
   }
   //
-  MARTY_LOG_INFO(marty_log, "{:<20} Clearing image buffer", "CameraConfigChanged");
-  this->imageBuffer->clear();
+  MARTY_LOG_INFO(marty_log, "{:<20} Resetting image buffer", "CameraConfigChanged");
+  this->imageBuffer->reset();
   //
   MARTY_LOG_INFO(marty_log, "{:<20} Creating capture thread", "CameraConfigChanged");
   this->createCaptureThread(

@@ -13,8 +13,15 @@ class ConcurrentCircularBuffer : private boost::noncopyable
 {
   public:
   typedef boost::mutex::scoped_lock lock;
-  ConcurrentCircularBuffer() {}
-  ConcurrentCircularBuffer(int n) { cb.set_capacity(n); }
+  ConcurrentCircularBuffer()
+    : shutdown_requested(false)
+  {
+  }
+  ConcurrentCircularBuffer(int n)
+    : shutdown_requested(false)
+  {
+    cb.set_capacity(n);
+  }
 
   void send(T imdata)
   {
@@ -26,7 +33,8 @@ class ConcurrentCircularBuffer : private boost::noncopyable
   T receive()
   {
     lock lk(monitor);
-    while (cb.empty()) { buffer_not_empty.wait(lk); }
+    while (cb.empty() && !shutdown_requested) { buffer_not_empty.wait(lk); }
+    if (cb.empty()) { return T(); }
     T imdata = cb.front();
     cb.pop_front();
     return imdata;
@@ -36,7 +44,8 @@ class ConcurrentCircularBuffer : private boost::noncopyable
   T receive_latest()
   {
     lock lk(monitor);
-    while (cb.empty()) { buffer_not_empty.wait(lk); }
+    while (cb.empty() && !shutdown_requested) { buffer_not_empty.wait(lk); }
+    if (cb.empty()) { return T(); }
     T imdata = cb.back();
     cb.clear();
     return imdata;
@@ -60,10 +69,27 @@ class ConcurrentCircularBuffer : private boost::noncopyable
     cb.set_capacity(capacity);
   }
 
+  // Request shutdown and wake all threads waiting on the buffer.
+  void shutdown()
+  {
+    lock lk(monitor);
+    shutdown_requested = true;
+    buffer_not_empty.notify_all();
+  }
+
+  // Reset the shutdown flag so the buffer can be reused.
+  void reset()
+  {
+    lock lk(monitor);
+    shutdown_requested = false;
+    cb.clear();
+  }
+
   private:
   boost::condition buffer_not_empty;
   boost::mutex monitor;
   boost::circular_buffer<T> cb;
+  bool shutdown_requested;
 };
 
 #endif

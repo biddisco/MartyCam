@@ -85,6 +85,7 @@ void ProcessingThread::run()
     // if camera not working or disconnected, abort
     if (cameraImage.empty())
     {
+      if (this->abort) break;
       boost::this_thread::sleep(boost::posix_time::milliseconds(100));
       continue;
     }
