@@ -64,6 +64,7 @@ class stream_buffer_recorder
   AVFormatContext* ofmt_ctx = nullptr;
   std::string out_filename;
   double stream_fps = 0.0;
+  int64_t last_mux_dts = AV_NOPTS_VALUE;
 
   // Decoded Frame Buffer (for OpenCV consumption)
   std::deque<cv::Mat> decoded_frames;
@@ -77,4 +78,8 @@ class stream_buffer_recorder
     double timestamp_secs;
   };
   std::deque<BufferedPacket> packet_buffer;
+
+  // Tiny look-ahead reorder cache for live writing
+  std::vector<AVPacket*> live_reorder_queue;
+  size_t const reorder_window_depth = 4; // Looks 20 packets ahead/behind
 };

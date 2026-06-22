@@ -166,14 +166,30 @@ bool stream_buffer_recorder::startRecording(std::string const& output_filename, 
     return false;
   }
 
+  // Reset timestamp tracking for the new file boundary
+  last_mux_dts = AV_NOPTS_VALUE;
+
   // Flush the existing rolling packet buffer straight into the output file
   for (auto const& bpkt : packet_buffer)
   {
-    AVPacket* pkt = bpkt.pkt;
+    // Clone the packet so we don't modify the memory queue's native timestamps
+    AVPacket* rec_pkt = av_packet_clone(bpkt.pkt);
+    if (!rec_pkt) continue;
+
     av_packet_rescale_ts(
-        pkt, ifmt_ctx->streams[video_stream_idx]->time_base, ofmt_ctx->streams[0]->time_base);
-    pkt->stream_index = 0;
-    av_interleaved_write_frame(ofmt_ctx, pkt);
+        rec_pkt, ifmt_ctx->streams[video_stream_idx]->time_base, ofmt_ctx->streams[0]->time_base);
+    rec_pkt->stream_index = 0;
+
+    // Enforce strict monotonicity
+    if (last_mux_dts != AV_NOPTS_VALUE && rec_pkt->dts <= last_mux_dts)
+    {
+      rec_pkt->dts = last_mux_dts + 1;
+      if (rec_pkt->pts < rec_pkt->dts) { rec_pkt->pts = rec_pkt->dts; }
+    }
+    last_mux_dts = rec_pkt->dts;
+
+    av_interleaved_write_frame(ofmt_ctx, rec_pkt);
+    av_packet_free(&rec_pkt);
   }
 
   is_recording = true;
@@ -186,6 +202,29 @@ void stream_buffer_recorder::stopRecording()
   std::lock_guard<std::mutex> lock(mtx);
   if (!is_recording) return;
   is_recording = false;
+
+  // Flush any lingering packets left in the live reordering sliding window
+  if (!live_reorder_queue.empty())
+  {
+    // Sort the stragglers
+    std::sort(live_reorder_queue.begin(), live_reorder_queue.end(),
+        [](AVPacket* a, AVPacket* b) { return a->dts < b->dts; });
+
+    for (AVPacket* remaining_pkt : live_reorder_queue)
+    {
+      if (last_mux_dts != AV_NOPTS_VALUE && remaining_pkt->dts <= last_mux_dts)
+      {
+        remaining_pkt->dts = last_mux_dts + 1;
+        if (remaining_pkt->pts < remaining_pkt->dts) { remaining_pkt->pts = remaining_pkt->dts; }
+      }
+      last_mux_dts = remaining_pkt->dts;
+
+      av_interleaved_write_frame(ofmt_ctx, remaining_pkt);
+      av_packet_free(&remaining_pkt);
+    }
+    live_reorder_queue.clear();
+  }
+
   closeOutputMuxer();
 }
 
@@ -245,10 +284,43 @@ void stream_buffer_recorder::captureLoop()
       if (is_recording && ofmt_ctx)
       {
         AVPacket* rec_pkt = av_packet_clone(pkt);
-        av_packet_rescale_ts(rec_pkt, in_stream->time_base, ofmt_ctx->streams[0]->time_base);
-        rec_pkt->stream_index = 0;
-        av_interleaved_write_frame(ofmt_ctx, rec_pkt);
-        av_packet_free(&rec_pkt);
+        if (rec_pkt)
+        {
+          // Rescale immediately upon entry
+          av_packet_rescale_ts(rec_pkt, in_stream->time_base, ofmt_ctx->streams[0]->time_base);
+          rec_pkt->stream_index = 0;
+
+          // Push into our tiny look-ahead reordering window
+          live_reorder_queue.push_back(rec_pkt);
+
+          // Once the window is full, find and flush the lowest DTS packet
+          if (live_reorder_queue.size() >= reorder_window_depth)
+          {
+            // Find the packet with the smallest DTS
+            auto min_it = std::min_element(live_reorder_queue.begin(), live_reorder_queue.end(),
+                [](AVPacket* a, AVPacket* b) { return a->dts < b->dts; });
+
+            AVPacket* lowest_dts_pkt = *min_it;
+
+            // Safe guard: enforce strict monotonicity relative to what went into the file last
+            if (last_mux_dts != AV_NOPTS_VALUE && lowest_dts_pkt->dts <= last_mux_dts)
+            {
+              lowest_dts_pkt->dts = last_mux_dts + 1;
+              if (lowest_dts_pkt->pts < lowest_dts_pkt->dts)
+              {
+                lowest_dts_pkt->pts = lowest_dts_pkt->dts;
+              }
+            }
+            last_mux_dts = lowest_dts_pkt->dts;
+
+            // Write and clean up
+            av_interleaved_write_frame(ofmt_ctx, lowest_dts_pkt);
+            av_packet_free(&lowest_dts_pkt);
+
+            // Remove it from our sliding window
+            live_reorder_queue.erase(min_it);
+          }
+        }
       }
 
       // 3. Decode frame natively for your OpenCV analysis pipeline
@@ -295,15 +367,31 @@ bool stream_buffer_recorder::initOutputMuxer(std::string const& filename)
   avcodec_parameters_copy(out_stream->codecpar, in_stream->codecpar);
   out_stream->codecpar->codec_tag = 0;
 
-  // Use the measured frame rate for the output time_base so the recorded
-  // file plays back at the correct speed.  Fall back to the input time_base
-  // if we haven't measured the rate yet.
-  if (stream_fps > 0.0)
+  // Check if we are dealing with a network URL or a local USB device
+  bool is_url = (url.find("://") != std::string::npos);
+
+  if (is_url)
   {
-    out_stream->time_base = av_d2q(1.0 / stream_fps, 100000);
-    out_stream->avg_frame_rate = av_d2q(stream_fps, 100000);
+    // IP Camera: ALWAYS match the input stream's native timebase exactly
+    // to preserve internal compressed bitstream syntax and hardware decoding compliance
+    out_stream->time_base = in_stream->time_base;
+    out_stream->avg_frame_rate = in_stream->avg_frame_rate;
   }
-  else { out_stream->time_base = in_stream->time_base; }
+  else
+  {
+    // USB Camera: Fall back to your custom or measured FPS timing logic
+    // since local raw driver streams do not possess a fixed network transport clock
+    if (stream_fps > 0.0)
+    {
+      out_stream->time_base = av_d2q(1.0 / stream_fps, 100000);
+      out_stream->avg_frame_rate = av_d2q(stream_fps, 100000);
+    }
+    else
+    {
+      out_stream->time_base = in_stream->time_base;
+      out_stream->avg_frame_rate = in_stream->avg_frame_rate;
+    }
+  }
 
   if (!(ofmt_ctx->oformat->flags & AVFMT_NOFILE))
   {
@@ -335,6 +423,11 @@ void stream_buffer_recorder::clearBuffer()
     av_packet_free(&packet_buffer.front().pkt);
     packet_buffer.pop_front();
   }
-  decoded_frames.clear();
-  new_frame_available = false;
+  
+  // Clean up any stray pointers left in the live look-ahead queue
+  for (AVPacket* pkt : live_reorder_queue)
+  {
+    av_packet_free(&pkt);
+  }
+  live_reorder_queue.clear();
 }
