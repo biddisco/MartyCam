@@ -84,22 +84,21 @@ bool stream_buffer_recorder::open_usb(int width, int height, std::string const& 
   AVDictionary* options = nullptr;
 
   // 1. Map OpenCV/MartyCam FourCC strings to FFmpeg V4L2 names
+  std::string ffmpeg_v4l2_format = "";
   if (!fourcc_str.empty())
   {
-    std::string ffmpeg_v4l2_format = "";
-
     if (fourcc_str == "GREY" || fourcc_str == "Y800" || fourcc_str == "Y8  ")
     {
       ffmpeg_v4l2_format = "raw";    // V4L2 uses 'raw' driver configurations for uncompressed gray
     }
     else if (fourcc_str == "MJPEG" || fourcc_str == "MJPG") { ffmpeg_v4l2_format = "mjpeg"; }
     else if (fourcc_str == "YUYV" || fourcc_str == "YUY2") { ffmpeg_v4l2_format = "yuyv422"; }
-
-    if (!ffmpeg_v4l2_format.empty())
-    {
-      av_dict_set(&options, "input_format", ffmpeg_v4l2_format.c_str(), 0);
-    }
   }
+
+  // Default to MJPEG for USB cameras if no format specified — raw formats like YUYV
+  // are not muxable into MP4 and produce empty recordings.
+  if (ffmpeg_v4l2_format.empty()) { ffmpeg_v4l2_format = "mjpeg"; }
+  av_dict_set(&options, "input_format", ffmpeg_v4l2_format.c_str(), 0);
 
   // 2. Set requested Resolution dynamically instead of hardcoded 1280x720
   if (width > 0 && height > 0)
@@ -154,10 +153,12 @@ bool stream_buffer_recorder::readFrame(cv::Mat& out_frame)
 }
 
 //----------------------------------------------------------------------------
-bool stream_buffer_recorder::startRecording(std::string const& output_filename)
+bool stream_buffer_recorder::startRecording(std::string const& output_filename, double fps)
 {
   std::lock_guard<std::mutex> lock(mtx);
   if (is_recording) return true;
+
+  if (fps > 0.0) { stream_fps = fps; }
 
   if (!initOutputMuxer(output_filename))
   {
@@ -198,12 +199,34 @@ void stream_buffer_recorder::captureLoop()
   AVStream* in_stream = ifmt_ctx->streams[video_stream_idx];
   double time_base_secs = av_q2d(in_stream->time_base);
 
+  int64_t frame_count = 0;
+
   while (is_running)
   {
     if (av_read_frame(ifmt_ctx, pkt) < 0) break;
 
     if (pkt->stream_index == video_stream_idx)
     {
+      // V4L2 raw capture often delivers packets with no timestamps.
+      // Synthesize monotonic PTS/DTS so the muxer can produce a valid file.
+      if (pkt->pts == AV_NOPTS_VALUE)
+      {
+        if (stream_fps > 0.0)
+        {
+          // Generate timestamps that match the measured frame rate in the
+          // stream's native time_base so rescaling to the output works.
+          AVRational const fps_q = av_d2q(stream_fps, 100000);
+          pkt->pts = av_rescale_q(frame_count, av_inv_q(fps_q), in_stream->time_base);
+          pkt->dts = pkt->pts;
+        }
+        else
+        {
+          pkt->pts = frame_count;
+          pkt->dts = frame_count;
+        }
+      }
+      ++frame_count;
+
       std::lock_guard<std::mutex> lock(mtx);
 
       // 1. Maintain Rolling Buffer of raw packets
@@ -267,9 +290,20 @@ bool stream_buffer_recorder::initOutputMuxer(std::string const& filename)
   avformat_alloc_output_context2(&ofmt_ctx, nullptr, nullptr, filename.c_str());
   if (!ofmt_ctx) return false;
 
+  AVStream* in_stream = ifmt_ctx->streams[video_stream_idx];
   AVStream* out_stream = avformat_new_stream(ofmt_ctx, nullptr);
-  avcodec_parameters_copy(out_stream->codecpar, ifmt_ctx->streams[video_stream_idx]->codecpar);
+  avcodec_parameters_copy(out_stream->codecpar, in_stream->codecpar);
   out_stream->codecpar->codec_tag = 0;
+
+  // Use the measured frame rate for the output time_base so the recorded
+  // file plays back at the correct speed.  Fall back to the input time_base
+  // if we haven't measured the rate yet.
+  if (stream_fps > 0.0)
+  {
+    out_stream->time_base = av_d2q(1.0 / stream_fps, 100000);
+    out_stream->avg_frame_rate = av_d2q(stream_fps, 100000);
+  }
+  else { out_stream->time_base = in_stream->time_base; }
 
   if (!(ofmt_ctx->oformat->flags & AVFMT_NOFILE))
   {

@@ -85,7 +85,7 @@ bool StreamCaptureThread::connectCamera(std::string const& URL)
   if (this->streamRecorder) { this->streamRecorder->close(); }
 
   this->streamRecorder = std::make_unique<stream_buffer_recorder>(URL, 10.0);
-  if (!this->streamRecorder->open())
+  if (!this->streamRecorder->open(this->imageSize.width, this->imageSize.height))
   {
     MARTY_LOG_ERROR(cap_log, "{:<20} Camera connection failed", "StreamCaptureThread");
     return false;
@@ -170,7 +170,8 @@ void StreamCaptureThread::setWriteMotionAVI(bool write)
     }
 
     this->MotionAVI_Writing = true;
-    streamRecorder->startRecording(expandedDir + "/" + this->MotionAVI_Name + std::string(".mp4"));
+    streamRecorder->startRecording(
+        expandedDir + "/" + this->MotionAVI_Name + std::string(".mp4"), this->grabFps.value());
     emit(RecordingState(true));
   }
   else if (this->MotionAVI_Writing && !write)
@@ -213,6 +214,7 @@ void StreamCaptureThread::run()
       continue;
     }
     this->grabFps.tick();
+    this->streamRecorder->setStreamFps(this->grabFps.value());
 
     if (frame.empty())
     {
@@ -225,7 +227,8 @@ void StreamCaptureThread::run()
     // Adaptive throttle: drop this frame if accepting it would push the
     // output rate above the requested FPS (allow 1 FPS tolerance to avoid
     // consistently running slightly under target due to jitter).
-    if (this->requestedFps > 0 && this->captureFps.would_exceed(this->requestedFps + 1.0/captureFps.size()))
+    if (this->requestedFps > 0 &&
+        this->captureFps.would_exceed(this->requestedFps + 1.0 / captureFps.size()))
     {
       continue;
     }
