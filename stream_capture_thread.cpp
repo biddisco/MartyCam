@@ -206,14 +206,13 @@ void StreamCaptureThread::run()
     // Read frame from the stream buffer recorder
     cv::Mat frame;
     bool const grabbed = this->streamRecorder->readFrame(frame);
-    this->grabFps.tick();
-
     if (!grabbed)
     {
       // No frame available yet - non-blocking, so sleep briefly and retry
       boost::this_thread::sleep(boost::posix_time::milliseconds(5));
       continue;
     }
+    this->grabFps.tick();
 
     if (frame.empty())
     {
@@ -224,8 +223,12 @@ void StreamCaptureThread::run()
     }
 
     // Adaptive throttle: drop this frame if accepting it would push the
-    // output rate above the requested FPS.
-    if (this->requestedFps > 0 && this->captureFps.would_exceed(this->requestedFps)) { continue; }
+    // output rate above the requested FPS (allow 1 FPS tolerance to avoid
+    // consistently running slightly under target due to jitter).
+    if (this->requestedFps > 0 && this->captureFps.would_exceed(this->requestedFps + 1.0/captureFps.size()))
+    {
+      continue;
+    }
 
     if (this->deInterlace)
     {

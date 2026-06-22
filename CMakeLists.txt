@@ -166,6 +166,38 @@ find_library(AVCODEC_LIB NAMES avcodec HINTS ${AVCODEC_LIBRARY_DIRS})
 find_library(AVUTIL_LIB NAMES avutil HINTS ${AVUTIL_LIBRARY_DIRS})
 find_library(SWSCALE_LIB NAMES swscale HINTS ${SWSCALE_LIBRARY_DIRS})
 find_library(AVDEVICE_LIB NAMES avdevice HINTS ${AVDEVICE_LIBRARY_DIRS})
+message(
+  STATUS
+    "Found FFmpeg libraries: ${AVFORMAT_LIB}, ${AVCODEC_LIB}, ${AVUTIL_LIB}, ${SWSCALE_LIB}, ${AVDEVICE_LIB}"
+)
+
+# pkg_check_modules() include dirs can be empty on some setups; fall back to pkg-config "includedir"
+# for each module.
+set(FFMPEG_INCLUDE_DIRS ${AVFORMAT_INCLUDE_DIRS} ${AVCODEC_INCLUDE_DIRS} ${AVUTIL_INCLUDE_DIRS}
+                        ${SWSCALE_INCLUDE_DIRS} ${AVDEVICE_INCLUDE_DIRS}
+)
+if("${FFMPEG_INCLUDE_DIRS}" STREQUAL "")
+  pkg_get_variable(AVFORMAT_PKG_INCLUDEDIR libavformat includedir)
+  pkg_get_variable(AVCODEC_PKG_INCLUDEDIR libavcodec includedir)
+  pkg_get_variable(AVUTIL_PKG_INCLUDEDIR libavutil includedir)
+  pkg_get_variable(SWSCALE_PKG_INCLUDEDIR libswscale includedir)
+  pkg_get_variable(AVDEVICE_PKG_INCLUDEDIR libavdevice includedir)
+
+  list(
+    APPEND
+    FFMPEG_INCLUDE_DIRS
+    ${AVFORMAT_PKG_INCLUDEDIR}
+    ${AVCODEC_PKG_INCLUDEDIR}
+    ${AVUTIL_PKG_INCLUDEDIR}
+    ${SWSCALE_PKG_INCLUDEDIR}
+    ${AVDEVICE_PKG_INCLUDEDIR}
+  )
+endif()
+list(REMOVE_DUPLICATES FFMPEG_INCLUDE_DIRS)
+
+message(STATUS "Found FFmpeg include dirs (pkg-config): ${FFMPEG_INCLUDE_DIRS}")
+
+include_directories(${FFMPEG_INCLUDE_DIRS})
 
 # -----------------------------------------------------------------------------
 # Set DATA_PATH directory of the repository
@@ -264,10 +296,7 @@ add_executable(
 target_include_directories(martycam PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/streamulus/src")
 
 # ffmpeg avcodec support
-target_include_directories(
-  martycam PRIVATE ${AVFORMAT_INCLUDE_DIRS} ${AVCODEC_INCLUDE_DIRS} ${AVUTIL_INCLUDE_DIRS}
-                   ${SWSCALE_INCLUDE_DIRS} ${AVDEVICE_INCLUDE_DIRS}
-)
+target_include_directories(martycam PRIVATE ${FFMPEG_INCLUDE_DIRS})
 
 set_property(TARGET martycam PROPERTY AUTOMOC ON)
 set_property(TARGET martycam PROPERTY AUTOUIC ON)

@@ -43,6 +43,7 @@ class fps_helper
   }
 
   double value() const { return current_value_; }
+  std::size_t size() { return times_.size(); }
 
   // Compute what the FPS would be if we called tick() right now, without
   // actually pushing the sample into the buffer. Accounts for buffer capacity.

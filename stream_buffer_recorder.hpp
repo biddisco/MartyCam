@@ -39,7 +39,7 @@ class stream_buffer_recorder
 
   // Cleanly split initialization methods
   bool open_ip();
-  bool open_usb(int width, int height, const std::string& fourcc_str);
+  bool open_usb(int width, int height, std::string const& fourcc_str);
 
   std::string url;
   double max_buffer_duration;
@@ -63,6 +63,7 @@ class stream_buffer_recorder
   // Decoded Frame Buffer (for OpenCV consumption)
   std::deque<cv::Mat> decoded_frames;
   size_t const max_decoded_queue_size = 5;
+  std::atomic<bool> new_frame_available{false};
 
   // Rolling Packet Buffer Structure
   struct BufferedPacket

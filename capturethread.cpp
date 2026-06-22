@@ -174,8 +174,6 @@ void CaptureThread::run()
     // Continuously grab from camera to drain backend buffers and keep the
     // stream current; publish to processing only at requested FPS.
     bool const grabbed = this->capture.grab();
-    this->grabFps.tick();
-
     if (!grabbed)
     {
       this->setAbort(true);
@@ -183,10 +181,14 @@ void CaptureThread::run()
           cap_log, "{:<20} Failed to grab camera image, aborting this->capture", "CaptureThread");
       continue;
     }
+    this->grabFps.tick();
 
     // Adaptive throttle: drop this frame if accepting it would push the
     // output rate above the requested FPS.
-    if (this->requestedFps > 0 && this->captureFps.would_exceed(this->requestedFps)) { continue; }
+    if (this->requestedFps > 0 && this->captureFps.would_exceed(this->requestedFps + 0.5))
+    {
+      continue;
+    }
 
     // Retrieve the most recently grabbed frame for publication.
     cv::Mat frame;
@@ -471,7 +473,7 @@ void CaptureThread::saveAVI(cv::Mat const& image)
       motion_video_FrameCounter++;
       MARTY_LOG_INFO(cap_log, "{:<20} Writing frame {:06d} to video writer", "CaptureThread",
           motion_video_FrameCounter);
-          // XXXXXXXXXXXXX FIX 
+      // XXXXXXXXXXXXX FIX
       // this->MotionAVI_Writer.write(frameCopy);
       // if CloseAvi has been called, stop writing.
       if (!this->MotionAVI_Writing)

@@ -10,7 +10,8 @@ stream_buffer_recorder::stream_buffer_recorder(
 
 stream_buffer_recorder::~stream_buffer_recorder() { close(); }
 
-bool stream_buffer_recorder::open(int width, int height, const std::string& fourcc_str) {
+bool stream_buffer_recorder::open(int width, int height, std::string const& fourcc_str)
+{
   bool is_url = (url.find("://") != std::string::npos);
 
   if (is_url)
@@ -66,45 +67,49 @@ bool stream_buffer_recorder::open_ip()
   return true;
 }
 
-bool stream_buffer_recorder::open_usb(int width, int height, const std::string& fourcc_str) {
-    avdevice_register_all();
+bool stream_buffer_recorder::open_usb(int width, int height, std::string const& fourcc_str)
+{
+  avdevice_register_all();
 
-    const AVInputFormat* ifmt = av_find_input_format("v4l2");
-    if (!ifmt) return false;
+  AVInputFormat const* ifmt = av_find_input_format("v4l2");
+  if (!ifmt) return false;
 
-    AVDictionary* options = nullptr;
+  AVDictionary* options = nullptr;
 
-    // 1. Map OpenCV/MartyCam FourCC strings to FFmpeg V4L2 names
-    if (!fourcc_str.empty()) {
-        std::string ffmpeg_v4l2_format = "";
-        
-        if (fourcc_str == "GREY" || fourcc_str == "Y800" || fourcc_str == "Y8  ") {
-            ffmpeg_v4l2_format = "raw"; // V4L2 uses 'raw' driver configurations for uncompressed gray
-        } else if (fourcc_str == "MJPEG" || fourcc_str == "MJPG") {
-            ffmpeg_v4l2_format = "mjpeg";
-        } else if (fourcc_str == "YUYV" || fourcc_str == "YUY2") {
-            ffmpeg_v4l2_format = "yuyv422";
-        }
+  // 1. Map OpenCV/MartyCam FourCC strings to FFmpeg V4L2 names
+  if (!fourcc_str.empty())
+  {
+    std::string ffmpeg_v4l2_format = "";
 
-        if (!ffmpeg_v4l2_format.empty()) {
-            av_dict_set(&options, "input_format", ffmpeg_v4l2_format.c_str(), 0);
-        }
+    if (fourcc_str == "GREY" || fourcc_str == "Y800" || fourcc_str == "Y8  ")
+    {
+      ffmpeg_v4l2_format = "raw";    // V4L2 uses 'raw' driver configurations for uncompressed gray
     }
+    else if (fourcc_str == "MJPEG" || fourcc_str == "MJPG") { ffmpeg_v4l2_format = "mjpeg"; }
+    else if (fourcc_str == "YUYV" || fourcc_str == "YUY2") { ffmpeg_v4l2_format = "yuyv422"; }
 
-    // 2. Set requested Resolution dynamically instead of hardcoded 1280x720
-    if (width > 0 && height > 0) {
-        std::string res_str = std::to_string(width) + "x" + std::to_string(height);
-        av_dict_set(&options, "video_size", res_str.c_str(), 0);
+    if (!ffmpeg_v4l2_format.empty())
+    {
+      av_dict_set(&options, "input_format", ffmpeg_v4l2_format.c_str(), 0);
     }
+  }
 
-    if (avformat_open_input(&ifmt_ctx, url.c_str(), ifmt, &options) < 0) {
-        av_dict_free(&options);
-        return false;
-    }
+  // 2. Set requested Resolution dynamically instead of hardcoded 1280x720
+  if (width > 0 && height > 0)
+  {
+    std::string res_str = std::to_string(width) + "x" + std::to_string(height);
+    av_dict_set(&options, "video_size", res_str.c_str(), 0);
+  }
 
+  if (avformat_open_input(&ifmt_ctx, url.c_str(), ifmt, &options) < 0)
+  {
     av_dict_free(&options);
-    if (avformat_find_stream_info(ifmt_ctx, nullptr) < 0) return false;
-    return true;
+    return false;
+  }
+
+  av_dict_free(&options);
+  if (avformat_find_stream_info(ifmt_ctx, nullptr) < 0) return false;
+  return true;
 }
 
 void stream_buffer_recorder::close()
@@ -127,9 +132,15 @@ void stream_buffer_recorder::close()
 bool stream_buffer_recorder::readFrame(cv::Mat& out_frame)
 {
   std::lock_guard<std::mutex> lock(mtx);
-  if (decoded_frames.empty()) return false;
-  out_frame = decoded_frames.front();
-  decoded_frames.pop_front();
+  if (!new_frame_available.load()) return false;
+  if (decoded_frames.empty())
+  {
+    new_frame_available = false;
+    return false;
+  }
+  out_frame = decoded_frames.back();
+  decoded_frames.clear();
+  new_frame_available = false;
   return true;
 }
 
@@ -226,6 +237,7 @@ void stream_buffer_recorder::captureLoop()
 
           decoded_frames.push_back(matFrame);
           if (decoded_frames.size() > max_decoded_queue_size) { decoded_frames.pop_front(); }
+          new_frame_available = true;
         }
       }
     }
@@ -274,4 +286,6 @@ void stream_buffer_recorder::clearBuffer()
     av_packet_free(&packet_buffer.front().pkt);
     packet_buffer.pop_front();
   }
+  decoded_frames.clear();
+  new_frame_available = false;
 }
