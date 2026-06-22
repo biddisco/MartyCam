@@ -10,16 +10,18 @@ stream_buffer_recorder::stream_buffer_recorder(
 
 stream_buffer_recorder::~stream_buffer_recorder() { close(); }
 
-bool stream_buffer_recorder::open()
-{
-  // Mirror the detection check used in camera_utils
+bool stream_buffer_recorder::open(int width, int height, const std::string& fourcc_str) {
   bool is_url = (url.find("://") != std::string::npos);
 
-  bool init_success = false;
-  if (is_url) { init_success = open_ip(); }
-  else { init_success = open_usb(); }
-
-  if (!init_success) { return false; }
+  if (is_url)
+  {
+    if (!open_ip()) return false;
+  }
+  else
+  {
+    // Pass the target specifications down to the USB configurator
+    if (!open_usb(width, height, fourcc_str)) return false;
+  }
 
   // Common setup: Find the streams, bind the decoder context and spawn the thread
   for (unsigned int i = 0; i < ifmt_ctx->nb_streams; i++)
@@ -64,32 +66,45 @@ bool stream_buffer_recorder::open_ip()
   return true;
 }
 
-bool stream_buffer_recorder::open_usb()
-{
-  // Register local video/audio device drivers
-  avdevice_register_all();
+bool stream_buffer_recorder::open_usb(int width, int height, const std::string& fourcc_str) {
+    avdevice_register_all();
 
-  AVInputFormat const* ifmt = av_find_input_format("v4l2");
-  if (!ifmt)
-  {
-    std::cerr << "V4L2 driver not found in FFmpeg assembly!" << std::endl;
-    return false;
-  }
+    const AVInputFormat* ifmt = av_find_input_format("v4l2");
+    if (!ifmt) return false;
 
-  AVDictionary* options = nullptr;
-  // Force a reliable baseline container format natively compressed by the web-cam
-  av_dict_set(&options, "input_format", "mjpeg", 0);
-  av_dict_set(&options, "video_size", "1280x720", 0);    // Can be driven dynamically later
+    AVDictionary* options = nullptr;
 
-  if (avformat_open_input(&ifmt_ctx, url.c_str(), ifmt, &options) < 0)
-  {
+    // 1. Map OpenCV/MartyCam FourCC strings to FFmpeg V4L2 names
+    if (!fourcc_str.empty()) {
+        std::string ffmpeg_v4l2_format = "";
+        
+        if (fourcc_str == "GREY" || fourcc_str == "Y800" || fourcc_str == "Y8  ") {
+            ffmpeg_v4l2_format = "raw"; // V4L2 uses 'raw' driver configurations for uncompressed gray
+        } else if (fourcc_str == "MJPEG" || fourcc_str == "MJPG") {
+            ffmpeg_v4l2_format = "mjpeg";
+        } else if (fourcc_str == "YUYV" || fourcc_str == "YUY2") {
+            ffmpeg_v4l2_format = "yuyv422";
+        }
+
+        if (!ffmpeg_v4l2_format.empty()) {
+            av_dict_set(&options, "input_format", ffmpeg_v4l2_format.c_str(), 0);
+        }
+    }
+
+    // 2. Set requested Resolution dynamically instead of hardcoded 1280x720
+    if (width > 0 && height > 0) {
+        std::string res_str = std::to_string(width) + "x" + std::to_string(height);
+        av_dict_set(&options, "video_size", res_str.c_str(), 0);
+    }
+
+    if (avformat_open_input(&ifmt_ctx, url.c_str(), ifmt, &options) < 0) {
+        av_dict_free(&options);
+        return false;
+    }
+
     av_dict_free(&options);
-    return false;
-  }
-
-  av_dict_free(&options);
-  if (avformat_find_stream_info(ifmt_ctx, nullptr) < 0) return false;
-  return true;
+    if (avformat_find_stream_info(ifmt_ctx, nullptr) < 0) return false;
+    return true;
 }
 
 void stream_buffer_recorder::close()

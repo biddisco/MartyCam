@@ -21,7 +21,7 @@ class stream_buffer_recorder
   stream_buffer_recorder(std::string const& stream_url, double buffer_duration_seconds);
   ~stream_buffer_recorder();
 
-  bool open();
+  bool open(int width = 0, int height = 0, std::string const& fourcc_str = "");
   void close();
 
   // Pull decoded frames for your existing OpenCV analysis loop
@@ -39,7 +39,7 @@ class stream_buffer_recorder
 
   // Cleanly split initialization methods
   bool open_ip();
-  bool open_usb();
+  bool open_usb(int width, int height, const std::string& fourcc_str);
 
   std::string url;
   double max_buffer_duration;
