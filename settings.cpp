@@ -140,16 +140,20 @@ void SettingsWidget::setThreads(CaptureThread_SP capthread, ProcessingThread_SP 
   this->capturethread = capthread;
   this->processingthread = procthread;
 }
+
 //----------------------------------------------------------------------------
 void SettingsWidget::unsetCaptureThread() { this->capturethread = nullptr; }
+
 //----------------------------------------------------------------------------
 void SettingsWidget::unsetProcessingThread() { this->processingthread = nullptr; }
+
 //----------------------------------------------------------------------------
 void SettingsWidget::onThresholdChanged(int value)
 {
   this->ui.t_label->setText(QString("%1").arg(value, 2));
   this->processingthread->setThreshold(value);
 }
+
 //----------------------------------------------------------------------------
 void SettingsWidget::onAverageChanged(int value)
 {
@@ -158,18 +162,21 @@ void SettingsWidget::onAverageChanged(int value)
   this->ui.a_label->setText(label);
   this->processingthread->setAveraging(value / 100.0);
 }
+
 //----------------------------------------------------------------------------
 void SettingsWidget::onErodeChanged(int value)
 {
   this->ui.e_label->setText(QString("%1").arg(value, 2));
   this->processingthread->setErodeIterations(value);
 }
+
 //----------------------------------------------------------------------------
 void SettingsWidget::onDilateChanged(int value)
 {
   this->ui.d_label->setText(QString("%1").arg(value, 2));
   this->processingthread->setDilateIterations(value);
 }
+
 //----------------------------------------------------------------------------
 void SettingsWidget::onBrowseClicked()
 {
@@ -201,6 +208,7 @@ void SettingsWidget::onAddCameraClicked()
 
 //----------------------------------------------------------------------------
 void SettingsWidget::onWriteMotionAVIToggled(bool state) { this->RecordMotionAVI(state); }
+
 //----------------------------------------------------------------------------
 void SettingsWidget::onTimer()
 {
@@ -267,7 +275,7 @@ void SettingsWidget::SetupAVIStrings()
 //----------------------------------------------------------------------------
 void SettingsWidget::RecordMotionAVI(bool state)
 {
-  this->ui.WriteMotionAVI->setChecked(state);
+  this->ui.WriteMotionAVI->setChecked(state);  
   //
   QString filePath = this->ui.avi_directory->text();
   QString fileName = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
@@ -309,8 +317,10 @@ void SettingsWidget::onImageSelection(int btn) { this->processingthread->setDisp
 //----------------------------------------------------------------------------
 int SettingsWidget::getSelectedRotation() { return this->RotateButtonGroup.checkedId(); }
 int SettingsWidget::getRequestedFps() { return this->ui.requestedFps_HorizontalSlider->value(); }
+
 //----------------------------------------------------------------------------
 void SettingsWidget::onRotateSelection(int btn) { emit(rotationChanged(btn)); }
+
 //----------------------------------------------------------------------------
 void SettingsWidget::onBlendChanged(int value)
 {
@@ -362,6 +372,7 @@ void SettingsWidget::saveSettings()
   settings.setValue("startDateTime", this->ui.startDateTime->dateTime());
   settings.endGroup();
 }
+
 //----------------------------------------------------------------------------
 void SettingsWidget::loadSettings()
 {
@@ -425,6 +436,7 @@ void SettingsWidget::loadSettings()
       ->setTime(settings.value("duration", QDateTime(QDate(0, 0, 1), QTime(0, 1, 0))).toTime());
   settings.endGroup();
 }
+
 //----------------------------------------------------------------------------
 void SettingsWidget::onSnapClicked()
 {
@@ -437,6 +449,7 @@ void SettingsWidget::onSnapClicked()
   QClipboard* clipboard = QApplication::clipboard();
   clipboard->setPixmap(p);
 }
+
 //----------------------------------------------------------------------------
 void SettingsWidget::onStartTimeLapseClicked()
 {
@@ -449,8 +462,10 @@ void SettingsWidget::onStartTimeLapseClicked()
   QClipboard* clipboard = QApplication::clipboard();
   clipboard->setPixmap(p);
 }
+
 //----------------------------------------------------------------------------
 QDateTime SettingsWidget::TimeLapseStart() { return this->ui.startDateTime->dateTime(); }
+
 //----------------------------------------------------------------------------
 QDateTime SettingsWidget::TimeLapseEnd()
 {
@@ -459,6 +474,7 @@ QDateTime SettingsWidget::TimeLapseEnd()
   QDateTime result = this->TimeLapseStart().addDays(days);
   return result;
 }
+
 //---------------------------------------------------------------------------
 void SettingsWidget::onTabChanged(int currentTabIndex)
 {
@@ -471,12 +487,14 @@ void SettingsWidget::onTabChanged(int currentTabIndex)
     break;
   }
 }
+
 //---------------------------------------------------------------------------
 void SettingsWidget::onRequestedFpsChanged(int value)
 {
   this->ui.requestedFps_ValueLabel->setText(QString("%1").arg(value, 2));
   this->capturethread->setRequestedFps(value);
 }
+
 //---------------------------------------------------------------------------
 void SettingsWidget::onEyesRecogStateChanged(int value)
 {
@@ -494,6 +512,7 @@ ProcessingType SettingsWidget::getCurentProcessingType()
 {
   return ProcessingType(this->ui.tabWidget->currentIndex());
 }
+
 //---------------------------------------------------------------------------
 void SettingsWidget::switchToNextResolution()
 {
@@ -501,17 +520,20 @@ void SettingsWidget::switchToNextResolution()
   // int newIndex = (currentIndex + 1) % 5;
   // SilentCall(&this->ResolutionButtonGroup)->button(newIndex)->click();
 }
+
 //---------------------------------------------------------------------------
 void SettingsWidget::switchToPreviousResolution()
 {
   // if (this->previousResolutionButtonIndex >= 0)
   //   this->ResolutionButtonGroup.button(previousResolutionButtonIndex)->click();
 }
+
 //---------------------------------------------------------------------------
 int SettingsWidget::getNumOfResolutions()
 {    //return this->numberOfResolutions;
   return 0;
 }
+
 //---------------------------------------------------------------------------
 QString SettingsWidget::decimationCoeffToQString(int sliderVal)
 {

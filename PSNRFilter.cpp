@@ -11,6 +11,7 @@ PSNRFilter::PSNRFilter()
   this->TotalNoise = 0.0;
   this->PSNR = 100.0;
 }
+
 //----------------------------------------------------------------------------
 void PSNRFilter::process(cv::Mat const& image)
 {
@@ -29,6 +30,7 @@ void PSNRFilter::process(cv::Mat const& image)
 
   this->lastFrame = image;
 }
+
 //----------------------------------------------------------------------------
 double PSNRFilter::getPSNR(cv::Mat const& I1, cv::Mat const& I2)
 {
@@ -55,4 +57,5 @@ double PSNRFilter::getPSNR(cv::Mat const& I1, cv::Mat const& I2)
     return psnr;
   }
 }
+
 //----------------------------------------------------------------------------

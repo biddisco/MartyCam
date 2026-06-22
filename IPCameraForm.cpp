@@ -38,6 +38,7 @@ IPCameraForm::IPCameraForm(QWidget* parent)
   ui.setupUi(this);
   this->loadSettings();
 }
+
 //----------------------------------------------------------------------------
 void IPCameraForm::seupModelView()
 {
@@ -55,6 +56,7 @@ void IPCameraForm::seupModelView()
   //
   ui.gridLayout->addWidget(table);
 }
+
 //----------------------------------------------------------------------------
 void IPCameraForm::saveSettings()
 {
@@ -73,6 +75,7 @@ void IPCameraForm::saveSettings()
   }
   settings.endArray();
 }
+
 //----------------------------------------------------------------------------
 void IPCameraForm::loadSettings()
 {

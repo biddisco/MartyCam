@@ -107,16 +107,17 @@ bool cross_alert::operator()(bool const is_golden_cross)
   {
     this->filter->goldenCross = true;
     this->filter->deathCross = false;
-//    std::cout << "Golden cross " << std::endl;
+    //    std::cout << "Golden cross " << std::endl;
   }
   else
   {
     this->filter->goldenCross = false;
     this->filter->deathCross = true;
-//    std::cout << "Death cross " << std::endl;
+    //    std::cout << "Death cross " << std::endl;
   }
   return is_golden_cross;
 }
+
 //----------------------------------------------------------------------------
 double Mavg::operator()(TimeValue const& tick)
 {
@@ -169,6 +170,7 @@ DecayFilter::DecayFilter()
   auto result2 = streamulus::Streamify(alert)(streamulus::Streamify<unique<bool>>(slow < fast));
   engine.Subscribe(result2);
 }
+
 //----------------------------------------------------------------------------
 void DecayFilter::process(TimeValue const& tv)
 {

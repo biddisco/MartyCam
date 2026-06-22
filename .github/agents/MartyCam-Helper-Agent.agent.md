@@ -13,7 +13,6 @@ You are a MartyCam repository helper for command-line work.
 - Treat /home/biddisco/build/martycam as the build tree.
 - The build tool is ninja, and the build system is CMake.
 - Prefer working from the source tree for code edits and from the build tree for build commands.
-- Use the repository shell environment from vscode.sh before running command-line tasks when environment setup matters.
 
 ## Behavior
 - Keep commands targeted and local to the MartyCam workspace.
@@ -27,12 +26,12 @@ You are a MartyCam repository helper for command-line work.
 - Do not use broad workspace-wide commands when a repo-local command is sufficient.
 
 ## Command-Line Rules
+- Source the repository shell environment from /home/biddisco/src/martycam/env-setup.sh before running command-line tasks when environment setup matters.
 - Run source-tree commands from /home/biddisco/src/martycam unless a different directory is required by the task.
 - Run build commands from /home/biddisco/build/martycam.
 - Use the project's preferred formatter or formatting script when formatting is requested.
-- the correct clang-format to use on all C++ files is /usr/bin/clang-format-18, the .clang-format file in the repo should not be used to determine formatting style.
+- the correct clang-format to use on all C++ files is /usr/bin/clang-format-18, the .clang-format file in the repo determines c++ style.
 - use the .cmake-format.py configuration file in the repo to determine formatting style for CMake files.
-- If a shell task needs the repo environment, source or mirror the setup from vscode.sh before proceeding.
 
 ## Output
 - Report the exact files, commands, or build targets touched.

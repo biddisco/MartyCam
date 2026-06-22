@@ -14,8 +14,8 @@
 //
 #include <memory>
 #include "ConcurrentCircularBuffer.h"
+#include "fps_helper.h"
 typedef std::shared_ptr<ConcurrentCircularBuffer<cv::Mat>> ImageBuffer;
-typedef boost::circular_buffer<int> IntCircBuff;
 class ProcessingThread;
 typedef std::shared_ptr<ProcessingThread> ProcessingThread_SP;
 //
@@ -64,7 +64,7 @@ class ProcessingThread : public QObject
   //
   void setEyesRecogState(int val) { this->faceRecogFilter->setEyesRecogState((bool) val); }
   void setDecimationCoeff(int val) { this->faceRecogFilter->setDecimationCoeff(val); }
-  int getProcessingTime() { return this->processingTime_ms; }
+  int getProcessingTime() { return this->processingTime.value(); }
   void run();
   bool startProcessing();
   bool stopProcessing();
@@ -84,8 +84,6 @@ class ProcessingThread : public QObject
   void NewData();
 
   private:
-  void updateProcessingTime(int time_ms);
-
   //
   QMutex stopLock;
   QWaitCondition stopWait;
@@ -95,8 +93,7 @@ class ProcessingThread : public QObject
   //
   ImageBuffer imageBuffer;
   ProcessingType processingType;
-  int processingTime_ms;
-  IntCircBuff processingTimes;
+  rolling_average processingTime;
 };
 
 #endif

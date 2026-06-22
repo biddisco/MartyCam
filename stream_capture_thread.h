@@ -1,36 +1,28 @@
-#ifndef CAPTURE_THREAD_H
-#define CAPTURE_THREAD_H
+#ifndef STREAM_CAPTURE_THREAD_H
+#define STREAM_CAPTURE_THREAD_H
+//
+#include <hpx/config.hpp>
+//
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/videoio.hpp>
+//
+#include <QMutex>
+#include <QObject>
+#include <QWaitCondition>
+#include <atomic>
+#include <mutex>
+//
+#include <boost/lockfree/spsc_queue.hpp>
+#include <memory>
+//
+#include <hpx/include/parallel_executors.hpp>
+//
+#include "ConcurrentCircularBuffer.h"
+#include "fps_helper.h"
+#include "stream_buffer_recorder.hpp"
 
-#ifdef USE_STREAM_CAPTURE_THREAD
-
-# include "stream_capture_thread.h"
-
-typedef StreamCaptureThread CaptureThread;
-typedef std::shared_ptr<CaptureThread> CaptureThread_SP;
-
-#else
-
-//
-# include <hpx/config.hpp>
-//
-# include <opencv2/core/core.hpp>
-# include <opencv2/highgui/highgui.hpp>
-# include <opencv2/videoio.hpp>
-//
-# include <QMutex>
-# include <QObject>
-# include <QWaitCondition>
-# include <atomic>
-# include <mutex>
-//
-# include <boost/lockfree/spsc_queue.hpp>
-# include <memory>
-//
-# include <hpx/include/parallel_executors.hpp>
-//
-# include "ConcurrentCircularBuffer.h"
-# include "fps_helper.h"
-# define IMAGE_QUEUE_LEN 1024
+#define IMAGE_QUEUE_LEN 1024
 
 typedef boost::circular_buffer<int> IntCircBuff;
 typedef std::shared_ptr<ConcurrentCircularBuffer<cv::Mat>> ImageBuffer;
@@ -38,17 +30,14 @@ typedef std::shared_ptr<
     boost::lockfree::spsc_queue<cv::Mat, boost::lockfree::capacity<IMAGE_QUEUE_LEN>>>
     ImageQueue;
 
-class CaptureThread;
-typedef std::shared_ptr<CaptureThread> CaptureThread_SP;
-
-class CaptureThread : public QObject
+class StreamCaptureThread : public QObject
 {
   Q_OBJECT;
 
   public:
-  CaptureThread(ImageBuffer imageBuffer, cv::Size const& size, int rotation, std::string const& URL,
-      hpx::execution::parallel_executor exec, int requestedFps);
-  ~CaptureThread();
+  StreamCaptureThread(ImageBuffer imageBuffer, cv::Size const& size, int rotation,
+      std::string const& URL, hpx::execution::parallel_executor exec, int requestedFps);
+  ~StreamCaptureThread();
 
   void run();
   //
@@ -70,7 +59,7 @@ class CaptureThread : public QObject
   //
   // Motion film
   //
-  void setWriteMotionAVI(bool write) { this->MotionAVI_Writing = write; }
+  void setWriteMotionAVI(bool write);
   bool getWriteMotionAVI() { return this->MotionAVI_Writing; }
   void setWriteMotionAVIName(char const* name);
 
@@ -84,7 +73,6 @@ class CaptureThread : public QObject
   // General
   //
   void setWriteMotionAVIDir(char const* dir);
-  void saveAVI(cv::Mat const& image);
   void closeAVI();
 
   void saveTimeLapseAVI(cv::Mat const& image);
@@ -101,8 +89,6 @@ class CaptureThread : public QObject
   cv::Size getRotatedSize() { return this->rotatedSize; }
 
   private:
-  bool tryResolutionUpdate(cv::Size requestedResolution);
-
   void setAbort(bool a) { this->abort = a; }
 
   signals:
@@ -122,7 +108,6 @@ class CaptureThread : public QObject
   cv::Size imageSize;
   bool requestedSizeCorrect;
   cv::Size rotatedSize;
-  cv::VideoCapture capture;
   fps_helper actualFps;
   fps_helper grabFps;
   fps_helper captureFps;
@@ -132,7 +117,6 @@ class CaptureThread : public QObject
   int motion_video_FrameCounter;
   ImageBuffer aviBuffer;
   //
-  cv::VideoWriter MotionAVI_Writer;
   cv::VideoWriter TimeLapseAVI_Writer;
   std::atomic<bool> MotionAVI_Writing;
   std::atomic<bool> aviWriterActive;
@@ -146,10 +130,11 @@ class CaptureThread : public QObject
   cv::Mat currentFrame;
   cv::Mat rotatedImage;
 
+  // Stream buffer recorder alternative to cv::VideoCapture
+  std::unique_ptr<stream_buffer_recorder> streamRecorder;
+
   public:
   std::atomic<bool> TimeLapseAVI_Writing;
 };
-
-#endif
 
 #endif

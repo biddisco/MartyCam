@@ -1,7 +1,7 @@
 #include "capturethread.h"
 
 #include <QDateTime>
-#include <QElapsedTimer>
+#include <chrono>
 #include <filesystem>
 //
 #include <wordexp.h>
@@ -84,12 +84,7 @@ CaptureThread::CaptureThread(ImageBuffer imageBuffer, cv::Size const& size, int 
   , executor(std::move(exec))
   , requestedFps(requestedFps)
   , requestedSizeCorrect(false)
-  , actualFps(0.0)
-  , grabFps(0.0)
   , FrameCounter(0)
-  , frameTimes(50)
-  , grabTimes(50)
-  , captureTimes(15)
   , abort(false)
   , captureActive(false)
   , deInterlace(false)
@@ -154,26 +149,15 @@ void CaptureThread::setRotation(int value)
   }
   if (wasActive) this->startCapture();
 }
+
 //----------------------------------------------------------------------------
 void CaptureThread::run()
 {
   MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
-  // Clear the frameTimes circular buffer to ensure actualFps is computed
-  // correctly from the first frame
-  this->frameTimes.clear();
-  this->grabTimes.clear();
-
-  QElapsedTimer actualFpsTime;
-  actualFpsTime.start();
-
-  QElapsedTimer grabFpsTime;
-  grabFpsTime.start();
-
-  QElapsedTimer requestedFpsTime;
-  requestedFpsTime.start();
-
-  QElapsedTimer captureWaitTime;
-  captureWaitTime.start();
+  // Start the fps helpers so they own their own timers
+  this->actualFps.start();
+  this->grabFps.start();
+  this->captureFps.start();
 
   while (!this->abort)
   {
@@ -189,11 +173,8 @@ void CaptureThread::run()
 
     // Continuously grab from camera to drain backend buffers and keep the
     // stream current; publish to processing only at requested FPS.
-    captureWaitTime.restart();
     bool const grabbed = this->capture.grab();
-    updateCaptureTime(captureWaitTime.elapsed());
-    updateGrabFps(grabFpsTime.elapsed());
-    int elapsedSinceLastOutput_ms = requestedFpsTime.elapsed();
+    this->grabFps.tick();
 
     if (!grabbed)
     {
@@ -203,11 +184,9 @@ void CaptureThread::run()
       continue;
     }
 
-    int requestedFrameTime_ms = (this->requestedFps > 0) ? (1000 / this->requestedFps) : 1000;
-    this->sleepTime_ms = requestedFrameTime_ms - elapsedSinceLastOutput_ms;
-    if (this->sleepTime_ms < 0) { this->sleepTime_ms = 0; }
-
-    if (elapsedSinceLastOutput_ms < requestedFrameTime_ms) { continue; }
+    // Adaptive throttle: drop this frame if accepting it would push the
+    // output rate above the requested FPS.
+    if (this->requestedFps > 0 && this->captureFps.would_exceed(this->requestedFps)) { continue; }
 
     // Retrieve the most recently grabbed frame for publication.
     cv::Mat frame;
@@ -251,14 +230,14 @@ void CaptureThread::run()
 
     this->FrameCounter++;
 
-    updateActualFps(actualFpsTime.elapsed());
-
-    requestedFpsTime.restart();
+    this->actualFps.tick();
+    this->captureFps.tick();
   }
 
   // The run() task is exiting -> wake the threads waiting for that.
   this->stopWait.wakeAll();
 }
+
 //----------------------------------------------------------------------------
 bool CaptureThread::startCapture()
 {
@@ -302,6 +281,7 @@ bool CaptureThread::startCapture()
   }
   return false;
 }
+
 //----------------------------------------------------------------------------
 bool CaptureThread::stopCapture()
 {
@@ -317,6 +297,7 @@ bool CaptureThread::stopCapture()
   }
   return wasActive;
 }
+
 //----------------------------------------------------------------------------
 void CaptureThread::updateTimeLapse()
 {
@@ -328,6 +309,7 @@ void CaptureThread::updateTimeLapse()
     this->saveTimeLapseAVI(this->currentFrame);
   }
 }
+
 //----------------------------------------------------------------------------
 void CaptureThread::saveTimeLapseAVI(cv::Mat const& image)
 {
@@ -335,6 +317,7 @@ void CaptureThread::saveTimeLapseAVI(cv::Mat const& image)
   if (!this->TimeLapseAVI_Writing) { this->TimeLapseAVI_Writer.release(); }
   else if (this->TimeLapseAVI_Writer.isOpened()) { this->TimeLapseAVI_Writer.write(image); }
 }
+
 //----------------------------------------------------------------------------
 void CaptureThread::startTimeLapse(double fps)
 {
@@ -386,6 +369,7 @@ void CaptureThread::startTimeLapse(double fps)
   }
   else { this->TimeLapseAVI_Writing = true; }
 }
+
 //----------------------------------------------------------------------------
 void CaptureThread::stopTimeLapse()
 {
@@ -393,47 +377,17 @@ void CaptureThread::stopTimeLapse()
   this->TimeLapseAVI_Writing = false;
   //    emit(RecordingState(true));
 }
+
 //----------------------------------------------------------------------------
 void CaptureThread::setRequestedFps(int value)
 {
   MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   this->requestedFps = value;
-  this->frameTimes.clear();
-  this->grabTimes.clear();
+  this->actualFps.clear();
+  this->grabFps.clear();
+  this->captureFps.clear();
 }
-//----------------------------------------------------------------------------
-void CaptureThread::updateActualFps(int time)
-{
-  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
-  frameTimes.push_back(time);
-  if (frameTimes.size() > 1)
-  {
-    actualFps = (frameTimes.size() - 1) / ((double) time - frameTimes.front()) * 1000.0;
-    actualFps = (static_cast<int>(actualFps * 10)) / 10.0;
-  }
-  else { actualFps = 0; }
-}
-//----------------------------------------------------------------------------
-void CaptureThread::updateGrabFps(int time)
-{
-  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
-  grabTimes.push_back(time);
-  if (grabTimes.size() > 1)
-  {
-    grabFps = (grabTimes.size() - 1) / ((double) time - grabTimes.front()) * 1000.0;
-    grabFps = (static_cast<int>(grabFps * 10)) / 10.0;
-  }
-  else { grabFps = 0; }
-}
-//----------------------------------------------------------------------------
-void CaptureThread::updateCaptureTime(int time_ms)
-{
-  MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
-  captureTimes.push_back(time_ms);
 
-  captureTime_ms = static_cast<int>(
-      std::accumulate(captureTimes.begin(), captureTimes.end(), 0) / captureTimes.size());
-}
 //----------------------------------------------------------------------------
 void CaptureThread::saveAVI(cv::Mat const& image)
 {
@@ -509,7 +463,7 @@ void CaptureThread::saveAVI(cv::Mat const& image)
         this->MotionAVI_Writer.open(path.c_str(), cv::CAP_FFMPEG, CV_FOURCC('m', 'p', '4', 'v'),
             fps, frameSize, writerParams);
       }
-      // emit(RecordingState(true));
+      emit(RecordingState(true));
     }
 
     if (this->MotionAVI_Writer.isOpened())
@@ -517,12 +471,13 @@ void CaptureThread::saveAVI(cv::Mat const& image)
       motion_video_FrameCounter++;
       MARTY_LOG_INFO(cap_log, "{:<20} Writing frame {:06d} to video writer", "CaptureThread",
           motion_video_FrameCounter);
-      this->MotionAVI_Writer.write(frameCopy);
+          // XXXXXXXXXXXXX FIX 
+      // this->MotionAVI_Writer.write(frameCopy);
       // if CloseAvi has been called, stop writing.
       if (!this->MotionAVI_Writing)
       {
         this->MotionAVI_Writer.release();
-        // emit(RecordingState(false));
+        emit(RecordingState(false));
       }
     }
     else
@@ -533,14 +488,19 @@ void CaptureThread::saveAVI(cv::Mat const& image)
     }
   });
 }
+
 //----------------------------------------------------------------------------
 void CaptureThread::closeAVI() { this->MotionAVI_Writing = false; }
+
 //----------------------------------------------------------------------------
 void CaptureThread::setWriteMotionAVIDir(char const* dir) { this->AVI_Directory = dir; }
+
 //----------------------------------------------------------------------------
 void CaptureThread::setWriteMotionAVIName(char const* name) { this->MotionAVI_Name = name; }
+
 //----------------------------------------------------------------------------
 void CaptureThread::setWriteTimeLapseAVIName(char const* name) { this->TimeLapseAVI_Name = name; }
+
 //----------------------------------------------------------------------------
 void CaptureThread::rotateImage(cv::Mat const& source, cv::Mat& rotated)
 {
@@ -562,6 +522,7 @@ void CaptureThread::rotateImage(cv::Mat const& source, cv::Mat& rotated)
     break;
   }
 }
+
 //----------------------------------------------------------------------------
 void CaptureThread::captionImage(cv::Mat& image)
 {
@@ -570,9 +531,9 @@ void CaptureThread::captionImage(cv::Mat& image)
   std::string text = timestring.toLatin1().data();
 
   // Scale the text so its width is a fixed fraction of the image width.
-  const double targetFraction = 0.20;    // 20 % of image width
-  const double minScale = 0.5;
-  const double maxScale = 4.0;
+  double const targetFraction = 0.20;    // 20 % of image width
+  double const minScale = 0.5;
+  double const maxScale = 4.0;
   int baseline = 0;
 
   cv::Size baseSize = cv::getTextSize(text, CV_FONT_HERSHEY_PLAIN, 1.0, 1, &baseline);
@@ -587,9 +548,10 @@ void CaptureThread::captionImage(cv::Mat& image)
   cv::Size textSize = cv::getTextSize(text, CV_FONT_HERSHEY_PLAIN, scale, thickness, &baseline);
 
   cv::Point origin(image.size().width - textSize.width - 4, textSize.height + 4);
-  cv::putText(image, text, origin, CV_FONT_HERSHEY_PLAIN, scale,
-      cv::Scalar(255, 255, 255, 0), thickness);
+  cv::putText(
+      image, text, origin, CV_FONT_HERSHEY_PLAIN, scale, cv::Scalar(255, 255, 255, 0), thickness);
 }
+
 //----------------------------------------------------------------------------
 // If the requested resolution is available switches to it and returns true.
 // Otherwise leaves the current resolution and returns false
@@ -603,4 +565,5 @@ bool CaptureThread::tryResolutionUpdate(cv::Size requestedResolution)
 
   return width == requestedResolution.width && height == requestedResolution.height;
 }
+
 //----------------------------------------------------------------------------

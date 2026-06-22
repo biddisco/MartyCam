@@ -9,6 +9,7 @@
 #include <QMainWindow>
 #include <QShowEvent>
 //
+#include <memory>
 #include <opencv2/core/core.hpp>
 //
 #include "capturethread.h"

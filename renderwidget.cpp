@@ -146,6 +146,7 @@ void RenderWidget::updatePixmap(cv::Mat const& frame)
 
   if (temp) { canvas->setImage(temp); }
 }
+
 //----------------------------------------------------------------------------
 void RenderWidget::process(cv::Mat const& image)
 {

@@ -25,86 +25,96 @@
 
 #include <assert.h>
 #include <cmath>
-//#include <iostream> // dla testów 
+//#include <iostream> // dla testï¿½w
 
 using namespace std;
 
 /** 
-* Znajduje najwiêksz± warto¶æ mniejsz± od scaleSize/steps i
-* jednocze¶nie bêd±c± ca³kowicie podzieln± przez warto¶æ 
-* 10^N  gdzie n jest dowoln± liczb± ca³kowit±.
+* Znajduje najwiï¿½kszï¿½ wartoï¿½ï¿½ mniejszï¿½ od scaleSize/steps i
+* jednoczeï¿½nie bï¿½dï¿½cï¿½ caï¿½kowicie podzielnï¿½ przez wartoï¿½ï¿½ 
+* 10^N  gdzie n jest dowolnï¿½ liczbï¿½ caï¿½kowitï¿½.
 * dla 5,2,1 jest to  odpowiedniio {...,500,50,5,0.5,...},
 * {...200,20,2,0.2,0.02,...} etc. 
-*/ 
- 
+*/
 
 double minimalStep(double scaleSize, int steps);
 
-
 /**
-* Szablonowa funkcja do wyznaczania skali w zadanym przedziale o wyznaczonej ilo¶ci punktów skali.
-* Na podstawie warto¶ci minimalnej oraz maksymalnej, jak± chcemy osi±gnaæ ustawia
-* warto¶ci m_min oraz m_max w taki sposób ca³y przedzia³ skali (m_max-m_min) by³ podzielny
-* przez ilo¶æ punktów skali a odleg³o¶æ pomiêdzy punktami skali by³a wartosci± która jest
-* wieloktorno¶ci± liczby 5. Dodatkowo isnieje mo¿liwo¶æ przesuniêcia skali w lewo lub prawo by
-* rozpoczyna³a siê jak najbli¿ej warto¶ci minimalnej lub koñczy³a jak najbli¿ej warto¶ci
+* Szablonowa funkcja do wyznaczania skali w zadanym przedziale o wyznaczonej iloï¿½ci punktï¿½w skali.
+* Na podstawie wartoï¿½ci minimalnej oraz maksymalnej, jakï¿½ chcemy osiï¿½gnaï¿½ ustawia
+* wartoï¿½ci m_min oraz m_max w taki sposï¿½b caï¿½y przedziaï¿½ skali (m_max-m_min) byï¿½ podzielny
+* przez iloï¿½ï¿½ punktï¿½w skali a odlegï¿½oï¿½ï¿½ pomiï¿½dzy punktami skali byï¿½a wartosciï¿½ ktï¿½ra jest
+* wieloktornoï¿½ciï¿½ liczby 5. Dodatkowo isnieje moï¿½liwoï¿½ï¿½ przesuniï¿½cia skali w lewo lub prawo by
+* rozpoczynaï¿½a siï¿½ jak najbliï¿½ej wartoï¿½ci minimalnej lub koï¿½czyï¿½a jak najbliï¿½ej wartoï¿½ci
 * maksymalnej.
 *
-* @param m_minimum - warto¶æ minilana na skali jaka ma byæ widoczna
-* @param m_maximum - warto¶æ maksymalna na skali jaka ma byæ widoczna
-* @param m_min     - wyliczona warto¶æ pocz±tkowa skali
-* @param m_max     - wyliczona warto¶æ koñcowa skali
-* @param stesp     - ilo¶æ wêz³ów jak± ma mieæ skala
-* @param left      - czy skala ma byæ wyrównana do lewej czy do prawej (domy¶lnie do prawej).
-* @return Funkcja zwraca warto¶æ true je¿eli warto¶ci m_min oraz m_max w wyniku zmiany zakresu
-* zmieni³y swoj± warto¶æ.  Na podstawie tej warto¶ci wiadomo czy nale¿y np. przerysowaæ skalê
-* - podaj±c wcze¶niej poprzednie warto¶ci zakresu skali.
+* @param m_minimum - wartoï¿½ï¿½ minilana na skali jaka ma byï¿½ widoczna
+* @param m_maximum - wartoï¿½ï¿½ maksymalna na skali jaka ma byï¿½ widoczna
+* @param m_min     - wyliczona wartoï¿½ï¿½ poczï¿½tkowa skali
+* @param m_max     - wyliczona wartoï¿½ï¿½ koï¿½cowa skali
+* @param stesp     - iloï¿½ï¿½ wï¿½zï¿½ï¿½w jakï¿½ ma mieï¿½ skala
+* @param left      - czy skala ma byï¿½ wyrï¿½wnana do lewej czy do prawej (domyï¿½lnie do prawej).
+* @return Funkcja zwraca wartoï¿½ï¿½ true jeï¿½eli wartoï¿½ci m_min oraz m_max w wyniku zmiany zakresu
+* zmieniï¿½y swojï¿½ wartoï¿½ï¿½.  Na podstawie tej wartoï¿½ci wiadomo czy naleï¿½y np. przerysowaï¿½ skalï¿½
+* - podajï¿½c wczeï¿½niej poprzednie wartoï¿½ci zakresu skali.
 */
 
 template <typename T>
-bool range(T m_minimum,T m_maximum, T & m_min, T & m_max,unsigned int steps, bool left = false,double inc = 5.0)
+bool range(T m_minimum, T m_maximum, T& m_min, T& m_max, unsigned int steps, bool left = false,
+    double inc = 5.0)
 {
   //cout<<"("<<m_minimum<<","<<m_maximum<<")  ("<<m_min<<","<<m_max<<")"<<endl;
   T max_tmp = m_max, min_tmp = m_min;
-  m_max=m_maximum;
-  m_min=m_minimum;
-  assert( m_max > m_min );
+  m_max = m_maximum;
+  m_min = m_minimum;
+  assert(m_max > m_min);
   //  assert( (m_max - m_min) > 0 );
-  //  if (m_max<0) left!=left; 
-  
-  T diff = abs(m_max - m_min);
-  T scale = 0, factor = 0 ;
+  //  if (m_max<0) left!=left;
 
-  while (inc * steps > (m_maximum-m_minimum))
-  if (inc/10 > 0 ) inc/=10;
-  else break;
+  T diff = abs(m_max - m_min);
+  T scale = 0, factor = 0;
+
+  while (inc * steps > (m_maximum - m_minimum))
+    if (inc / 10 > 0)
+      inc /= 10;
+    else
+      break;
 
   bool done = false;
-  while ( diff > scale ) 
-   { factor+=static_cast<T>(inc);  scale = factor * steps;  }
-   
+  while (diff > scale)
+  {
+    factor += static_cast<T>(inc);
+    scale = factor * steps;
+  }
+
   while (!done)
   {
-    
-    // dirty hack to have zero equal exactly zero 
-    if (m_max<0)  m_max=m_min - fmodf(m_min,steps);
-    else m_max = 0.0; 
-    
-     while ( m_max < m_maximum ) m_max +=factor;
-     m_min = m_max - scale;
-     if (m_min <= m_minimum ) done = true;
-     else { factor+=static_cast<T>(inc); scale = factor * steps; }
+    // dirty hack to have zero equal exactly zero
+    if (m_max < 0)
+      m_max = m_min - fmodf(m_min, steps);
+    else
+      m_max = 0.0;
+
+    while (m_max < m_maximum) m_max += factor;
+    m_min = m_max - scale;
+    if (m_min <= m_minimum)
+      done = true;
+    else
+    {
+      factor += static_cast<T>(inc);
+      scale = factor * steps;
+    }
   }
-  // Wprowadzenie koretkty by skala nie przesuwa³a siê w lewo na osi X
+  // Wprowadzenie koretkty by skala nie przesuwaï¿½a siï¿½ w lewo na osi X
   if (left)
-  	while (m_min + factor <= m_minimum)
-  	{
-	   	m_min+=factor;
-   		m_max+=factor;
-  	}
-//  cout<<"Min:"<<m_min<<" Max:"<<m_max<<endl;
- return (m_max != max_tmp) | (m_min != min_tmp);
+    while (m_min + factor <= m_minimum)
+    {
+      m_min += factor;
+      m_max += factor;
+    }
+
+  //  cout<<"Min:"<<m_min<<" Max:"<<m_max<<endl;
+  return (m_max != max_tmp) | (m_min != min_tmp);
 }
 
-
-#endif // _FUNCTIONS_H_
+#endif    // _FUNCTIONS_H_

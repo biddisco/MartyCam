@@ -122,8 +122,11 @@ int qt_main(hpx::program_options::variables_map& vm)
 //                     << std::endl;
 //           rp.add_resource(p, "blocking");
 //         }
+
 //       }
+
 //     }
+
 //   }
 
 //   std::cout << "[main] resources added to thread_pools" << std::endl;
@@ -165,6 +168,7 @@ int qt_main(hpx::program_options::variables_map& vm)
 //     po::store(
 //         po::command_line_parser(argc, argv).allow_unregistered().options(desc_cmdline).run(), vm);
 //   }
+
 //   catch (po::error& e)
 //   {
 //     std::cerr << "ERROR: " << e.what() << "\n\n";

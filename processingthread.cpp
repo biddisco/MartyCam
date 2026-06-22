@@ -1,5 +1,4 @@
 #include <QDebug>
-#include <QElapsedTimer>
 #include <QTime>
 //
 #include <iostream>
@@ -32,19 +31,19 @@ ProcessingThread::ProcessingThread(ImageBuffer buffer, hpx::execution::parallel_
   , faceRecogFilter(new FaceRecogFilter(frfp))
   , abort(false)
   , processingType(processingType)
-  , processingTimes(15)
-  , processingTime_ms(0)
   , QObject(nullptr)
 {
   MARTY_LOG_SCOPE(process_log, "{} {}", (void*) (this), __func__);
   this->graphFilter = new GraphUpdateFilter();
 }
+
 //----------------------------------------------------------------------------
 ProcessingThread::~ProcessingThread()
 {
   MARTY_LOG_SCOPE(process_log, "{} {}", (void*) (this), __func__);
   delete this->graphFilter;
 }
+
 //----------------------------------------------------------------------------
 void ProcessingThread::CopySettings(ProcessingThread* thread)
 {
@@ -58,6 +57,7 @@ void ProcessingThread::CopySettings(ProcessingThread* thread)
   this->motionFilter->blendRatio = thread->motionFilter->blendRatio;
   this->motionFilter->noiseBlendRatio = thread->motionFilter->noiseBlendRatio;
 }
+
 //----------------------------------------------------------------------------
 void ProcessingThread::setMotionDetectionProcessing()
 {
@@ -69,13 +69,13 @@ void ProcessingThread::setFaceRecognitionProcessing()
   MARTY_LOG_SCOPE(process_log, "{} {}", (void*) (this), __func__);
   this->processingType = ProcessingType::faceRecognition;
 }
+
 //----------------------------------------------------------------------------
 void ProcessingThread::run()
 {
   MARTY_LOG_SCOPE(process_log, "{} {}", (void*) (this), __func__);
   int framenum = 0;
-  QElapsedTimer processingTime;
-  processingTime.start();
+  this->processingTime.start();
 
   while (!this->abort)
   {
@@ -91,7 +91,7 @@ void ProcessingThread::run()
     }
     cv::Mat cameracopy = cameraImage.clone();
 
-    processingTime.restart();
+    this->processingTime.restart();
     switch (this->processingType)
     {
     case ProcessingType::motionDetection:
@@ -106,13 +106,14 @@ void ProcessingThread::run()
       break;
     case ProcessingType ::faceRecognition: this->faceRecogFilter->process(cameracopy); break;
     }
-    updateProcessingTime(processingTime.elapsed());
+    this->processingTime.tick();
     emit(NewData());
   }
 
   this->abort = false;
   this->stopWait.wakeAll();
 }
+
 //----------------------------------------------------------------------------
 bool ProcessingThread::startProcessing()
 {
@@ -128,6 +129,7 @@ bool ProcessingThread::startProcessing()
   }
   return false;
 }
+
 //----------------------------------------------------------------------------
 bool ProcessingThread::stopProcessing()
 {
@@ -142,15 +144,6 @@ bool ProcessingThread::stopProcessing()
     this->stopLock.unlock();
   }
   return wasActive;
-}
-//----------------------------------------------------------------------------
-void ProcessingThread::updateProcessingTime(int time_ms)
-{
-  MARTY_LOG_SCOPE(process_log, "{} {}", (void*) (this), __func__);
-  processingTimes.push_back(time_ms);
-
-  processingTime_ms = static_cast<int>(
-      std::accumulate(processingTimes.begin(), processingTimes.end(), 0) / processingTimes.size());
 }
 
 //----------------------------------------------------------------------------

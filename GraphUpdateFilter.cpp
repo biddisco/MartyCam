@@ -35,6 +35,7 @@ GraphUpdateFilter::GraphUpdateFilter()
   thresholdLevel.push_back(0.0);
   //
 }
+
 //----------------------------------------------------------------------------
 GraphUpdateFilter::~GraphUpdateFilter()
 {
@@ -48,6 +49,7 @@ GraphUpdateFilter::~GraphUpdateFilter()
   delete fastDecay;
   delete slowDecay;
 }
+
 //----------------------------------------------------------------------------
 void GraphUpdateFilter::process(double PSNR, double motion, double norm, double mean, double slow,
     double fast, int framenumber, double userlevel, double eventLevel)
@@ -73,8 +75,10 @@ void GraphUpdateFilter::process(double PSNR, double motion, double norm, double 
   thresholdLevel[0] = userlevel;
   thresholdLevel[1] = userlevel;
 }
+
 //----------------------------------------------------------------------------
 void GraphUpdateFilter::initChart(MartyCamPlot* plot) { plot->initCurves(); }
+
 //----------------------------------------------------------------------------
 // Helper: copy circular_buffer contents into a contiguous std::vector
 // because QwtPlotCurve::setRawSamples requires contiguous arrays.
@@ -84,6 +88,7 @@ static void linearizeBuffer(boost::circular_buffer<double> const& src, std::vect
   dst.resize(src.size());
   std::copy(src.begin(), src.end(), dst.begin());
 }
+
 //----------------------------------------------------------------------------
 void GraphUpdateFilter::updateChart(MartyCamPlot* plot)
 {
@@ -128,6 +133,7 @@ void GraphUpdateFilter::updateChart(MartyCamPlot* plot)
 
   plot->replot();
 }
+
 //----------------------------------------------------------------------------
 void GraphUpdateFilter::clearChart()
 {
@@ -146,4 +152,5 @@ void GraphUpdateFilter::clearChart()
   //  vint     thresholdTime(2);
   //  vdouble  thresholdLevel(2);
 }
+
 //----------------------------------------------------------------------------

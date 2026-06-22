@@ -30,6 +30,7 @@ FaceRecogFilter::FaceRecogFilter()
   if (eyesRecogState) nestedCascade.load(nestedCascadePath);
   cascade.load(cascadePath);
 }
+
 //----------------------------------------------------------------------------
 FaceRecogFilter::FaceRecogFilter(FaceRecogFilterParams frfp)
   : cascade()
@@ -49,14 +50,17 @@ FaceRecogFilter::FaceRecogFilter(FaceRecogFilterParams frfp)
   nestedCascade.load(nestedCascadePath);
   cascade.load(cascadePath);
 }
+
 //----------------------------------------------------------------------------
 FaceRecogFilter::~FaceRecogFilter() { this->DeleteTemporaryStorage(); }
+
 //----------------------------------------------------------------------------
 void FaceRecogFilter::DeleteTemporaryStorage()
 {
   this->inputImage.release();
   this->outputImage.release();
 }
+
 //----------------------------------------------------------------------------
 void FaceRecogFilter::process(cv::Mat const& img)
 {

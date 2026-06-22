@@ -1,8 +1,8 @@
 #include "MotionFilter.h"
 #include "DecayFilter.h"
 #include "PSNRFilter.h"
-#include "filter.h"
 #include "capturethread.h"
+#include "filter.h"
 //
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -68,6 +68,7 @@ MotionFilter::MotionFilter(MotionFilterParams mfp)
   //
   this->frameCount = 0;
 }
+
 //----------------------------------------------------------------------------
 MotionFilter::~MotionFilter()
 {
@@ -75,6 +76,7 @@ MotionFilter::~MotionFilter()
   delete this->decayFilter;
   this->DeleteTemporaryStorage();
 }
+
 //----------------------------------------------------------------------------
 void MotionFilter::DeleteTemporaryStorage()
 {
@@ -86,6 +88,7 @@ void MotionFilter::DeleteTemporaryStorage()
   this->floatImage.release();
   this->noiseImage.release();
 }
+
 //----------------------------------------------------------------------------
 void MotionFilter::process(cv::Mat const& image)
 {
@@ -149,7 +152,8 @@ void MotionFilter::process(cv::Mat const& image)
       this->updateNoiseMap(this->thresholdImage, this->noiseBlendRatio);
 
       // 3. Morphological Open to delete isolated 8x8 block artifacts
-      if (this->erodeIterations>0) {
+      if (this->erodeIterations > 0)
+      {
         int openclose = this->erodeIterations;
         cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(openclose, openclose));
         cv::morphologyEx(this->thresholdImage, this->thresholdImage, cv::MORPH_OPEN, element);
@@ -230,6 +234,7 @@ void MotionFilter::process(cv::Mat const& image)
   //
   this->lastFrame = image;
 }
+
 //----------------------------------------------------------------------------
 void MotionFilter::updateNoiseMap(cv::Mat const& image, double noiseblend)
 {
@@ -257,6 +262,7 @@ void MotionFilter::updateNoiseMap(cv::Mat const& image, double noiseblend)
   */
   cnt++;
 }
+
 //----------------------------------------------------------------------------
 void MotionFilter::countPixels(cv::Mat const& image)
 {

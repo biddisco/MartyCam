@@ -46,7 +46,14 @@ set_property(
            error
            critical
 )
-
+# -----------------------------------------------------------------------------
+# Use stream_buffer_recorder based capture thread instead of OpenCV VideoCapture
+# -----------------------------------------------------------------------------
+option(MARTYCAM_USE_STREAM_CAPTURE "Use stream_buffer_recorder for frame capture" OFF)
+if(MARTYCAM_USE_STREAM_CAPTURE)
+  message(STATUS "Using stream_buffer_recorder based capture thread")
+  add_compile_definitions(USE_STREAM_CAPTURE_THREAD)
+endif()
 # -----------------------------------------------------------------------------
 # Include GitExternal for cloning other repos internally
 # -----------------------------------------------------------------------------
@@ -145,6 +152,22 @@ git_external(
 )
 
 # -----------------------------------------------------------------------------
+# libs we need for video processing/recording
+# -----------------------------------------------------------------------------
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(AVFORMAT REQUIRED libavformat)
+pkg_check_modules(AVCODEC REQUIRED libavcodec)
+pkg_check_modules(AVUTIL REQUIRED libavutil)
+pkg_check_modules(SWSCALE REQUIRED libswscale)
+pkg_check_modules(AVDEVICE REQUIRED libavdevice)
+# Manually find the absolute path to each library using the Spack directory hints
+find_library(AVFORMAT_LIB NAMES avformat HINTS ${AVFORMAT_LIBRARY_DIRS})
+find_library(AVCODEC_LIB NAMES avcodec HINTS ${AVCODEC_LIBRARY_DIRS})
+find_library(AVUTIL_LIB NAMES avutil HINTS ${AVUTIL_LIBRARY_DIRS})
+find_library(SWSCALE_LIB NAMES swscale HINTS ${SWSCALE_LIBRARY_DIRS})
+find_library(AVDEVICE_LIB NAMES avdevice HINTS ${AVDEVICE_LIBRARY_DIRS})
+
+# -----------------------------------------------------------------------------
 # Set DATA_PATH directory of the repository
 # -----------------------------------------------------------------------------
 set(DATA_PATH "${PROJECT_SOURCE_DIR}/data")
@@ -200,8 +223,14 @@ add_subdirectory(test)
 # -----------------------------------------------------------------------------
 # Main source files
 # -----------------------------------------------------------------------------
+if(MARTYCAM_USE_STREAM_CAPTURE)
+  set(capture_source stream_capture_thread.cpp)
+else()
+  set(capture_source capturethread.cpp)
+endif()
+
 set(martycam_SRCS
-    capturethread.cpp
+    ${capture_source}
     filter.cpp
     PSNRFilter.cpp
     MotionFilter.cpp
@@ -217,6 +246,7 @@ set(martycam_SRCS
     IPCameraForm.cpp
     martycam.rc
     FaceRecogFilter.cpp
+    stream_buffer_recorder.cpp
 )
 if(WIN32)
   set(martycam_SRCS
@@ -233,20 +263,25 @@ add_executable(
 )
 target_include_directories(martycam PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/streamulus/src")
 
-# qt5_use_modules(martycam Core Widgets Gui Svg OpenGL Concurrent) Qt properties
+# ffmpeg avcodec support
+target_include_directories(
+  martycam PRIVATE ${AVFORMAT_INCLUDE_DIRS} ${AVCODEC_INCLUDE_DIRS} ${AVUTIL_INCLUDE_DIRS}
+                   ${SWSCALE_INCLUDE_DIRS} ${AVDEVICE_INCLUDE_DIRS}
+)
+
 set_property(TARGET martycam PROPERTY AUTOMOC ON)
 set_property(TARGET martycam PROPERTY AUTOUIC ON)
 set_property(TARGET martycam PROPERTY AUTORCC ON)
 
 target_link_libraries(
   martycam
-  Qt::Core
-  Qt::Concurrent
-  Qt::Gui
-  Qt::OpenGL
-  Qt::Svg
-  Qt::Widgets
-  Qt::OpenGLWidgets
+  PRIVATE Qt::Core
+          Qt::Concurrent
+          Qt::Gui
+          Qt::OpenGL
+          Qt::Svg
+          Qt::Widgets
+          Qt::OpenGLWidgets
 )
 
 # -----------------------------------------------------------------------------
@@ -264,14 +299,19 @@ target_include_directories(
 
 target_link_libraries(
   martycam
-  utility_widgets
-  ${MARTYCAM_LOG_LIBS}
-  ${OpenCV_LIBS}
-  ${Boost_LIBRARIES}
-  HPX::hpx
-  qwt
-  nlohmann_json::nlohmann_json
-  Fontconfig::Fontconfig
+  PRIVATE utility_widgets
+          ${MARTYCAM_LOG_LIBS}
+          ${AVFORMAT_LIB}
+          ${AVCODEC_LIB}
+          ${AVUTIL_LIB}
+          ${SWSCALE_LIB}
+          ${AVDEVICE_LIB}
+          ${OpenCV_LIBS}
+          ${Boost_LIBRARIES}
+          HPX::hpx
+          qwt
+          nlohmann_json::nlohmann_json
+          Fontconfig::Fontconfig
 )
 
 add_subdirectory(webcam_test)

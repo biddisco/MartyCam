@@ -12,6 +12,7 @@
 #include <hpx/future.hpp>
 #include <hpx/include/async.hpp>
 
+#include <fmt/format.h>
 #include "GraphUpdateFilter.h"
 #include "debug/logging.hpp"
 #include "utility_widgets/CameraSelectorWidget.h"
@@ -128,6 +129,7 @@ MartyCam::MartyCam(hpx::execution::parallel_executor const& defaultExec,
   //
   restoreState(settings.value("mainWindowState").toByteArray());
 }
+
 //----------------------------------------------------------------------------
 void MartyCam::closeEvent(QCloseEvent*)
 {
@@ -137,6 +139,7 @@ void MartyCam::closeEvent(QCloseEvent*)
   this->deleteCaptureThread();
   this->deleteProcessingThread();
 }
+
 //----------------------------------------------------------------------------
 void MartyCam::createCaptureThread(
     cv::Size size, std::string const& cameraUTL, int fps, hpx::execution::parallel_executor exec)
@@ -146,6 +149,10 @@ void MartyCam::createCaptureThread(
       this->settingsWidget->getSelectedRotation(), cameraUTL, this->blockingExecutor, fps);
   this->captureThread->startCapture();
   this->settingsWidget->setThreads(this->captureThread, this->processingThread);
+
+  // not needed for now, but leave it here for future use
+  connect(this->captureThread.get(), SIGNAL(RecordingState(bool)), this,
+      SLOT(onRecordingStateChanged(bool)));
 }
 
 //----------------------------------------------------------------------------
@@ -176,6 +183,7 @@ void MartyCam::createProcessingThread(ProcessingThread* oldThread,
   connect(this->processingThread.get(), SIGNAL(NewData()), this, SLOT(updateGUI()),
       Qt::QueuedConnection);
 }
+
 //----------------------------------------------------------------------------
 void MartyCam::deleteProcessingThread()
 {
@@ -201,33 +209,30 @@ void MartyCam::onRotationChanged(int rotation)
   }
   this->clearGraphs();
 }
+
 //----------------------------------------------------------------------------
 void MartyCam::updateGUI()
 {
   MARTY_LOG_SCOPE(marty_log, "{} {}", (void*) (this), __func__);
   if (!this->processingThread) return;
 
-  statusBar()->showMessage(
-      QString("Grab FPS: %1 | Req FPS: %2 | Actual FPS: %3 | Frame Counter : %4 "
-              "| Image Buffer Occupancy : %5\% "
-              "| Sleep in CaptureThread: %6ms "
-              "| Capture Time: %7ms "
-              "| Processing Time: %8ms")
-          .arg(this->captureThread->getGrabFps(), 5, 'f', 2)
-          .arg(this->captureThread->getRequestedFps(), 3)
-          .arg(this->captureThread->getActualFps(), 5, 'f', 2)
-          .arg(captureThread->GetFrameCounter(), 5)
-          .arg(100 * (float) this->imageBuffer->size() / IMAGE_BUFF_CAPACITY, 4)
-          .arg(captureThread->getSleepTime())
-          .arg(captureThread->getCaptureTime())
-          .arg(processingThread->getProcessingTime()));
+  std::string const status = fmt::format(
+      "Grab FPS: {:05.2f} | Req FPS: {:03d} | Actual FPS: {:05.2f} | Frame Counter: {:05d} "
+      "| Image Buffer Occupancy: {:04.1f}% "
+      "| Capture FPS: {:05.2f} "
+      "| Processing Time: {:03d}ms",
+      this->captureThread->getGrabFps(), this->captureThread->getRequestedFps(),
+      this->captureThread->getActualFps(), captureThread->GetFrameCounter(),
+      100.0f * this->imageBuffer->size() / IMAGE_BUFF_CAPACITY,
+      this->captureThread->getCaptureFps(), processingThread->getProcessingTime());
+  statusBar()->showMessage(QString::fromStdString(status));
 
   //
   // as the data scrolls, we move the x-axis start and end (size)
   //
   this->processingThread->graphFilter->updateChart(this->ui.chart);
-  this->ui.detect_value->setText(
-      QString("%1").arg(this->processingThread->motionFilter->motionEstimate, 4, 'f', 2));
+  this->ui.detect_value->setText(QString::fromStdString(
+      fmt::format("{:04.2f}", this->processingThread->motionFilter->motionEstimate)));
 
   //
   // if an event was triggered, start recording
@@ -267,12 +272,14 @@ void MartyCam::updateGUI()
     this->captureThread->stopTimeLapse();
   }
 }
+
 //----------------------------------------------------------------------------
 void MartyCam::clearGraphs()
 {
   MARTY_LOG_SCOPE(marty_log, "{} {}", (void*) (this), __func__);
   this->processingThread->graphFilter->clearChart();
 }
+
 //----------------------------------------------------------------------------
 void MartyCam::onUserTrackChanged(int value)
 {
@@ -281,11 +288,12 @@ void MartyCam::onUserTrackChanged(int value)
   this->processingThread->motionFilter->triggerLevel = percent;
 
   double logval = percent > 1 ? (100.0 / 4.0) * log10(percent) : 0;
-  this->ui.set_value->setText(QString("%1").arg(logval, 4, 'f', 2));
+  this->ui.set_value->setText(QString::fromStdString(fmt::format("{:04.2f}", logval)));
   // threshold back from log to original
   double trigger = pow(10, value * (4.0 / 100.0)) / 100.0;
-  this->ui.set_value->setText(QString("%1").arg(trigger, 4, 'f', 2));
+  this->ui.set_value->setText(QString::fromStdString(fmt::format("{:04.2f}", trigger)));
 }
+
 //----------------------------------------------------------------------------
 void MartyCam::onRecordingStateChanged(bool state)
 {
@@ -296,21 +304,30 @@ void MartyCam::onRecordingStateChanged(bool state)
     this->EventRecordCounter++;
     QString evc = QString("Events : %1").arg(this->EventRecordCounter, 3);
     this->ui.eventCounter->setText(evc);
+    //
+    // streamRecorder->startRecording("/home/biddisco/wildlife/test.mp4");
   }
-  else { this->ui.RecordingEnabled->setStyleSheet("QCheckBox { background-color: window; }"); }
+  else
+  {
+    // streamRecorder->stopRecording();
+    this->ui.RecordingEnabled->setStyleSheet("QCheckBox { background-color: window; }");
+  }
 }
+
 //----------------------------------------------------------------------------
 void MartyCam::resetChart()
 {
   MARTY_LOG_SCOPE(marty_log, "{} {}", (void*) (this), __func__);
   this->ui.chart->clearCurves();
 }
+
 //----------------------------------------------------------------------------
 void MartyCam::initChart()
 {
   MARTY_LOG_SCOPE(marty_log, "{} {}", (void*) (this), __func__);
   this->processingThread->graphFilter->initChart(this->ui.chart);
 }
+
 //----------------------------------------------------------------------------
 void MartyCam::saveSettings()
 {
@@ -325,6 +342,7 @@ void MartyCam::saveSettings()
   settings.setValue("trackval", this->ui.user_trackval->value());
   settings.endGroup();
 }
+
 //----------------------------------------------------------------------------
 void MartyCam::loadSettings()
 {
