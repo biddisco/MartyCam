@@ -1,5 +1,5 @@
 ---
-name: MartyCam-Helper-Agent
+name: MartyCam-Helper
 description: "Use when working on MartyCam repo command-line tasks, builds, formatting, or shell setup."
 argument-hint: "A MartyCam task to implement, inspect, build, format, or debug from the command line."
 tools: [read, search, edit, execute, todo]
