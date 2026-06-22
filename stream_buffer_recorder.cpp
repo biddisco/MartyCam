@@ -1,6 +1,9 @@
-#include "stream_buffer_recorder.hpp"
 #include <iostream>
+//
+#include "debug/logging.hpp"
+#include "stream_buffer_recorder.hpp"
 
+//----------------------------------------------------------------------------
 stream_buffer_recorder::stream_buffer_recorder(
     std::string const& stream_url, double buffer_duration_seconds)
   : url(stream_url)
@@ -8,8 +11,10 @@ stream_buffer_recorder::stream_buffer_recorder(
 {
 }
 
+//----------------------------------------------------------------------------
 stream_buffer_recorder::~stream_buffer_recorder() { close(); }
 
+//----------------------------------------------------------------------------
 bool stream_buffer_recorder::open(int width, int height, std::string const& fourcc_str)
 {
   bool is_url = (url.find("://") != std::string::npos);
@@ -46,6 +51,7 @@ bool stream_buffer_recorder::open(int width, int height, std::string const& four
   return true;
 }
 
+//----------------------------------------------------------------------------
 bool stream_buffer_recorder::open_ip()
 {
   AVDictionary* options = nullptr;
@@ -67,6 +73,7 @@ bool stream_buffer_recorder::open_ip()
   return true;
 }
 
+//----------------------------------------------------------------------------
 bool stream_buffer_recorder::open_usb(int width, int height, std::string const& fourcc_str)
 {
   avdevice_register_all();
@@ -112,6 +119,7 @@ bool stream_buffer_recorder::open_usb(int width, int height, std::string const& 
   return true;
 }
 
+//----------------------------------------------------------------------------
 void stream_buffer_recorder::close()
 {
   is_running = false;
@@ -129,6 +137,7 @@ void stream_buffer_recorder::close()
   if (ifmt_ctx) { avformat_close_input(&ifmt_ctx); }
 }
 
+//----------------------------------------------------------------------------
 bool stream_buffer_recorder::readFrame(cv::Mat& out_frame)
 {
   std::lock_guard<std::mutex> lock(mtx);
@@ -144,6 +153,7 @@ bool stream_buffer_recorder::readFrame(cv::Mat& out_frame)
   return true;
 }
 
+//----------------------------------------------------------------------------
 bool stream_buffer_recorder::startRecording(std::string const& output_filename)
 {
   std::lock_guard<std::mutex> lock(mtx);
@@ -169,6 +179,7 @@ bool stream_buffer_recorder::startRecording(std::string const& output_filename)
   return true;
 }
 
+//----------------------------------------------------------------------------
 void stream_buffer_recorder::stopRecording()
 {
   std::lock_guard<std::mutex> lock(mtx);
@@ -177,6 +188,7 @@ void stream_buffer_recorder::stopRecording()
   closeOutputMuxer();
 }
 
+//----------------------------------------------------------------------------
 void stream_buffer_recorder::captureLoop()
 {
   AVPacket* pkt = av_packet_alloc();
@@ -249,6 +261,7 @@ void stream_buffer_recorder::captureLoop()
   av_frame_free(&bgr_frame);
 }
 
+//----------------------------------------------------------------------------
 bool stream_buffer_recorder::initOutputMuxer(std::string const& filename)
 {
   avformat_alloc_output_context2(&ofmt_ctx, nullptr, nullptr, filename.c_str());
@@ -267,6 +280,7 @@ bool stream_buffer_recorder::initOutputMuxer(std::string const& filename)
   return true;
 }
 
+//----------------------------------------------------------------------------
 void stream_buffer_recorder::closeOutputMuxer()
 {
   if (ofmt_ctx)
@@ -278,6 +292,7 @@ void stream_buffer_recorder::closeOutputMuxer()
   }
 }
 
+//----------------------------------------------------------------------------
 void stream_buffer_recorder::clearBuffer()
 {
   std::lock_guard<std::mutex> lock(mtx);
