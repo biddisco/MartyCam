@@ -86,7 +86,7 @@ void ProcessingThread::run()
     if (cameraImage.empty())
     {
       if (this->abort) break;
-      boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+      hpx::this_thread::yield();
       continue;
     }
     cv::Mat cameracopy = cameraImage.clone();

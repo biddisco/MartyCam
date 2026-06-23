@@ -4,6 +4,7 @@
 #include <chrono>
 #include <filesystem>
 //
+#include <hpx/threading/thread.hpp>
 #include <wordexp.h>
 //
 #include <iomanip>
@@ -55,7 +56,8 @@ StreamCaptureThread::StreamCaptureThread(ImageBuffer imageBuffer, cv::Size const
   , aviWriterActive(false)
   , rotatedImage()
   , rotatedSize(cv::Size(0, 0))
-  , streamRecorder(std::make_unique<stream_buffer_recorder>(URL, 10.0))
+  , streamRecorder(std::make_unique<stream_buffer_recorder>(
+        URL, 10.0, executor))    // Create the stream recorder with a 10 second buffer
 {
   MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   // initialize font and precompute text size
@@ -84,7 +86,7 @@ bool StreamCaptureThread::connectCamera(std::string const& URL)
   bool wasActive = this->stopCapture();
   if (this->streamRecorder) { this->streamRecorder->close(); }
 
-  this->streamRecorder = std::make_unique<stream_buffer_recorder>(URL, 10.0);
+  this->streamRecorder = std::make_unique<stream_buffer_recorder>(URL, 10.0, executor);
   if (!this->streamRecorder->open(this->imageSize.width, this->imageSize.height))
   {
     MARTY_LOG_ERROR(cap_log, "{:<20} Camera connection failed", "StreamCaptureThread");
@@ -97,7 +99,7 @@ bool StreamCaptureThread::connectCamera(std::string const& URL)
   for (int attempt = 0; attempt < 50 && !gotFrame; ++attempt)
   {
     gotFrame = this->streamRecorder->readFrame(probeFrame);
-    if (!gotFrame) { std::this_thread::sleep_for(std::chrono::milliseconds(10)); }
+    if (!gotFrame) { hpx::this_thread::yield(); }
   }
 
   if (gotFrame && !probeFrame.empty())
@@ -200,7 +202,7 @@ void StreamCaptureThread::run()
           "{:<20} StreamCaptureThread::run() still running even though "
           "captureActive=false",
           "StreamCaptureThread");
-      boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+      hpx::this_thread::yield();
       continue;
     }
 
@@ -210,7 +212,7 @@ void StreamCaptureThread::run()
     if (!grabbed)
     {
       // No frame available yet - non-blocking, so sleep briefly and retry
-      boost::this_thread::sleep(boost::posix_time::milliseconds(5));
+      hpx::this_thread::yield();
       continue;
     }
     this->grabFps.tick();

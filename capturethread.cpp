@@ -167,7 +167,7 @@ void CaptureThread::run()
           "{:<20} CaptureThread::run() still running even though "
           "captureActive=false",
           "CaptureThread");
-      boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+      hpx::this_thread::yield();
       continue;
     }
 

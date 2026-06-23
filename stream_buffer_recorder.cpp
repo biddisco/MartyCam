@@ -2,13 +2,22 @@
 //
 #include "debug/logging.hpp"
 #include "stream_buffer_recorder.hpp"
+//
+#include <hpx/async_local/async_fwd.hpp>
+#include <hpx/executors/parallel_executor.hpp>
+#include <hpx/include/async.hpp>
+#include <hpx/include/parallel_executors.hpp>
+
+// ----------------------------------------------------------------------------
+static auto sbr_log = martycam::log::create("StreamBuf");
 
 //----------------------------------------------------------------------------
-stream_buffer_recorder::stream_buffer_recorder(
-    std::string const& stream_url, double buffer_duration_seconds)
+stream_buffer_recorder::stream_buffer_recorder(std::string const& stream_url,
+    double buffer_duration_seconds, hpx::execution::parallel_executor exec)
   : url(stream_url)
   , max_buffer_duration(buffer_duration_seconds)
 {
+  this->executor = exec;
 }
 
 //----------------------------------------------------------------------------
@@ -17,7 +26,8 @@ stream_buffer_recorder::~stream_buffer_recorder() { close(); }
 //----------------------------------------------------------------------------
 bool stream_buffer_recorder::open(int width, int height, std::string const& fourcc_str)
 {
-  bool is_url = (url.find("://") != std::string::npos);
+  MARTY_LOG_SCOPE(sbr_log, "{} {}", (void*) (this), __func__);
+  is_url = (url.find("://") != std::string::npos);
 
   if (is_url)
   {
@@ -47,13 +57,14 @@ bool stream_buffer_recorder::open(int width, int height, std::string const& four
   if (avcodec_open2(decoder_ctx, decoder, nullptr) < 0) return false;
 
   is_running = true;
-  worker_thread = std::thread(&stream_buffer_recorder::captureLoop, this);
+  worker_future = hpx::async(this->executor, [this]() { captureLoop(); });
   return true;
 }
 
 //----------------------------------------------------------------------------
 bool stream_buffer_recorder::open_ip()
 {
+  MARTY_LOG_SCOPE(sbr_log, "{} {}", (void*) (this), __func__);
   AVDictionary* options = nullptr;
 
   // Force TCP transport to prevent packet loss and blocky artifacts
@@ -76,6 +87,7 @@ bool stream_buffer_recorder::open_ip()
 //----------------------------------------------------------------------------
 bool stream_buffer_recorder::open_usb(int width, int height, std::string const& fourcc_str)
 {
+  MARTY_LOG_SCOPE(sbr_log, "{} {}", (void*) (this), __func__);
   avdevice_register_all();
 
   AVInputFormat const* ifmt = av_find_input_format("v4l2");
@@ -121,9 +133,12 @@ bool stream_buffer_recorder::open_usb(int width, int height, std::string const& 
 //----------------------------------------------------------------------------
 void stream_buffer_recorder::close()
 {
+  MARTY_LOG_SCOPE(sbr_log, "{} {}", (void*) (this), __func__);
+  // block until the capture thread has exited to ensure all packets are processed
   is_running = false;
-  if (worker_thread.joinable()) worker_thread.join();
+  if (worker_future.valid()) { worker_future.get(); }
 
+  // make sure the writer thread has exited before closing the muxer
   stopRecording();
   clearBuffer();
 
@@ -139,7 +154,7 @@ void stream_buffer_recorder::close()
 //----------------------------------------------------------------------------
 bool stream_buffer_recorder::readFrame(cv::Mat& out_frame)
 {
-  std::lock_guard<std::mutex> lock(mtx);
+  // MARTY_LOG_SCOPE(sbr_log, "{}", "Taking lock in readFrame()");
   if (!new_frame_available.load()) return false;
   if (decoded_frames.empty())
   {
@@ -155,7 +170,7 @@ bool stream_buffer_recorder::readFrame(cv::Mat& out_frame)
 //----------------------------------------------------------------------------
 bool stream_buffer_recorder::startRecording(std::string const& output_filename, double fps)
 {
-  std::lock_guard<std::mutex> lock(mtx);
+  MARTY_LOG_SCOPE(sbr_log, "{} {}", (void*) (this), __func__);
   if (is_recording) return true;
 
   if (fps > 0.0) { stream_fps = fps; }
@@ -166,64 +181,46 @@ bool stream_buffer_recorder::startRecording(std::string const& output_filename, 
     return false;
   }
 
-  // Reset timestamp tracking for the new file boundary
-  last_mux_dts = AV_NOPTS_VALUE;
-
-  // Flush the existing rolling packet buffer straight into the output file
-  for (auto const& bpkt : packet_buffer)
+  // 1. Drain history buffer straight into the sorting window initialization
   {
-    // Clone the packet so we don't modify the memory queue's native timestamps
-    AVPacket* rec_pkt = av_packet_clone(bpkt.pkt);
-    if (!rec_pkt) continue;
+    std::lock_guard<mutex_type> lock(packet_buffer_mtx);
+    std::vector<AVPacket*> historical_packets;
+    historical_packets.reserve(packet_buffer.size());
 
-    av_packet_rescale_ts(
-        rec_pkt, ifmt_ctx->streams[video_stream_idx]->time_base, ofmt_ctx->streams[0]->time_base);
-    rec_pkt->stream_index = 0;
-
-    // Enforce strict monotonicity
-    if (last_mux_dts != AV_NOPTS_VALUE && rec_pkt->dts <= last_mux_dts)
+    for (auto const& bpkt : packet_buffer)
     {
-      rec_pkt->dts = last_mux_dts + 1;
-      if (rec_pkt->pts < rec_pkt->dts) { rec_pkt->pts = rec_pkt->dts; }
+      AVPacket* cloned = av_packet_clone(bpkt.pkt);
+      if (cloned) { historical_packets.push_back(cloned); }
     }
-    last_mux_dts = rec_pkt->dts;
 
-    av_interleaved_write_frame(ofmt_ctx, rec_pkt);
-    av_packet_free(&rec_pkt);
+    // Sort the history
+    std::sort(historical_packets.begin(), historical_packets.end(),
+        [](AVPacket* a, AVPacket* b) { return a->dts < b->dts; });
+
+    // Transfer history to the processing queue
+    for (AVPacket* pkt : historical_packets) { live_input_queue.push_back(pkt); }
   }
 
+  // 2. Spawn dedicated writing thread
+  last_mux_dts = AV_NOPTS_VALUE;
   is_recording = true;
+  writer_future = hpx::async(this->executor, [this]() { writerLoop(); });
   return true;
 }
 
 //----------------------------------------------------------------------------
 void stream_buffer_recorder::stopRecording()
 {
-  std::lock_guard<std::mutex> lock(mtx);
-  if (!is_recording) return;
-  is_recording = false;
-
-  // Flush any lingering packets left in the live reordering sliding window
-  if (!live_reorder_queue.empty())
+  MARTY_LOG_SCOPE(sbr_log, "{} {}", (void*) (this), __func__);
+  // MARTY_LOG_DEBUG(sbr_log, "Taking lock in stopRecording()");
   {
-    // Sort the stragglers
-    std::sort(live_reorder_queue.begin(), live_reorder_queue.end(),
-        [](AVPacket* a, AVPacket* b) { return a->dts < b->dts; });
-
-    for (AVPacket* remaining_pkt : live_reorder_queue)
-    {
-      if (last_mux_dts != AV_NOPTS_VALUE && remaining_pkt->dts <= last_mux_dts)
-      {
-        remaining_pkt->dts = last_mux_dts + 1;
-        if (remaining_pkt->pts < remaining_pkt->dts) { remaining_pkt->pts = remaining_pkt->dts; }
-      }
-      last_mux_dts = remaining_pkt->dts;
-
-      av_interleaved_write_frame(ofmt_ctx, remaining_pkt);
-      av_packet_free(&remaining_pkt);
-    }
-    live_reorder_queue.clear();
+    if (!is_recording.load()) return;
+    is_recording = false;
   }
+
+  // Wake up and join the async writer thread to ensure all frames are written
+  writer_cv.notify_all();
+  if (writer_future.valid()) { writer_future.get(); }
 
   closeOutputMuxer();
 }
@@ -231,6 +228,7 @@ void stream_buffer_recorder::stopRecording()
 //----------------------------------------------------------------------------
 void stream_buffer_recorder::captureLoop()
 {
+  MARTY_LOG_SCOPE(sbr_log, "{} {}", (void*) (this), __func__);
   AVPacket* pkt = av_packet_alloc();
   AVFrame* av_frame = av_frame_alloc();
   AVFrame* bgr_frame = av_frame_alloc();
@@ -242,6 +240,7 @@ void stream_buffer_recorder::captureLoop()
 
   while (is_running)
   {
+    MARTY_LOG_TRACE(sbr_log, "{} {}", (void*) (this), __func__);
     if (av_read_frame(ifmt_ctx, pkt) < 0) break;
 
     if (pkt->stream_index == video_stream_idx)
@@ -266,60 +265,43 @@ void stream_buffer_recorder::captureLoop()
       }
       ++frame_count;
 
-      std::lock_guard<std::mutex> lock(mtx);
-
       // 1. Maintain Rolling Buffer of raw packets
       AVPacket* cloned_pkt = av_packet_clone(pkt);
       double pts_time = (cloned_pkt->pts == AV_NOPTS_VALUE) ? 0 : cloned_pkt->pts * time_base_secs;
-      packet_buffer.push_back({cloned_pkt, pts_time});
-
-      while (!packet_buffer.empty() &&
-          (pts_time - packet_buffer.front().timestamp_secs > max_buffer_duration))
       {
-        av_packet_free(&packet_buffer.front().pkt);
-        packet_buffer.pop_front();
+        // add new packet to the rolling buffer and remove any packets that are too old
+        // we do this under lock as the packet buffer is not thread safe and is shared with the writer thread
+        // MARTY_LOG_DEBUG(sbr_log,
+        //     "Taking lock in captureLoop() for packet with PTS = {} and timestamp = {}",
+        //     cloned_pkt->pts, pts_time);
+        std::lock_guard<mutex_type> lock(packet_buffer_mtx);
+        packet_buffer.push_back({cloned_pkt, pts_time});
+
+        while (!packet_buffer.empty() &&
+            (pts_time - packet_buffer.front().timestamp_secs > max_buffer_duration))
+        {
+          av_packet_free(&packet_buffer.front().pkt);
+          packet_buffer.pop_front();
+        }
       }
 
-      // 2. Stream directly to file if actively recording
-      if (is_recording && ofmt_ctx)
+      // 2. Stream packets directly to file if actively recording
+      if (is_recording)
       {
         AVPacket* rec_pkt = av_packet_clone(pkt);
         if (rec_pkt)
         {
-          // Rescale immediately upon entry
-          av_packet_rescale_ts(rec_pkt, in_stream->time_base, ofmt_ctx->streams[0]->time_base);
-          rec_pkt->stream_index = 0;
-
-          // Push into our tiny look-ahead reordering window
-          live_reorder_queue.push_back(rec_pkt);
-
-          // Once the window is full, find and flush the lowest DTS packet
-          if (live_reorder_queue.size() >= reorder_window_depth)
-          {
-            // Find the packet with the smallest DTS
-            auto min_it = std::min_element(live_reorder_queue.begin(), live_reorder_queue.end(),
-                [](AVPacket* a, AVPacket* b) { return a->dts < b->dts; });
-
-            AVPacket* lowest_dts_pkt = *min_it;
-
-            // Safe guard: enforce strict monotonicity relative to what went into the file last
-            if (last_mux_dts != AV_NOPTS_VALUE && lowest_dts_pkt->dts <= last_mux_dts)
-            {
-              lowest_dts_pkt->dts = last_mux_dts + 1;
-              if (lowest_dts_pkt->pts < lowest_dts_pkt->dts)
-              {
-                lowest_dts_pkt->pts = lowest_dts_pkt->dts;
-              }
-            }
-            last_mux_dts = lowest_dts_pkt->dts;
-
-            // Write and clean up
-            av_interleaved_write_frame(ofmt_ctx, lowest_dts_pkt);
-            av_packet_free(&lowest_dts_pkt);
-
-            // Remove it from our sliding window
-            live_reorder_queue.erase(min_it);
-          }
+          // MARTY_LOG_DEBUG(sbr_log,
+          //     "Taking lock in captureLoop() for recording packet with DTS = {}", rec_pkt->dts);
+          std::lock_guard<mutex_type> lock(packet_buffer_mtx);
+          live_input_queue.push_back(rec_pkt);
+          MARTY_LOG_DEBUG(sbr_log,
+              "waking writer thread for new packet with DTS = {}. Queue size = {}", rec_pkt->dts,
+              live_input_queue.size());
+          writer_cv.notify_one();    // Wake up the sorting loop
+          MARTY_LOG_DEBUG(sbr_log,
+              "Added packet with DTS = {} to live_input_queue. Queue size = {}", rec_pkt->dts,
+              live_input_queue.size());
         }
       }
 
@@ -359,6 +341,7 @@ void stream_buffer_recorder::captureLoop()
 //----------------------------------------------------------------------------
 bool stream_buffer_recorder::initOutputMuxer(std::string const& filename)
 {
+  MARTY_LOG_SCOPE(sbr_log, "{} {}", (void*) (this), __func__);
   avformat_alloc_output_context2(&ofmt_ctx, nullptr, nullptr, filename.c_str());
   if (!ofmt_ctx) return false;
 
@@ -366,9 +349,6 @@ bool stream_buffer_recorder::initOutputMuxer(std::string const& filename)
   AVStream* out_stream = avformat_new_stream(ofmt_ctx, nullptr);
   avcodec_parameters_copy(out_stream->codecpar, in_stream->codecpar);
   out_stream->codecpar->codec_tag = 0;
-
-  // Check if we are dealing with a network URL or a local USB device
-  bool is_url = (url.find("://") != std::string::npos);
 
   if (is_url)
   {
@@ -405,6 +385,7 @@ bool stream_buffer_recorder::initOutputMuxer(std::string const& filename)
 //----------------------------------------------------------------------------
 void stream_buffer_recorder::closeOutputMuxer()
 {
+  MARTY_LOG_SCOPE(sbr_log, "{} {}", (void*) (this), __func__);
   if (ofmt_ctx)
   {
     av_write_trailer(ofmt_ctx);
@@ -417,17 +398,89 @@ void stream_buffer_recorder::closeOutputMuxer()
 //----------------------------------------------------------------------------
 void stream_buffer_recorder::clearBuffer()
 {
-  std::lock_guard<std::mutex> lock(mtx);
+  MARTY_LOG_SCOPE(sbr_log, "{} {}", (void*) (this), __func__);
+  // MARTY_LOG_DEBUG(sbr_log, "Taking lock in clearBuffer()");
+  std::lock_guard<mutex_type> lock(packet_buffer_mtx);
   while (!packet_buffer.empty())
   {
     av_packet_free(&packet_buffer.front().pkt);
     packet_buffer.pop_front();
   }
-  
+
   // Clean up any stray pointers left in the live look-ahead queue
-  for (AVPacket* pkt : live_reorder_queue)
-  {
-    av_packet_free(&pkt);
-  }
+  for (AVPacket* pkt : live_reorder_queue) { av_packet_free(&pkt); }
   live_reorder_queue.clear();
+}
+
+//----------------------------------------------------------------------------
+void stream_buffer_recorder::writerLoop()
+{
+  MARTY_LOG_SCOPE(sbr_log, "{} {}", (void*) (this), __func__);
+  std::vector<AVPacket*> sorting_window;
+  size_t const target_window_depth = 20;    // Your proposed 20 frame threshold
+
+  while (true)
+  {
+    std::unique_lock<mutex_type> lock(packet_buffer_mtx);
+
+    // Wait until new packets arrive or recording stops
+    MARTY_LOG_INFO(sbr_log,
+        "Writer thread waiting: live_input_queue size = {}, sorting_window size = {}, is_recording "
+        "= {}",
+        live_input_queue.size(), sorting_window.size(), is_recording.load());
+    writer_cv.wait(
+        lock, [this, &sorting_window]() { return !live_input_queue.empty() || !is_recording; });
+
+    MARTY_LOG_INFO(sbr_log,
+        "Writer thread woke up: live_input_queue size = {}, sorting_window size = {}, is_recording "
+        "= {}",
+        live_input_queue.size(), sorting_window.size(), is_recording.load());
+    // Pull packets out of the ingestion queue into our sorting vector
+    while (!live_input_queue.empty())
+    {
+      sorting_window.push_back(live_input_queue.front());
+      live_input_queue.pop_front();
+    }
+
+    // Keep the active sliding window sorted by true decoding timestamp
+    std::sort(sorting_window.begin(), sorting_window.end(),
+        [](AVPacket* a, AVPacket* b) { return a->dts < b->dts; });
+
+    // If recording is running, only pop off packets if we have reached our look-ahead threshold
+    while (
+        !sorting_window.empty() && (sorting_window.size() >= target_window_depth || !is_recording))
+    {
+      MARTY_LOG_INFO(sbr_log,
+          "Writing packet with DTS = {} to output file. Sorting window size = {}",
+          sorting_window.front()->dts, sorting_window.size());
+      AVPacket* ready_pkt = sorting_window.front();
+      sorting_window.erase(sorting_window.begin());
+
+      // Rescale timestamps right at the moment of file muxing
+      AVStream* in_stream = ifmt_ctx->streams[video_stream_idx];
+      av_packet_rescale_ts(ready_pkt, in_stream->time_base, ofmt_ctx->streams[0]->time_base);
+      ready_pkt->stream_index = 0;
+
+      // Final safeguard for duplicate timestamps
+      if (last_mux_dts != AV_NOPTS_VALUE && ready_pkt->dts <= last_mux_dts)
+      {
+        int64_t drift = (last_mux_dts + 1) - ready_pkt->dts;
+        ready_pkt->dts += drift;
+        ready_pkt->pts += drift;
+      }
+      last_mux_dts = ready_pkt->dts;
+
+      // Commit cleanly to disk
+      av_interleaved_write_frame(ofmt_ctx, ready_pkt);
+      av_packet_free(&ready_pkt);
+    }
+
+    // Break out completely if recording was stopped and the remaining buffer is completely empty
+    if (!is_recording && sorting_window.empty())
+    {
+      MARTY_LOG_INFO(sbr_log,
+          "Recording stopped and all buffered packets have been written. Exiting writer thread.");
+      break;
+    }
+  }
 }

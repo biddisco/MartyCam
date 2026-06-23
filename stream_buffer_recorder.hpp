@@ -2,11 +2,18 @@
 
 #include <atomic>
 #include <deque>
-#include <mutex>
-#include <opencv2/opencv.hpp>
 #include <string>
-#include <thread>
-
+//
+#include <hpx/config.hpp>
+//
+#include <hpx/condition_variable.hpp>
+#include <hpx/execution/execution.hpp>
+#include <hpx/executors/parallel_executor.hpp>
+#include <hpx/futures/future.hpp>
+#include <hpx/include/parallel_executors.hpp>
+//
+#include <opencv2/opencv.hpp>
+//
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavdevice/avdevice.h>    // for usb type devices
@@ -18,7 +25,8 @@ extern "C" {
 class stream_buffer_recorder
 {
   public:
-  stream_buffer_recorder(std::string const& stream_url, double buffer_duration_seconds);
+  stream_buffer_recorder(std::string const& stream_url, double buffer_duration_seconds,
+      hpx::execution::parallel_executor exec);
   ~stream_buffer_recorder();
 
   bool open(int width = 0, int height = 0, std::string const& fourcc_str = "");
@@ -45,14 +53,20 @@ class stream_buffer_recorder
   bool open_ip();
   bool open_usb(int width, int height, std::string const& fourcc_str);
 
+  //
+  void writerLoop();
+
   std::string url;
+  bool is_url;
   double max_buffer_duration;
 
+  using mutex_type = hpx::spinlock;
+
   // Threading and State
-  std::thread worker_thread;
   std::atomic<bool> is_running{false};
   std::atomic<bool> is_recording{false};
-  std::mutex mtx;
+  hpx::execution::parallel_executor executor;
+  mutex_type packet_buffer_mtx;
 
   // FFmpeg Ingestion Contexts
   AVFormatContext* ifmt_ctx = nullptr;
@@ -81,5 +95,12 @@ class stream_buffer_recorder
 
   // Tiny look-ahead reorder cache for live writing
   std::vector<AVPacket*> live_reorder_queue;
-  size_t const reorder_window_depth = 4; // Looks 20 packets ahead/behind
+  size_t const reorder_window_depth = 6;    // Looks 20 packets ahead/behind
+
+  // Your suggested Threaded Sorting Wrapper
+  hpx::condition_variable writer_cv;
+  std::deque<AVPacket*> live_input_queue;    // Lock-free or mutexed fast ingestion queue
+
+  hpx::future<void> worker_future;
+  hpx::future<void> writer_future;
 };
