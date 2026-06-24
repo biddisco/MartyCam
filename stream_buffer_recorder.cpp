@@ -152,13 +152,13 @@ void stream_buffer_recorder::close()
 //----------------------------------------------------------------------------
 bool stream_buffer_recorder::readFrame(cv::Mat& out_frame)
 {
-  // MARTY_LOG_SCOPE(sbr_log, "{}", "Taking lock in readFrame()");
-  if (!new_frame_available.load()) return false;
+  std::lock_guard<mutex_type> lock(decoded_frames_mtx);
   if (decoded_frames.empty())
   {
     new_frame_available = false;
     return false;
   }
+
   out_frame = decoded_frames.back();
   decoded_frames.clear();
   new_frame_available = false;
@@ -261,9 +261,12 @@ void stream_buffer_recorder::captureLoop()
           sws_scale(sws_ctx, av_frame->data, av_frame->linesize, 0, av_frame->height, dest,
               dest_linesize);
 
-          decoded_frames.push_back(matFrame);
-          if (decoded_frames.size() > max_decoded_queue_size) { decoded_frames.pop_front(); }
-          new_frame_available = true;
+          {
+            std::lock_guard<mutex_type> lock(decoded_frames_mtx);
+            decoded_frames.push_back(matFrame);
+            if (decoded_frames.size() > max_decoded_queue_size) { decoded_frames.pop_front(); }
+            new_frame_available = true;
+          }
         }
       }
     }

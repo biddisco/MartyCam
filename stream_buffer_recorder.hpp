@@ -82,6 +82,7 @@ class stream_buffer_recorder
   std::deque<cv::Mat> decoded_frames;
   size_t const max_decoded_queue_size = 5;
   std::atomic<bool> new_frame_available{false};
+  mutex_type decoded_frames_mtx;
 
   // Rolling Packet Buffer Structure
   struct BufferedPacket
