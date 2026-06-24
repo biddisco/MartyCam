@@ -4,7 +4,6 @@
 #include <deque>
 #include <queue>
 #include <string>
-#include <vector>
 //
 #include <hpx/config.hpp>
 //
@@ -82,7 +81,6 @@ class stream_buffer_recorder
 
   // FFmpeg Recording Contexts
   AVFormatContext* ofmt_ctx = nullptr;
-  std::string out_filename;
   double stream_fps = 0.0;
   int64_t last_mux_dts = AV_NOPTS_VALUE;
 
@@ -99,10 +97,6 @@ class stream_buffer_recorder
   };
   std::deque<BufferedPacket> packet_buffer;
 
-  // Tiny look-ahead reorder cache for live writing
-  std::vector<AVPacket*> live_reorder_queue;
-  size_t const reorder_window_depth = 6;    // Looks 20 packets ahead/behind
-
   // Your suggested Threaded Sorting Wrapper
   hpx::condition_variable writer_cv;
   std::deque<AVPacket*> live_input_queue;    // Lock-free or mutexed fast ingestion queue
@@ -110,54 +104,5 @@ class stream_buffer_recorder
   hpx::future<void> worker_future;
   hpx::future<void> writer_future;
 
-  struct AVPacketDtsComparator_dts
-  {
-    bool operator()(AVPacket const* a, AVPacket const* b) const
-    {
-      // 1. Handle potential uninitialized timestamps (AV_NOPTS_VALUE) safely
-      int64_t dts_a = (a && a->dts != AV_NOPTS_VALUE) ? a->dts : 0;
-      int64_t dts_b = (b && b->dts != AV_NOPTS_VALUE) ? b->dts : 0;
-      if (dts_a == dts_b)
-      {
-        MARTY_LOG_WARN(sbr_log, "Comparing packets: dts_a = {}, dts_b = {}", dts_a, dts_b);
-        // If DTS are equal, fall back to PTS for ordering
-        int64_t pts_a = (a && a->pts != AV_NOPTS_VALUE) ? a->pts : 0;
-        int64_t pts_b = (b && b->pts != AV_NOPTS_VALUE) ? b->pts : 0;
-        return pts_a > pts_b;    // Min-heap based on PTS if DTS are equal
-      }
-
-      // 2. Reverse the standard 'less-than' check.
-      // Returning true here forces the priority queue to bubble the LOWEST DTS
-      // to the top (making it a min-heap).
-      return dts_a > dts_b;
-    }
-  };
-
-    struct AVPacketDtsComparator_pts
-  {
-    bool operator()(AVPacket const* a, AVPacket const* b) const
-    {
-      // 1. Handle potential uninitialized timestamps (AV_NOPTS_VALUE) safely
-      int64_t pts_a = (a && a->pts != AV_NOPTS_VALUE) ? a->pts : 0;
-      int64_t pts_b = (b && b->pts != AV_NOPTS_VALUE) ? b->pts : 0;
-      if (pts_a == pts_b)
-      {
-        MARTY_LOG_WARN(sbr_log, "Comparing packets: pts_a = {}, pts_b = {}", pts_a, pts_b);
-        // If PTS are equal, fall back to DTS for ordering
-        int64_t dts_a = (a && a->dts != AV_NOPTS_VALUE) ? a->dts : 0;
-        int64_t dts_b = (b && b->dts != AV_NOPTS_VALUE) ? b->dts : 0;
-        return dts_a > dts_b;    // Min-heap based on DTS if PTS are equal
-      }
-
-      // 2. Reverse the standard 'less-than' check.
-      // Returning true here forces the priority queue to bubble the LOWEST DTS
-      // to the top (making it a min-heap).
-      return pts_a > pts_b;
-    }
-  };
-
-  std::queue<AVPacket*>
-      packet_priority_queue;
-  // std::priority_queue<AVPacket*, std::vector<AVPacket*>, AVPacketDtsComparator_pts>
-  //     packet_priority_queue;
+  std::queue<AVPacket*> packet_priority_queue;
 };
