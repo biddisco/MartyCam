@@ -197,8 +197,6 @@ list(REMOVE_DUPLICATES FFMPEG_INCLUDE_DIRS)
 
 message(STATUS "Found FFmpeg include dirs (pkg-config): ${FFMPEG_INCLUDE_DIRS}")
 
-include_directories(${FFMPEG_INCLUDE_DIRS})
-
 # -----------------------------------------------------------------------------
 # Set DATA_PATH directory of the repository
 # -----------------------------------------------------------------------------
@@ -245,104 +243,16 @@ endif()
 # Setup libs
 # -----------------------------------------------------------------------------
 # QWT is fetched via get_external_project() earlier in this file
-set(MARTYCAM_INCLUDE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_BINARY_DIR}/src)
+set(MARTYCAM_INCLUDE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/include
+                          ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_BINARY_DIR}/src)
 
 add_subdirectory(src/debug)
+add_subdirectory(src/core)
+add_subdirectory(src/widgets)
+add_subdirectory(apps/gui)
+add_subdirectory(apps/cli)
 
-add_subdirectory(utility_widgets)
 add_subdirectory(test)
-
-# -----------------------------------------------------------------------------
-# Main source files
-# -----------------------------------------------------------------------------
-if(MARTYCAM_USE_STREAM_CAPTURE)
-  set(capture_source stream_capture_thread.cpp)
-else()
-  set(capture_source capturethread.cpp)
-endif()
-
-set(martycam_SRCS
-    ${capture_source}
-    filter.cpp
-    PSNRFilter.cpp
-    MotionFilter.cpp
-    DecayFilter.cpp
-    GraphUpdateFilter.cpp
-    martyplot.cpp
-    martycam.cpp
-    main.cpp
-    processingthread.cpp
-    rendercanvas.h
-    renderwidget.cpp
-    settings.cpp
-    IPCameraForm.cpp
-    martycam.rc
-    FaceRecogFilter.cpp
-    stream_buffer_recorder.cpp
-)
-if(WIN32)
-  set(martycam_SRCS
-      ${martycam_SRCS}
-      ${CMAKE_CURRENT_SOURCE_DIR}/videoInput/videoInputSrcAndDemos/libs/videoInput/videoInput.cpp
-  )
-endif()
-
-# -----------------------------------------------------------------------------
-# Target executable
-# -----------------------------------------------------------------------------
-add_executable(
-  martycam ${martycam_SRCS} ${martycam_RCC_SRCS} ${martycam_QT_UIS_H} ${martycam_MOC_SRCS}
-)
-target_include_directories(martycam PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/streamulus/src")
-
-# ffmpeg avcodec support
-target_include_directories(martycam PRIVATE ${FFMPEG_INCLUDE_DIRS})
-
-set_property(TARGET martycam PROPERTY AUTOMOC ON)
-set_property(TARGET martycam PROPERTY AUTOUIC ON)
-set_property(TARGET martycam PROPERTY AUTORCC ON)
-
-target_link_libraries(
-  martycam
-  PRIVATE Qt::Core
-          Qt::Concurrent
-          Qt::Gui
-          Qt::OpenGL
-          Qt::Svg
-          Qt::Widgets
-          Qt::OpenGLWidgets
-)
-
-# -----------------------------------------------------------------------------
-# Include directories
-# -----------------------------------------------------------------------------
-target_include_directories(
-  martycam
-  PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"
-          "${MARTYCAM_INCLUDE_ROOT}"
-          "${CMAKE_CURRENT_BINARY_DIR}"
-          "${CMAKE_CURRENT_BINARY_DIR}/src"
-          "${qwt_SOURCE_DIR}/src"
-          ${HPX_INCLUDE_DIRS}
-)
-
-target_link_libraries(
-  martycam
-  PRIVATE utility_widgets
-          ${MARTYCAM_LOG_LIBS}
-          ${AVFORMAT_LIB}
-          ${AVCODEC_LIB}
-          ${AVUTIL_LIB}
-          ${SWSCALE_LIB}
-          ${AVDEVICE_LIB}
-          ${OpenCV_LIBS}
-          ${Boost_LIBRARIES}
-          HPX::hpx
-          qwt
-          nlohmann_json::nlohmann_json
-          Fontconfig::Fontconfig
-)
-
 add_subdirectory(webcam_test)
 
 # ------------------------------------------------------------------------------

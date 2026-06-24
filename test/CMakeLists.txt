@@ -13,7 +13,7 @@ set_property(TARGET qt_camera_resolutions PROPERTY AUTORCC ON)
 
 target_link_libraries(
   qt_camera_resolutions
-  utility_widgets
+  martycam_widgets
   ${OpenCV_LIBS}
   Qt::Core
   Qt::Concurrent

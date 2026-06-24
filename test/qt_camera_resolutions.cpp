@@ -5,8 +5,8 @@
 #include <QRadioButton>
 #include <QVBoxLayout>
 
-#include "utility_widgets/CameraSelectorWidget.h"
-#include "utility_widgets/camera_utils.h"
+#include "martycam/widgets/CameraSelectorWidget.h"
+#include "martycam/core/camera_utils.h"
 
 int main(int argc, char* argv[])
 {
