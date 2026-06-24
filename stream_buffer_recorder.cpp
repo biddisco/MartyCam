@@ -237,7 +237,7 @@ void stream_buffer_recorder::captureLoop()
         if (cloned_pkt)
         {
           std::lock_guard<mutex_type> lock(packet_buffer_mtx);
-          packet_priority_queue.push(cloned_pkt);
+          packet_queue.push(cloned_pkt);
         }
       }
 
@@ -287,10 +287,10 @@ bool stream_buffer_recorder::startRecording(std::string const& output_filename, 
     return false;
   }
 
-  // 1. Drain history buffer straight into the sorting window initialization
+  // Drain the buffered history into the writer queue before starting live writes.
   {
     std::lock_guard<mutex_type> lock(packet_buffer_mtx);
-    for (auto const& bpkt : packet_buffer) { packet_priority_queue.push(bpkt.pkt); }
+    for (auto const& bpkt : packet_buffer) { packet_queue.push(bpkt.pkt); }
     packet_buffer.clear();
   }
 
@@ -305,7 +305,6 @@ bool stream_buffer_recorder::startRecording(std::string const& output_filename, 
 void stream_buffer_recorder::stopRecording()
 {
   MARTY_LOG_SCOPE(sbr_log, "{} {}", (void*) (this), __func__);
-  // MARTY_LOG_DEBUG(sbr_log, "Taking lock in stopRecording()");
   {
     if (!is_recording.load()) return;
     is_recording = false;
@@ -401,10 +400,7 @@ void stream_buffer_recorder::writerLoop()
   while (true)
   {
     std::unique_lock<mutex_type> lock(packet_buffer_mtx);
-    // Wait until new packets arrive or recording stops
-    MARTY_LOG_INFO(sbr_log, "Writer thread waiting: live_input_queue size = {}, is_recording = {}",
-        live_input_queue.size(), is_recording.load());
-    writer_cv.wait(lock, [this]() { return !live_input_queue.empty() || !is_recording; });
+    writer_cv.wait(lock, [this]() { return !is_recording; });
 
     auto write_lambda = [this, in_stream, &I_frame_found, &first_stream_dts](AVPacket* pkt) {
       // 1. Check for the absolute anchor point (I-Frame/Keyframe)
@@ -442,29 +438,26 @@ void stream_buffer_recorder::writerLoop()
       av_packet_free(&pkt);
     };
 
-    // If recording is running, pop off packets but keep a running buffer of 100
-    // to allow out of order packets to be sorted and written in the correct order.
     if (is_recording)
     {
-      while (!packet_priority_queue.empty() && packet_priority_queue.size() > 200)
+      while (!packet_queue.empty())
       {
-        AVPacket* ready_pkt = packet_priority_queue.front();
-        packet_priority_queue.pop();
+        AVPacket* ready_pkt = packet_queue.front();
+        packet_queue.pop();
         write_lambda(ready_pkt);
       }
     }
     if (!is_recording)
     {
-      while (!packet_priority_queue.empty())
+      while (!packet_queue.empty())
       {
-        AVPacket* ready_pkt = packet_priority_queue.front();
-        packet_priority_queue.pop();
+        AVPacket* ready_pkt = packet_queue.front();
+        packet_queue.pop();
         write_lambda(ready_pkt);
       }
     }
 
-    // Break out completely if recording was stopped and the remaining buffer is completely empty
-    if (!is_recording && packet_priority_queue.empty())
+    if (!is_recording && packet_queue.empty())
     {
       MARTY_LOG_INFO(sbr_log,
           "Recording stopped and all buffered packets have been written. Exiting writer thread.");

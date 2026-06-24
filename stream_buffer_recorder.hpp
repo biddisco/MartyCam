@@ -67,12 +67,6 @@ class stream_buffer_recorder
 
   using mutex_type = hpx::spinlock;
 
-  // Threading and State
-  std::atomic<bool> is_running{false};
-  std::atomic<bool> is_recording{false};
-  hpx::execution::parallel_executor executor;
-  mutex_type packet_buffer_mtx;
-
   // FFmpeg Ingestion Contexts
   AVFormatContext* ifmt_ctx = nullptr;
   AVCodecContext* decoder_ctx = nullptr;
@@ -97,12 +91,13 @@ class stream_buffer_recorder
   };
   std::deque<BufferedPacket> packet_buffer;
 
-  // Your suggested Threaded Sorting Wrapper
-  hpx::condition_variable writer_cv;
-  std::deque<AVPacket*> live_input_queue;    // Lock-free or mutexed fast ingestion queue
-
+  // Threading and State
+  std::atomic<bool> is_running{false};
+  std::atomic<bool> is_recording{false};
+  hpx::execution::parallel_executor executor;
+  mutex_type packet_buffer_mtx;
   hpx::future<void> worker_future;
   hpx::future<void> writer_future;
-
-  std::queue<AVPacket*> packet_priority_queue;
+  hpx::condition_variable writer_cv;
+  std::queue<AVPacket*> packet_queue;
 };
