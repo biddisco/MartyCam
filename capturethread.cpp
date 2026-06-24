@@ -76,13 +76,15 @@ cv::Mat Deinterlace(cv::Mat& src)
 
 //----------------------------------------------------------------------------
 CaptureThread::CaptureThread(ImageBuffer imageBuffer, cv::Size const& size, int rotation,
-    std::string const& URL, hpx::execution::parallel_executor exec, int requestedFps)
+    std::string const& URL, hpx::execution::parallel_executor exec, int requestedFps,
+    int requestedFourCC)
   : imageBuffer(std::move(imageBuffer))
   , imageSize(size)
   , rotation(-360)
   , CameraURL(URL)
   , executor(std::move(exec))
   , requestedFps(requestedFps)
+  , requestedFourCC(requestedFourCC)
   , requestedSizeCorrect(false)
   , FrameCounter(0)
   , abort(false)
@@ -123,7 +125,7 @@ bool CaptureThread::connectCamera(std::string const& URL)
   if (this->capture.isOpened()) { this->capture.release(); }
 
   capture = camera_utils::createVideoCapture(
-      URL, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), this->requestedFps, this->imageSize);
+      URL, this->requestedFourCC, this->requestedFps, this->imageSize);
 
   if (!this->capture.isOpened())
   {

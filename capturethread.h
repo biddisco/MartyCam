@@ -47,7 +47,8 @@ class CaptureThread : public QObject
 
   public:
   CaptureThread(ImageBuffer imageBuffer, cv::Size const& size, int rotation, std::string const& URL,
-      hpx::execution::parallel_executor exec, int requestedFps);
+      hpx::execution::parallel_executor exec, int requestedFps,
+      int requestedFourCC = cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
   ~CaptureThread();
 
   void run();
@@ -127,6 +128,7 @@ class CaptureThread : public QObject
   fps_helper grabFps;
   fps_helper captureFps;
   int requestedFps;
+  int requestedFourCC;
   int rotation;
   int FrameCounter;
   int motion_video_FrameCounter;

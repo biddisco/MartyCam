@@ -98,7 +98,8 @@ bool stream_buffer_recorder::open_usb(int width, int height, std::string const& 
   {
     if (fourcc_str == "GREY" || fourcc_str == "Y800" || fourcc_str == "Y8  ")
     {
-      ffmpeg_v4l2_format = "raw";    // V4L2 uses 'raw' driver configurations for uncompressed gray
+      // Use an explicit grayscale pixel format for raw IR sensors.
+      ffmpeg_v4l2_format = "gray";
     }
     else if (fourcc_str == "MJPEG" || fourcc_str == "MJPG") { ffmpeg_v4l2_format = "mjpeg"; }
     else if (fourcc_str == "YUYV" || fourcc_str == "YUY2") { ffmpeg_v4l2_format = "yuyv422"; }

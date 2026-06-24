@@ -48,7 +48,7 @@ class MartyCam : public QMainWindow
   protected:
   void closeEvent(QCloseEvent*);
   void deleteCaptureThread();
-  void createCaptureThread(cv::Size size, std::string const& cameraname, int fps,
+  void createCaptureThread(cv::Size size, std::string const& cameraname, int fps, int fourcc,
       hpx::execution::parallel_executor exec);
   void deleteProcessingThread();
   void createProcessingThread(ProcessingThread* oldThread, hpx::execution::parallel_executor exec,

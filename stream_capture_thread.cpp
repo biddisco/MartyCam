@@ -19,6 +19,7 @@
 #include <utility>
 
 #include "debug/logging.hpp"
+#include "utility_widgets/camera_utils.h"
 
 // ----------------------------------------------------------------------------
 static auto cap_log = martycam::log::create("StreamCapture");
@@ -40,13 +41,15 @@ static std::string expandPath(std::string const& path)
 
 //----------------------------------------------------------------------------
 StreamCaptureThread::StreamCaptureThread(ImageBuffer imageBuffer, cv::Size const& size,
-    int rotation, std::string const& URL, hpx::execution::parallel_executor exec, int requestedFps)
+    int rotation, std::string const& URL, hpx::execution::parallel_executor exec, int requestedFps,
+    int requestedFourCC)
   : imageBuffer(std::move(imageBuffer))
   , imageSize(size)
   , rotation(-360)
   , CameraURL(URL)
   , executor(std::move(exec))
   , requestedFps(requestedFps)
+  , requestedFourCC(requestedFourCC)
   , requestedSizeCorrect(false)
   , FrameCounter(0)
   , abort(false)
@@ -87,7 +90,8 @@ bool StreamCaptureThread::connectCamera(std::string const& URL)
   if (this->streamRecorder) { this->streamRecorder->close(); }
 
   this->streamRecorder = std::make_unique<stream_buffer_recorder>(URL, 10.0, executor);
-  if (!this->streamRecorder->open(this->imageSize.width, this->imageSize.height))
+  if (!this->streamRecorder->open(
+          this->imageSize.width, this->imageSize.height, fourCCToString(this->requestedFourCC)))
   {
     MARTY_LOG_ERROR(cap_log, "{:<20} Camera connection failed", "StreamCaptureThread");
     return false;

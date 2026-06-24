@@ -97,7 +97,7 @@ MartyCam::MartyCam(hpx::execution::parallel_executor const& defaultExec,
       // Loop over different resolutions to make sure the one supported by
       // webcam is chosen
       cv::Size res = this->settingsWidget->getSelectedResolution();
-      this->createCaptureThread(res, this->cameraIndex, camerastring, blockingExecutor);
+      this->createCaptureThread(res, this->cameraIndex, camerastring, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), blockingExecutor);
       requestedSizeCorrect = captureThread->isRequestedSizeCorrect();
       if (!requestedSizeCorrect)
       {
@@ -141,12 +141,12 @@ void MartyCam::closeEvent(QCloseEvent*)
 }
 
 //----------------------------------------------------------------------------
-void MartyCam::createCaptureThread(
-    cv::Size size, std::string const& cameraUTL, int fps, hpx::execution::parallel_executor exec)
+void MartyCam::createCaptureThread(cv::Size size, std::string const& cameraUTL, int fps, int fourcc,
+    hpx::execution::parallel_executor exec)
 {
   MARTY_LOG_SCOPE(marty_log, "{} {}", (void*) (this), __func__);
   this->captureThread = std::make_shared<CaptureThread>(imageBuffer, size,
-      this->settingsWidget->getSelectedRotation(), cameraUTL, this->blockingExecutor, fps);
+      this->settingsWidget->getSelectedRotation(), cameraUTL, this->blockingExecutor, fps, fourcc);
   this->captureThread->startCapture();
   this->settingsWidget->setThreads(this->captureThread, this->processingThread);
 
@@ -396,7 +396,7 @@ void MartyCam::onCameraConfigChanged(QString cameraPath, int width, int height, 
   //
   MARTY_LOG_INFO(marty_log, "{:<20} Creating capture thread", "CameraConfigChanged");
   this->createCaptureThread(
-      cv::Size(width, height), cameraPath.toStdString(), fps, blockingExecutor);
+      cv::Size(width, height), cameraPath.toStdString(), fps, fourcc, blockingExecutor);
   MARTY_LOG_INFO(marty_log, "{:<20} Updating renderwidget size", "CameraConfigChanged");
   this->renderWidget->setCVSize(this->captureThread->getImageSize());
   MARTY_LOG_INFO(marty_log, "{:<20} Creating processing thread", "CameraConfigChanged");
