@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <QFrame>
 #include <QwtPlot>
 
 class QwtPlotCurve;
@@ -45,9 +46,18 @@ class MartyCamPlot : public QwtPlot
   void clearCurves();
   void setXAxisRange(double min, double max);
 
+  protected:
+  void enterEvent(QEnterEvent* event) override;
+  void leaveEvent(QEvent* event) override;
+
   private:
+  void createHoverLegend();
+
   QwtPlotCurve* m_curves[NumCurves];
   QwtPlotGrid* m_grid;
+
+  // Hover legend overlay
+  QFrame* m_legendOverlay;
 
   // Local buffers for threshold line (only 2 points)
   double m_thresholdX[2];

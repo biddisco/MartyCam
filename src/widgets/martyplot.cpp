@@ -8,7 +8,11 @@
 
 #include "martycam/widgets/martyplot.h"
 
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QPainter>
 #include <QPen>
+#include <QVBoxLayout>
 #include <QwtLegend>
 #include <QwtPlotCurve>
 #include <QwtPlotGrid>
@@ -17,6 +21,7 @@
 MartyCamPlot::MartyCamPlot(QWidget* parent)
   : QwtPlot(parent)
   , m_grid(nullptr)
+  , m_legendOverlay(nullptr)
 {
   setAutoReplot(false);
 
@@ -25,24 +30,97 @@ MartyCamPlot::MartyCamPlot(QWidget* parent)
   m_grid->setMajorPen(Qt::gray, 0, Qt::DotLine);
   m_grid->attach(this);
 
-  // Legend
-  QwtLegend* legend = new QwtLegend();
-  insertLegend(legend, QwtPlot::RightLegend);
-
   // Axis labels
-//   setAxisTitle(QwtAxis::XBottom, "Frame");
-//   setAxisTitle(QwtAxis::YLeft, "Value");
   setAxisScale(QwtAxis::YLeft, -5.0, 105.0);
 
   setCanvasBackground(Qt::black);
 
   for (int i = 0; i < NumCurves; ++i) { m_curves[i] = nullptr; }
+
+  createHoverLegend();
 }
 
 //----------------------------------------------------------------------------
 MartyCamPlot::~MartyCamPlot()
 {
   for (int i = 0; i < NumCurves; ++i) { delete m_curves[i]; }
+}
+
+//----------------------------------------------------------------------------
+void MartyCamPlot::createHoverLegend()
+{
+  m_legendOverlay = new QFrame(this);
+  m_legendOverlay->setObjectName("HoverLegend");
+  m_legendOverlay->setStyleSheet(
+      "QFrame#HoverLegend {"
+      "  background-color: rgba(0, 0, 0, 200);"
+      "  border: 1px solid rgba(255, 255, 255, 80);"
+      "  border-radius: 6px;"
+      "}");
+  m_legendOverlay->setFrameShape(QFrame::StyledPanel);
+
+  QVBoxLayout* layout = new QVBoxLayout(m_legendOverlay);
+  layout->setContentsMargins(8, 6, 8, 6);
+  layout->setSpacing(4);
+
+  struct Entry
+  {
+    char const* name;
+    QColor color;
+  };
+
+  static Entry const entries[NumCurves] = {
+      {"Motion", Qt::green},
+      {"Moving Average", Qt::blue},
+      {"PSNR", Qt::yellow},
+      {"NM", Qt::cyan},
+      {"Event Level", Qt::white},
+      {"Threshold", Qt::red},
+      {"Slow Decay", Qt::darkMagenta},
+      {"Fast Decay", Qt::darkGreen},
+  };
+
+  for (int i = 0; i < NumCurves; ++i)
+  {
+    QHBoxLayout* row = new QHBoxLayout();
+    row->setSpacing(6);
+    row->setContentsMargins(0, 0, 0, 0);
+
+    QLabel* swatch = new QLabel(m_legendOverlay);
+    swatch->setFixedSize(20, 12);
+    swatch->setStyleSheet(QString("background-color: %1; border: 1px solid rgba(255,255,255,60);"
+                                  "border-radius: 2px;")
+                              .arg(entries[i].color.name()));
+
+    QLabel* text = new QLabel(entries[i].name, m_legendOverlay);
+    text->setStyleSheet("color: white; font-size: 11px;");
+
+    row->addWidget(swatch);
+    row->addWidget(text, 1);
+    layout->addLayout(row);
+  }
+
+  m_legendOverlay->adjustSize();
+  m_legendOverlay->hide();
+}
+
+//----------------------------------------------------------------------------
+void MartyCamPlot::enterEvent(QEnterEvent* event)
+{
+  Q_UNUSED(event);
+  if (m_legendOverlay)
+  {
+    m_legendOverlay->move(8, 8);
+    m_legendOverlay->show();
+    m_legendOverlay->raise();
+  }
+}
+
+//----------------------------------------------------------------------------
+void MartyCamPlot::leaveEvent(QEvent* event)
+{
+  Q_UNUSED(event);
+  if (m_legendOverlay) { m_legendOverlay->hide(); }
 }
 
 //----------------------------------------------------------------------------
