@@ -6,45 +6,40 @@
 #include <QWidget>
 #include <opencv2/opencv.hpp>
 
-// 1. Define the canvas that actually draws the image
 class RenderCanvas : public QWidget
 {
-  Q_OBJECT
-  public:
-  RenderCanvas(QWidget* parent = nullptr)
-    : QWidget(parent)
-    , bufferImage(nullptr)
-    , imageValid(1)
-  {
-    setAttribute(Qt::WA_OpaquePaintEvent, true);    // don't clear the area before the paintEvent
-  }
+   Q_OBJECT
 
-  void setImage(QImage* img)
-  {
-    imageValid.acquire();
-    QImage* old = bufferImage;
-    bufferImage = img;
-    imageValid.release();
-    delete old;    // Safe: paintEvent cannot run while we hold the semaphore
-    update();      // Triggers a repaint
-  }
+   public:
+   explicit RenderCanvas(QWidget* parent = nullptr);
+   ~RenderCanvas() override;
+
+  void setImage(QImage* img);
+
+  void resetView();
+
+  signals:
+  void doubleClicked(QPoint const& pos);
 
   protected:
-  void paintEvent(QPaintEvent*) override
-  {
-    QPainter painter(this);    // Paints directly on itself
+   void paintEvent(QPaintEvent*) override;
+  void wheelEvent(QWheelEvent* event) override;
+  void mousePressEvent(QMouseEvent* event) override;
+  void mouseMoveEvent(QMouseEvent* event) override;
+  void mouseReleaseEvent(QMouseEvent* event) override;
+  void mouseDoubleClickEvent(QMouseEvent* event) override;
+  void keyPressEvent(QKeyEvent* event) override;
 
-    if (bufferImage)
-    {
-      imageValid.acquire();
-      // Draw the image scaled to fill the canvas safely
-      painter.drawImage(rect(), *bufferImage);
-      imageValid.release();
-    }
-    else { painter.fillRect(rect(), Qt::lightGray); }
-  }
+   private:
+   QRectF calculateImageRect() const;
+   void zoomAt(QPointF const& widgetPos, double zoomFactor);
 
-  private:
-  QImage* bufferImage;
-  QSemaphore imageValid;
+   QImage* bufferImage;
+   QSemaphore imageValid;
+
+   // View transform state
+   double zoom;
+   QPointF panOffset;
+   bool isPanning;
+   QPoint lastMousePos;
 };

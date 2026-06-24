@@ -9,6 +9,7 @@ set(martycam_widgets_SRCS
     GraphUpdateFilter.cpp
     IPCameraForm.cpp
     martyplot.cpp
+    rendercanvas.cpp
     renderwidget.cpp
     ${CMAKE_SOURCE_DIR}/include/martycam/widgets/CameraSelectorWidget.h
     ${CMAKE_SOURCE_DIR}/include/martycam/widgets/IPCameraForm.h

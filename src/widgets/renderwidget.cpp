@@ -81,14 +81,15 @@ RenderWidget::RenderWidget(QWidget* parent)
   // 1. Tell parent layouts that this widget wants to expand freely
   setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
-  //  setAttribute(Qt::WA_PaintOnScreen, true); // disable double buffering
   connect(this, SIGNAL(update_signal(bool, int)), this, SLOT(UpdateTrigger(bool, int)),
       Qt::QueuedConnection);
 
-  // This is the container/wrapper. Your actual content goes inside 'canvas'.
+  // Full-bleed canvas; aspect-ratio fitting, zoom and pan are handled inside paintEvent.
   canvas = new RenderCanvas(this);
-  canvas->setStyleSheet("background-color: blue;");    // For visualization
-  canvas->setGeometry(0, 0, idealSize.width, idealSize.height);
+  canvas->setGeometry(0, 0, width(), height());
+
+  // Proxy double-clicks from the inner canvas to the outer widget signal.
+  connect(canvas, &RenderCanvas::doubleClicked, this, &RenderWidget::mouseDblClicked);
 }
 
 //----------------------------------------------------------------------------
@@ -97,29 +98,14 @@ void RenderWidget::resizeEvent(QResizeEvent* event)
   MARTY_LOG_SCOPE(render_log, "{} {}", (void*) (this), __func__);
   Q_UNUSED(event);
 
-  if (idealSize.width <= 0 || idealSize.height <= 0 || !canvas) { return; }
-
-  // 1. Define target aspect ratio
-  double targetRatio = idealSize.width / static_cast<double>(idealSize.height);
-
-  int newWidth = this->width();
-  int newHeight = this->height();
-
-  // 2. Calculate best fit while maintaining aspect ratio
-  if (newWidth / targetRatio <= newHeight) { newHeight = qRound(newWidth / targetRatio); }
-  else { newWidth = qRound(newHeight * targetRatio); }
-
-  // 3. Center and resize the content widget
-  int x = (this->width() - newWidth) / 2;
-  int y = (this->height() - newHeight) / 2;
-
-  canvas->setGeometry(x, y, newWidth, newHeight);
+  if (canvas) { canvas->setGeometry(0, 0, width(), height()); }
 }
 
 //----------------------------------------------------------------------------
 void RenderWidget::setCVSize(cv::Size const& size)
 {
   this->idealSize = size;
+  if (canvas) { canvas->resetView(); }
   // Update the canvas geometry immediately in case no resize event fires
   resizeEvent(nullptr);
   update();
