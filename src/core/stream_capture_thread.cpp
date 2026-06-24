@@ -53,6 +53,7 @@ StreamCaptureThread::StreamCaptureThread(ImageBuffer imageBuffer, cv::Size const
   , requestedSizeCorrect(false)
   , FrameCounter(0)
   , abort(false)
+  , finished(false)
   , captureActive(false)
   , deInterlace(false)
   , MotionAVI_Writing(false)
@@ -259,7 +260,13 @@ void StreamCaptureThread::run()
     this->captureFps.tick();
   }
 
-  // The run() task is exiting -> wake the threads waiting for that.
+  // The run() task is exiting -> notify the stopCapture/stopProcessing waiter.
+  {
+    QMutexLocker locker(&stopLock);
+    captureActive = false;
+    abort = false;
+    finished = true;
+  }
   this->stopWait.wakeAll();
 }
 
@@ -277,6 +284,7 @@ bool StreamCaptureThread::startCapture()
 
     captureActive = true;
     abort = false;
+    finished = false;
 
     hpx::async(this->executor, &StreamCaptureThread::run, this);
 
@@ -292,11 +300,15 @@ bool StreamCaptureThread::stopCapture()
   bool wasActive = this->captureActive;
   if (wasActive)
   {
-    this->stopLock.lock();
+    stopLock.lock();
     captureActive = false;
     abort = true;
-    this->stopWait.wait(&this->stopLock);
-    this->stopLock.unlock();
+    while (!finished)
+    {
+      stopWait.wait(&stopLock, 100);
+    }
+    finished = false;
+    stopLock.unlock();
   }
   return wasActive;
 }

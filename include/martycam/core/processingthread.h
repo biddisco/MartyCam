@@ -88,7 +88,8 @@ class ProcessingThread : public QObject
   QMutex stopLock;
   QWaitCondition stopWait;
   bool processingActive;
-  bool abort;
+  std::atomic<bool> abort;
+  bool finished;
   hpx::execution::parallel_executor executor;
   //
   ImageBuffer imageBuffer;

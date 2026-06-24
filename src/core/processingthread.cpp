@@ -30,6 +30,7 @@ ProcessingThread::ProcessingThread(ImageBuffer buffer, hpx::execution::parallel_
   , motionFilter(new MotionFilter(mfp))
   , faceRecogFilter(new FaceRecogFilter(frfp))
   , abort(false)
+  , finished(false)
   , processingType(processingType)
   , QObject(nullptr)
 {
@@ -110,7 +111,12 @@ void ProcessingThread::run()
     emit(NewData());
   }
 
-  this->abort = false;
+  {
+    QMutexLocker locker(&stopLock);
+    processingActive = false;
+    abort = false;
+    finished = true;
+  }
   this->stopWait.wakeAll();
 }
 
@@ -122,6 +128,7 @@ bool ProcessingThread::startProcessing()
   {
     processingActive = true;
     abort = false;
+    finished = false;
 
     hpx::async(this->executor, &ProcessingThread::run, this);
 
@@ -137,11 +144,15 @@ bool ProcessingThread::stopProcessing()
   bool wasActive = this->processingActive;
   if (wasActive)
   {
-    this->stopLock.lock();
+    stopLock.lock();
     processingActive = false;
     abort = true;
-    this->stopWait.wait(&this->stopLock);
-    this->stopLock.unlock();
+    while (!finished)
+    {
+      stopWait.wait(&stopLock, 100);
+    }
+    finished = false;
+    stopLock.unlock();
   }
   return wasActive;
 }

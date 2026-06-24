@@ -116,7 +116,8 @@ class CaptureThread : public QObject
   QWaitCondition stopWait;
   hpx::execution::parallel_executor executor;
   //
-  bool abort;
+  std::atomic<bool> abort;
+  bool finished;
   ImageBuffer imageBuffer;
   bool captureActive;
   bool deInterlace;
