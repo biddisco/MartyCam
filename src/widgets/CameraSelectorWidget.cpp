@@ -452,7 +452,23 @@ void CameraSelectorWidget::saveSelection()
       QCoreApplication::applicationDirPath() + "/MartyCam.ini", QSettings::IniFormat);
   settings.beginGroup("CameraSelection");
   settings.setValue("cameraPath", QString::fromStdString(m_selectedCameraPath));
-  settings.setValue("resolutionIndex", m_cameraComboBox ? m_cameraComboBox->currentIndex() : 0);
+
+  // Save the actual resolution radio-button index, not the combo-box camera index.
+  int resolutionIndex = 0;
+  if (m_cameraComboBox)
+  {
+    std::string cameraPath = m_cameraComboBox->currentData().toString().toStdString();
+    auto it = m_cameraButtonGroups.find(cameraPath);
+    if (it != m_cameraButtonGroups.end())
+    {
+      QAbstractButton* checkedButton = it->second->checkedButton();
+      if (checkedButton)
+      {
+        resolutionIndex = checkedButton->property("resolution_index").toInt();
+      }
+    }
+  }
+  settings.setValue("resolutionIndex", resolutionIndex);
   settings.endGroup();
 }
 
@@ -496,17 +512,29 @@ void CameraSelectorWidget::restoreSelection()
   if (it != m_cameraButtonGroups.end())
   {
     QButtonGroup* buttonGroup = it->second;
+    QAbstractButton* targetButton = nullptr;
     for (QAbstractButton* button : buttonGroup->buttons())
     {
       int resIdx = button->property("resolution_index").toInt();
       if (resIdx == savedResolutionIndex)
       {
-        qobject_cast<QRadioButton*>(button)->setChecked(true);
+        targetButton = button;
         break;
       }
     }
+    if (targetButton)
+    {
+      qobject_cast<QRadioButton*>(targetButton)->setChecked(true);
+    }
+    else if (!buttonGroup->buttons().isEmpty())
+    {
+      // Fallback to the first resolution if the saved index no longer exists
+      qobject_cast<QRadioButton*>(buttonGroup->buttons().first())->setChecked(true);
+    }
   }
 
+  // Now that the UI is fully consistent, emit the actual selection so the
+  // capture thread is created with the correct camera + resolution.
   emitConfigChanged();
 }
 
