@@ -453,14 +453,10 @@ void SettingsWidget::onSnapClicked()
 //----------------------------------------------------------------------------
 void SettingsWidget::onStartTimeLapseClicked()
 {
-  QPixmap p = this->renderWidget->grab();
-  QString filename = QString("%1/MartySnap-%2")
-                         .arg(this->ui.avi_directory->text())
-                         .arg(SnapshotId, 3, 10, QChar('0')) +
-      QString(".png");
-  p.save(filename);
-  QClipboard* clipboard = QApplication::clipboard();
-  clipboard->setPixmap(p);
+  // This button was incorrectly duplicating onSnapClicked().
+  // Time-lapse recording is managed automatically by the update loop
+  // when timeLapseEnabled is checked and the current time is within
+  // the configured start/end window.
 }
 
 //----------------------------------------------------------------------------
@@ -469,9 +465,13 @@ QDateTime SettingsWidget::TimeLapseStart() { return this->ui.startDateTime->date
 //----------------------------------------------------------------------------
 QDateTime SettingsWidget::TimeLapseEnd()
 {
-  QDateTime finish = this->ui.duration->dateTime();
-  int days = QDateTime().daysTo(finish);
-  QDateTime result = this->TimeLapseStart().addDays(days);
+  QDateTime durationDT = this->ui.duration->dateTime();
+  // The duration widget stores its value relative to a base date of 1999-12-29
+  // (from the UI defaults). Compute the delta from that base so the user’s
+  // dd / HH:mm:ss selection is interpreted as a duration.
+  int days = QDate(1999, 12, 29).daysTo(durationDT.date());
+  qint64 msecs = durationDT.time().msecsSinceStartOfDay();
+  QDateTime result = this->TimeLapseStart().addDays(days).addMSecs(msecs);
   return result;
 }
 
@@ -481,7 +481,8 @@ void SettingsWidget::onTabChanged(int currentTabIndex)
   switch (currentTabIndex)
   {
   case 0: this->processingthread->setMotionDetectionProcessing(); break;
-  case 1: this->processingthread->setFaceRecognitionProcessing(); break;
+  case 1: this->processingthread->setMotionDetectionProcessing(); break;
+  case 2: this->processingthread->setFaceRecognitionProcessing(); break;
   default:
     std::cout << "Current tab index = " << std::to_string(currentTabIndex) << " is unsupported\n";
     break;
@@ -510,7 +511,13 @@ void SettingsWidget::onDecimationCoeffChanged(int value)
 
 ProcessingType SettingsWidget::getCurentProcessingType()
 {
-  return ProcessingType(this->ui.tabWidget->currentIndex());
+  switch (this->ui.tabWidget->currentIndex())
+  {
+  case 0: return ProcessingType::motionDetection;
+  case 1: return ProcessingType::motionDetection;
+  case 2: return ProcessingType::faceRecognition;
+  default: return ProcessingType::motionDetection;
+  }
 }
 
 //---------------------------------------------------------------------------

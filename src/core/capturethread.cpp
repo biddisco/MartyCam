@@ -345,20 +345,20 @@ void CaptureThread::startTimeLapse(double fps)
     return;
   }
 
-  std::filesystem::path dirPath(this->AVI_Directory);
+  std::string expandedDir = expandPath(this->AVI_Directory);
+  std::filesystem::path dirPath(expandedDir);
   if (!std::filesystem::exists(dirPath))
   {
     if (!std::filesystem::create_directories(dirPath))
     {
       std::cout << "Cannot create time-lapse writer: failed to create directory "
-                << this->AVI_Directory << std::endl;
+                << expandedDir << std::endl;
       this->TimeLapseAVI_Writing = false;
       return;
     }
   }
 
-  std::string path =
-      expandPath(this->AVI_Directory) + "/" + this->TimeLapseAVI_Name + std::string(".mp4");
+  std::string path = expandedDir + "/" + this->TimeLapseAVI_Name + std::string(".mp4");
   cv::Size frameSize = this->getImageSize();
   if (frameSize.width <= 0 || frameSize.height <= 0)
   {
