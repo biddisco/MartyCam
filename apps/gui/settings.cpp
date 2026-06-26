@@ -4,12 +4,13 @@
 #include <QElapsedTimer>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QRegularExpression>
 #include <QSettings>
 //
-#include "martycam/widgets/IPCameraForm.h"
 #include "debug/logging.hpp"
-#include "martycam/widgets/renderwidget.h"
 #include "martycam/widgets/CameraSelectorWidget.h"
+#include "martycam/widgets/IPCameraForm.h"
+#include "martycam/widgets/renderwidget.h"
 //
 #ifdef WIN32
 # include "videoInput.h"
@@ -47,6 +48,7 @@ SettingsWidget::SettingsWidget(QWidget* parent)
   connect(
       ui.dilate, SIGNAL(valueChanged(int)), this, SLOT(onDilateChanged(int)), Qt::QueuedConnection);
   connect(ui.browse, SIGNAL(clicked()), this, SLOT(onBrowseClicked()), Qt::QueuedConnection);
+  connect(ui.browse_3, SIGNAL(clicked()), this, SLOT(onBrowseClicked()), Qt::QueuedConnection);
   // connect(ui.add_camera, SIGNAL(clicked()), this, SLOT(onAddCameraClicked()), Qt::QueuedConnection);
 
   connect(ui.WriteMotionAVI, SIGNAL(toggled(bool)), this, SLOT(onWriteMotionAVIToggled(bool)),
@@ -187,8 +189,12 @@ void SettingsWidget::onBrowseClicked()
   if (dialog.exec())
   {
     QString fileName = dialog.selectedFiles().at(0);
-    this->ui.avi_directory->setText(fileName);
-    this->capturethread->setWriteMotionAVIDir(fileName.toStdString().c_str());
+    if (this->sender() == this->ui.browse_3) { this->ui.avi_directory_TL->setText(fileName); }
+    else
+    {
+      this->ui.avi_directory->setText(fileName);
+      this->capturethread->setWriteMotionAVIDir(fileName.toStdString().c_str());
+    }
   }
 }
 
@@ -265,17 +271,21 @@ FaceRecogFilterParams SettingsWidget::getFaceRecogFilterParams()
 void SettingsWidget::SetupAVIStrings()
 {
   QString filePath = this->ui.avi_directory->text();
+  QString timeLapsePath = this->ui.avi_directory_TL->text();
   QString fileName = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
   this->capturethread->setWriteMotionAVIName(fileName.toLatin1().constData());
   this->capturethread->setWriteMotionAVIDir(filePath.toLatin1().constData());
-  QString fileName2 = "TimeLapse" + QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
+  QString fileName2 = "TimeLapse-" + QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
+  this->capturethread->setWriteMotionAVIDir(timeLapsePath.toLatin1().constData());
   this->capturethread->setWriteTimeLapseAVIName(fileName2.toLatin1().constData());
+  MARTY_LOG_INFO(settings_log, "{:<20} Time-lapse output configured: dir='{}', name='{}'",
+      "SettingsWidget", timeLapsePath.toStdString(), fileName2.toStdString());
 }
 
 //----------------------------------------------------------------------------
 void SettingsWidget::RecordMotionAVI(bool state)
 {
-  this->ui.WriteMotionAVI->setChecked(state);  
+  this->ui.WriteMotionAVI->setChecked(state);
   //
   QString filePath = this->ui.avi_directory->text();
   QString fileName = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
@@ -367,6 +377,7 @@ void SettingsWidget::saveSettings()
   settings.endGroup();
 
   settings.beginGroup("TimeLapse");
+  settings.setValue("aviDirectory", this->ui.avi_directory_TL->text());
   settings.setValue("interval", this->ui.interval->time());
   settings.setValue("duration", this->ui.duration->dateTime());
   settings.setValue("startDateTime", this->ui.startDateTime->dateTime());
@@ -427,6 +438,8 @@ void SettingsWidget::loadSettings()
   settings.endGroup();
 
   settings.beginGroup("TimeLapse");
+  SilentCall(this->ui.avi_directory_TL)
+      ->setText(settings.value("aviDirectory", this->ui.avi_directory->text()).toString());
   SilentCall(this->ui.startDateTime)
       ->setDateTime(
           settings.value("startDateTime", QDateTime(QDate::currentDate(), QTime::currentTime()))
@@ -445,7 +458,17 @@ void SettingsWidget::onSnapClicked()
                          .arg(this->ui.avi_directory->text())
                          .arg(SnapshotId++, 3, 10, QChar('0')) +
       QString(".png");
-  p.save(filename);
+  bool const saved = p.save(filename);
+  if (saved)
+  {
+    MARTY_LOG_INFO(
+        settings_log, "{:<20} Snapshot saved: {}", "SettingsWidget", filename.toStdString());
+  }
+  else
+  {
+    MARTY_LOG_ERROR(
+        settings_log, "{:<20} Snapshot save failed: {}", "SettingsWidget", filename.toStdString());
+  }
   QClipboard* clipboard = QApplication::clipboard();
   clipboard->setPixmap(p);
 }
@@ -453,10 +476,42 @@ void SettingsWidget::onSnapClicked()
 //----------------------------------------------------------------------------
 void SettingsWidget::onStartTimeLapseClicked()
 {
-  // This button was incorrectly duplicating onSnapClicked().
-  // Time-lapse recording is managed automatically by the update loop
-  // when timeLapseEnabled is checked and the current time is within
-  // the configured start/end window.
+  if (!this->capturethread)
+  {
+    MARTY_LOG_WARN(settings_log,
+        "{:<20} Start/stop time-lapse requested before capture thread is set", "SettingsWidget");
+    return;
+  }
+
+  bool const startRequested = this->ui.startTimeLapse->isChecked();
+  this->ui.timeLapseEnabled->setChecked(startRequested);
+
+  if (startRequested)
+  {
+    this->ui.startDateTime->setDateTime(QDateTime::currentDateTime());
+
+    if (this->TimeLapseEnd() <= this->TimeLapseStart())
+    {
+      // Ensure a valid capture window when users click Start without adjusting duration.
+      this->ui.duration->setDateTime(QDateTime(QDate(1999, 12, 29), QTime(0, 1, 0)));
+      MARTY_LOG_WARN(settings_log,
+          "{:<20} Time-lapse duration was zero/invalid, defaulting to 00:01:00", "SettingsWidget");
+    }
+
+    QString const dir = this->ui.avi_directory_TL->text();
+    MARTY_LOG_INFO(settings_log,
+        "{:<20} Time-lapse START requested: enabled={}, interval={}s, fps={:0.2f}, dir='{}', "
+        "start={}, stop={}",
+        "SettingsWidget", this->TimeLapseEnabled(), this->TimeLapseInterval() / 1000,
+        this->TimeLapseFPS(), dir.toStdString(),
+        this->TimeLapseStart().toString(Qt::ISODate).toStdString(),
+        this->TimeLapseEnd().toString(Qt::ISODate).toStdString());
+  }
+  else
+  {
+    this->capturethread->stopTimeLapse();
+    MARTY_LOG_INFO(settings_log, "{:<20} Time-lapse STOP requested by user", "SettingsWidget");
+  }
 }
 
 //----------------------------------------------------------------------------
@@ -465,14 +520,28 @@ QDateTime SettingsWidget::TimeLapseStart() { return this->ui.startDateTime->date
 //----------------------------------------------------------------------------
 QDateTime SettingsWidget::TimeLapseEnd()
 {
+  // Parse duration from the widget text to avoid hidden-date inconsistencies.
+  // Expected format: dd / HH:mm:ss
+  QString const durationText = this->ui.duration->text();
+  QRegularExpression const re("^\\s*(\\d+)\\s*/\\s*(\\d{1,2}):(\\d{1,2}):(\\d{1,2})\\s*$");
+  QRegularExpressionMatch const m = re.match(durationText);
+  if (m.hasMatch())
+  {
+    qint64 const days = m.captured(1).toLongLong();
+    qint64 const hours = m.captured(2).toLongLong();
+    qint64 const minutes = m.captured(3).toLongLong();
+    qint64 const seconds = m.captured(4).toLongLong();
+    qint64 const totalMs =
+        (((days * 24 + hours) * 60 + minutes) * 60 + seconds) * static_cast<qint64>(1000);
+    return this->TimeLapseStart().addMSecs(totalMs);
+  }
+
+  // Fallback to date-time based interpretation if the text could not be parsed.
   QDateTime durationDT = this->ui.duration->dateTime();
-  // The duration widget stores its value relative to a base date of 1999-12-29
-  // (from the UI defaults). Compute the delta from that base so the user’s
-  // dd / HH:mm:ss selection is interpreted as a duration.
   int days = QDate(1999, 12, 29).daysTo(durationDT.date());
+  if (days < 0) days = 0;
   qint64 msecs = durationDT.time().msecsSinceStartOfDay();
-  QDateTime result = this->TimeLapseStart().addDays(days).addMSecs(msecs);
-  return result;
+  return this->TimeLapseStart().addDays(days).addMSecs(msecs);
 }
 
 //---------------------------------------------------------------------------

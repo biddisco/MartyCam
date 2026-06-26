@@ -303,10 +303,7 @@ bool StreamCaptureThread::stopCapture()
     stopLock.lock();
     captureActive = false;
     abort = true;
-    while (!finished)
-    {
-      stopWait.wait(&stopLock, 100);
-    }
+    while (!finished) { stopWait.wait(&stopLock, 100); }
     finished = false;
     stopLock.unlock();
   }
@@ -323,6 +320,11 @@ void StreamCaptureThread::updateTimeLapse()
     // add date time stamp if enabled
     this->saveTimeLapseAVI(this->currentFrame);
   }
+  else
+  {
+    MARTY_LOG_WARN(
+        cap_log, "{:<20} updateTimeLapse called but writer is not open", "StreamCaptureThread");
+  }
 }
 
 //----------------------------------------------------------------------------
@@ -330,7 +332,12 @@ void StreamCaptureThread::saveTimeLapseAVI(cv::Mat const& image)
 {
   MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   if (!this->TimeLapseAVI_Writing) { this->TimeLapseAVI_Writer.release(); }
-  else if (this->TimeLapseAVI_Writer.isOpened()) { this->TimeLapseAVI_Writer.write(image); }
+  else if (this->TimeLapseAVI_Writer.isOpened())
+  {
+    this->TimeLapseAVI_Writer.write(image);
+    MARTY_LOG_INFO(cap_log, "{:<20} Time-lapse frame written: {}x{} at {}", "StreamCaptureThread",
+        image.cols, image.rows, QTime::currentTime().toString("hh:mm:ss.zzz").toStdString());
+  }
 }
 
 //----------------------------------------------------------------------------
@@ -339,7 +346,9 @@ void StreamCaptureThread::startTimeLapse(double fps)
   MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   if (this->AVI_Directory.empty() || this->TimeLapseAVI_Name.empty())
   {
-    std::cout << "Cannot create time-lapse writer: directory or filename is empty" << std::endl;
+    MARTY_LOG_ERROR(cap_log,
+        "{:<20} Cannot create time-lapse writer: directory or filename is empty",
+        "StreamCaptureThread");
     this->TimeLapseAVI_Writing = false;
     return;
   }
@@ -350,8 +359,9 @@ void StreamCaptureThread::startTimeLapse(double fps)
   {
     if (!std::filesystem::create_directories(dirPath))
     {
-      std::cout << "Cannot create time-lapse writer: failed to create directory "
-                << expandedDir << std::endl;
+      MARTY_LOG_ERROR(cap_log,
+          "{:<20} Cannot create time-lapse writer: failed to create directory {}",
+          "StreamCaptureThread", expandedDir);
       this->TimeLapseAVI_Writing = false;
       return;
     }
@@ -361,11 +371,14 @@ void StreamCaptureThread::startTimeLapse(double fps)
   cv::Size frameSize = this->getImageSize();
   if (frameSize.width <= 0 || frameSize.height <= 0)
   {
-    std::cout << "Cannot create time-lapse writer: invalid frame size " << frameSize.width << "x"
-              << frameSize.height << std::endl;
+    MARTY_LOG_ERROR(cap_log, "{:<20} Cannot create time-lapse writer: invalid frame size {}x{}",
+        "StreamCaptureThread", frameSize.width, frameSize.height);
     this->TimeLapseAVI_Writing = false;
     return;
   }
+
+  MARTY_LOG_INFO(cap_log, "{:<20} Opening time-lapse writer: path='{}', fps={:0.2f}, size={}x{}",
+      "StreamCaptureThread", path, fps, frameSize.width, frameSize.height);
 
   if (!this->TimeLapseAVI_Writer.isOpened())
   {
@@ -379,17 +392,28 @@ void StreamCaptureThread::startTimeLapse(double fps)
 
   if (!this->TimeLapseAVI_Writer.isOpened())
   {
-    std::cout << "Failed to open Time Lapse video writer : " << path.c_str() << std::endl;
+    MARTY_LOG_ERROR(
+        cap_log, "{:<20} Failed to open time-lapse writer: {}", "StreamCaptureThread", path);
     this->TimeLapseAVI_Writing = false;
   }
-  else { this->TimeLapseAVI_Writing = true; }
+  else
+  {
+    this->TimeLapseAVI_Writing = true;
+    MARTY_LOG_INFO(cap_log, "{:<20} Time-lapse writer started", "StreamCaptureThread");
+  }
 }
 
 //----------------------------------------------------------------------------
 void StreamCaptureThread::stopTimeLapse()
 {
   MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
+  MARTY_LOG_INFO(cap_log, "{:<20} Stopping time-lapse writer", "StreamCaptureThread");
   this->TimeLapseAVI_Writing = false;
+  if (this->TimeLapseAVI_Writer.isOpened())
+  {
+    this->TimeLapseAVI_Writer.release();
+    MARTY_LOG_INFO(cap_log, "{:<20} Time-lapse writer released", "StreamCaptureThread");
+  }
   //    emit(RecordingState(true));
 }
 

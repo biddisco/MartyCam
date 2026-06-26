@@ -21,9 +21,19 @@ stream_buffer_recorder::stream_buffer_recorder(std::string const& stream_url,
 stream_buffer_recorder::~stream_buffer_recorder() { close(); }
 
 //----------------------------------------------------------------------------
+int stream_buffer_recorder::ffmpegInterruptCallback(void* opaque)
+{
+  auto* self = static_cast<stream_buffer_recorder*>(opaque);
+  if (!self) return 0;
+  // Return non-zero to interrupt blocking FFmpeg I/O calls during shutdown.
+  return self->interrupt_requested.load() ? 1 : 0;
+}
+
+//----------------------------------------------------------------------------
 bool stream_buffer_recorder::open(int width, int height, std::string const& fourcc_str)
 {
   MARTY_LOG_SCOPE(sbr_log, "{} {}", (void*) (this), __func__);
+  this->interrupt_requested = false;
   is_url = (url.find("://") != std::string::npos);
 
   if (is_url)
@@ -62,6 +72,11 @@ bool stream_buffer_recorder::open(int width, int height, std::string const& four
 bool stream_buffer_recorder::open_ip()
 {
   MARTY_LOG_SCOPE(sbr_log, "{} {}", (void*) (this), __func__);
+  ifmt_ctx = avformat_alloc_context();
+  if (!ifmt_ctx) return false;
+  ifmt_ctx->interrupt_callback.callback = &stream_buffer_recorder::ffmpegInterruptCallback;
+  ifmt_ctx->interrupt_callback.opaque = this;
+
   AVDictionary* options = nullptr;
 
   // Force TCP transport to prevent packet loss and blocky artifacts
@@ -73,11 +88,20 @@ bool stream_buffer_recorder::open_ip()
   if (avformat_open_input(&ifmt_ctx, url.c_str(), nullptr, &options) < 0)
   {
     av_dict_free(&options);
+    if (ifmt_ctx)
+    {
+      avformat_free_context(ifmt_ctx);
+      ifmt_ctx = nullptr;
+    }
     return false;
   }
 
   av_dict_free(&options);
-  if (avformat_find_stream_info(ifmt_ctx, nullptr) < 0) return false;
+  if (avformat_find_stream_info(ifmt_ctx, nullptr) < 0)
+  {
+    avformat_close_input(&ifmt_ctx);
+    return false;
+  }
   return true;
 }
 
@@ -86,6 +110,11 @@ bool stream_buffer_recorder::open_usb(int width, int height, std::string const& 
 {
   MARTY_LOG_SCOPE(sbr_log, "{} {}", (void*) (this), __func__);
   avdevice_register_all();
+
+  ifmt_ctx = avformat_alloc_context();
+  if (!ifmt_ctx) return false;
+  ifmt_ctx->interrupt_callback.callback = &stream_buffer_recorder::ffmpegInterruptCallback;
+  ifmt_ctx->interrupt_callback.opaque = this;
 
   AVInputFormat const* ifmt = av_find_input_format("v4l2");
   if (!ifmt) return false;
@@ -120,11 +149,20 @@ bool stream_buffer_recorder::open_usb(int width, int height, std::string const& 
   if (avformat_open_input(&ifmt_ctx, url.c_str(), ifmt, &options) < 0)
   {
     av_dict_free(&options);
+    if (ifmt_ctx)
+    {
+      avformat_free_context(ifmt_ctx);
+      ifmt_ctx = nullptr;
+    }
     return false;
   }
 
   av_dict_free(&options);
-  if (avformat_find_stream_info(ifmt_ctx, nullptr) < 0) return false;
+  if (avformat_find_stream_info(ifmt_ctx, nullptr) < 0)
+  {
+    avformat_close_input(&ifmt_ctx);
+    return false;
+  }
   return true;
 }
 
@@ -132,9 +170,12 @@ bool stream_buffer_recorder::open_usb(int width, int height, std::string const& 
 void stream_buffer_recorder::close()
 {
   MARTY_LOG_SCOPE(sbr_log, "{} {}", (void*) (this), __func__);
-  // block until the capture thread has exited to ensure all packets are processed
+  // Request prompt interruption of blocking read calls before waiting on worker exit.
+  this->interrupt_requested = true;
   is_running = false;
+  MARTY_LOG_INFO(sbr_log, "Stopping stream capture worker");
   if (worker_future.valid()) { worker_future.get(); }
+  MARTY_LOG_INFO(sbr_log, "Stream capture worker stopped");
 
   // make sure the writer thread has exited before closing the muxer
   stopRecording();

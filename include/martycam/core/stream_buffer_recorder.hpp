@@ -53,6 +53,7 @@ class stream_buffer_recorder
   void clearBuffer();
   bool initOutputMuxer(std::string const& filename);
   void closeOutputMuxer();
+  static int ffmpegInterruptCallback(void* opaque);
 
   // Cleanly split initialization methods
   bool open_ip();
@@ -94,6 +95,7 @@ class stream_buffer_recorder
 
   // Threading and State
   std::atomic<bool> is_running{false};
+  std::atomic<bool> interrupt_requested{false};
   std::atomic<bool> is_recording{false};
   hpx::execution::parallel_executor executor;
   mutex_type packet_buffer_mtx;

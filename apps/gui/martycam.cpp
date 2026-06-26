@@ -13,8 +13,8 @@
 #include <hpx/include/async.hpp>
 
 #include <fmt/format.h>
-#include "martycam/core/GraphUpdateFilter.h"
 #include "debug/logging.hpp"
+#include "martycam/core/GraphUpdateFilter.h"
 #include "martycam/widgets/CameraSelectorWidget.h"
 //
 // ----------------------------------------------------------------------------
@@ -134,6 +134,14 @@ MartyCam::MartyCam(hpx::execution::parallel_executor const& defaultExec,
 void MartyCam::closeEvent(QCloseEvent*)
 {
   MARTY_LOG_SCOPE(marty_log, "{} {}", (void*) (this), __func__);
+
+  if (this->captureThread && this->captureThread->TimeLapseAVI_Writing)
+  {
+    MARTY_LOG_INFO(marty_log,
+        "{:<20} Close requested while time-lapse active; stopping writer immediately", "MartyCam");
+    this->captureThread->stopTimeLapse();
+  }
+
   this->saveSettings();
   this->settingsWidget->saveSettings();
   this->deleteCaptureThread();
@@ -159,6 +167,20 @@ void MartyCam::createCaptureThread(cv::Size size, std::string const& cameraUTL, 
 void MartyCam::deleteCaptureThread()
 {
   MARTY_LOG_SCOPE(marty_log, "{} {}", (void*) (this), __func__);
+
+  if (!this->captureThread)
+  {
+    MARTY_LOG_DEBUG(marty_log, "{:<20} No capture thread to delete", "MartyCam");
+    return;
+  }
+
+  if (this->captureThread->TimeLapseAVI_Writing)
+  {
+    MARTY_LOG_INFO(
+        marty_log, "{:<20} Stopping active time-lapse before capture thread shutdown", "MartyCam");
+    this->captureThread->stopTimeLapse();
+  }
+
   this->captureThread->stopCapture();
   this->imageBuffer->shutdown();
   this->settingsWidget->unsetCaptureThread();
@@ -255,20 +277,37 @@ void MartyCam::updateGUI()
     {
       if (now > start && now < stop)
       {
+        MARTY_LOG_INFO(marty_log,
+            "{:<20} Starting time-lapse: now={}, start={}, stop={}, interval={}s, fps={:0.2f}",
+            "MartyCam", now.toString(Qt::ISODate).toStdString(),
+            start.toString(Qt::ISODate).toStdString(), stop.toString(Qt::ISODate).toStdString(),
+            secs, this->settingsWidget->TimeLapseFPS());
         this->settingsWidget->SetupAVIStrings();
         this->captureThread->startTimeLapse(this->settingsWidget->TimeLapseFPS());
         this->captureThread->updateTimeLapse();
         this->lastTimeLapse = now;
       }
+      else
+      {
+        MARTY_LOG_INFO(marty_log, "{:<20} Time-lapse not started yet: now={}, start={}, stop={}",
+            "MartyCam", now.toString(Qt::ISODate).toStdString(),
+            start.toString(Qt::ISODate).toStdString(), stop.toString(Qt::ISODate).toStdString());
+      }
     }
   }
   else if ((now > next && now < stop) && this->settingsWidget->TimeLapseEnabled())
   {
+    MARTY_LOG_TRACE(marty_log, "{:<20} Time-lapse frame requested at {}", "MartyCam",
+        now.toString(Qt::ISODate).toStdString());
     this->captureThread->updateTimeLapse();
     this->lastTimeLapse = now;
   }
   else if (now > stop || !this->settingsWidget->TimeLapseEnabled())
   {
+    MARTY_LOG_INFO(marty_log, "{:<20} Stopping time-lapse: reason={}, now={}, stop={}, enabled={}",
+        "MartyCam", (now > stop ? "window elapsed" : "disabled"),
+        now.toString(Qt::ISODate).toStdString(), stop.toString(Qt::ISODate).toStdString(),
+        this->settingsWidget->TimeLapseEnabled());
     this->captureThread->stopTimeLapse();
   }
 }
