@@ -337,7 +337,7 @@ void StreamCaptureThread::updateTimeLapse()
 }
 
 //----------------------------------------------------------------------------
-void StreamCaptureThread::saveTimeLapseAVI(cv::Mat const& image)
+void StreamCaptureThread::saveTimeLapseAVI(cv::Mat image)
 {
   MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
 #ifdef MARTYCAM_USE_FFMPEG_TIMELAPSE
@@ -347,16 +347,18 @@ void StreamCaptureThread::saveTimeLapseAVI(cv::Mat const& image)
   }
   else if (this->timeLapseFFmpegWriter && this->timeLapseFFmpegWriter->isOpen())
   {
-    if (!this->timeLapseFFmpegWriter->write(image))
-    {
-      MARTY_LOG_ERROR(cap_log, "{:<20} FFmpeg timelapse write failed: {}", "StreamCaptureThread",
-          this->timeLapseFFmpegWriter->lastError());
-      this->TimeLapseAVI_Writing = false;
-      this->timeLapseFFmpegWriter->close();
-      return;
-    }
-    MARTY_LOG_INFO(cap_log, "{:<20} Time-lapse frame written: {}x{} at {}", "StreamCaptureThread",
-        image.cols, image.rows, QTime::currentTime().toString("hh:mm:ss.zzz").toStdString());
+    hpx::async(this->executor, [this, image = std::move(image)]() mutable {
+      if (!this->timeLapseFFmpegWriter->write(image))
+      {
+        MARTY_LOG_ERROR(cap_log, "{:<20} FFmpeg timelapse write failed: {}", "StreamCaptureThread",
+            this->timeLapseFFmpegWriter->lastError());
+        this->TimeLapseAVI_Writing = false;
+        this->timeLapseFFmpegWriter->close();
+        return;
+      }
+      MARTY_LOG_INFO(cap_log, "{:<20} Time-lapse frame written: {}x{} at {}", "StreamCaptureThread",
+          image.cols, image.rows, QTime::currentTime().toString("hh:mm:ss.zzz").toStdString());
+    });
   }
 #else
   if (!this->TimeLapseAVI_Writing) { this->TimeLapseAVI_Writer.release(); }

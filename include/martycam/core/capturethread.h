@@ -90,7 +90,7 @@ class CaptureThread : public QObject
   void saveAVI(cv::Mat const& image);
   void closeAVI();
 
-  void saveTimeLapseAVI(cv::Mat const& image);
+  void saveTimeLapseAVI(cv::Mat image);
   void startTimeLapse(double fps);
   void stopTimeLapse();
   void updateTimeLapse();

@@ -78,7 +78,7 @@ class StreamCaptureThread : public QObject
   void setWriteMotionAVIDir(char const* dir);
   void closeAVI();
 
-  void saveTimeLapseAVI(cv::Mat const& image);
+  void saveTimeLapseAVI(cv::Mat image);
   void startTimeLapse(double fps);
   void stopTimeLapse();
   void updateTimeLapse();
