@@ -96,6 +96,7 @@ void ProcessingThread::run()
     switch (this->processingType)
     {
     case ProcessingType::motionDetection:
+      if (!this->motionDetectionEnabled) break;
       this->motionFilter->process(cameracopy);
 
       this->graphFilter->process(this->motionFilter->PSNR_Filter->PSNR,
@@ -105,7 +106,10 @@ void ProcessingThread::run()
           this->motionFilter->triggerLevel, this->motionFilter->eventLevel);
 
       break;
-    case ProcessingType ::faceRecognition: this->faceRecogFilter->process(cameracopy); break;
+    case ProcessingType::faceRecognition:
+      if (!this->faceRecognitionEnabled) break;
+      this->faceRecogFilter->process(cameracopy);
+      break;
     }
     this->processingTime.tick();
     emit(NewData());
@@ -147,10 +151,7 @@ bool ProcessingThread::stopProcessing()
     stopLock.lock();
     processingActive = false;
     abort = true;
-    while (!finished)
-    {
-      stopWait.wait(&stopLock, 100);
-    }
+    while (!finished) { stopWait.wait(&stopLock, 100); }
     finished = false;
     stopLock.unlock();
   }

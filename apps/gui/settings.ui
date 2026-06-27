@@ -672,6 +672,38 @@
      </property>
      <layout class="QVBoxLayout" name="verticalLayout_3">
       <item>
+             <widget class="QFrame" name="frame_processing_enable">
+                <property name="frameShape">
+                 <enum>QFrame::Shape::StyledPanel</enum>
+                </property>
+                <property name="frameShadow">
+                 <enum>QFrame::Shadow::Raised</enum>
+                </property>
+                <layout class="QHBoxLayout" name="horizontalLayout_processing_enable">
+                 <item>
+                    <widget class="QCheckBox" name="motionProcessingEnabled">
+                     <property name="text">
+                        <string>Enable Motion Tracking</string>
+                     </property>
+                     <property name="checked">
+                        <bool>true</bool>
+                     </property>
+                    </widget>
+                 </item>
+                 <item>
+                    <widget class="QCheckBox" name="faceProcessingEnabled">
+                     <property name="text">
+                        <string>Enable Face Tracking</string>
+                     </property>
+                     <property name="checked">
+                        <bool>true</bool>
+                     </property>
+                    </widget>
+                 </item>
+                </layout>
+             </widget>
+            </item>
+            <item>
        <widget class="QFrame" name="frame_2">
         <property name="frameShape">
          <enum>QFrame::Shape::StyledPanel</enum>

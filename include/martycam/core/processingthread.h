@@ -71,6 +71,10 @@ class ProcessingThread : public QObject
 
   void setMotionDetectionProcessing();
   void setFaceRecognitionProcessing();
+  void setMotionDetectionEnabled(bool enabled) { this->motionDetectionEnabled = enabled; }
+  void setFaceRecognitionEnabled(bool enabled) { this->faceRecognitionEnabled = enabled; }
+  bool isMotionDetectionEnabled() const { return this->motionDetectionEnabled; }
+  bool isFaceRecognitionEnabled() const { return this->faceRecognitionEnabled; }
   MotionFilter_SP motionFilter;
   FaceRecogFilter_SP faceRecogFilter;
 
@@ -94,6 +98,8 @@ class ProcessingThread : public QObject
   //
   ImageBuffer imageBuffer;
   ProcessingType processingType;
+  bool motionDetectionEnabled = true;
+  bool faceRecognitionEnabled = true;
   rolling_average processingTime;
 };
 

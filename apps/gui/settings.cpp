@@ -74,6 +74,10 @@ SettingsWidget::SettingsWidget(QWidget* parent)
   connect(ui.snapButton, SIGNAL(clicked()), this, SLOT(onSnapClicked()), Qt::QueuedConnection);
   connect(ui.startTimeLapse, SIGNAL(clicked()), this, SLOT(onStartTimeLapseClicked()),
       Qt::QueuedConnection);
+  connect(ui.motionProcessingEnabled, SIGNAL(toggled(bool)), this,
+      SLOT(onProcessingEnableToggled(bool)), Qt::QueuedConnection);
+  connect(ui.faceProcessingEnabled, SIGNAL(toggled(bool)), this,
+      SLOT(onProcessingEnableToggled(bool)), Qt::QueuedConnection);
 
   ImageButtonGroup.addButton(ui.cameraImage, 0);
   ImageButtonGroup.addButton(ui.movingAverage, 1);
@@ -141,6 +145,7 @@ void SettingsWidget::setThreads(CaptureThread_SP capthread, ProcessingThread_SP 
 {
   this->capturethread = capthread;
   this->processingthread = procthread;
+  this->applyProcessingEnableState();
 }
 
 //----------------------------------------------------------------------------
@@ -368,6 +373,8 @@ void SettingsWidget::saveSettings()
   settings.setValue("rotation", this->RotateButtonGroup.checkedId());
   settings.setValue("requestedFps", this->ui.requestedFps_HorizontalSlider->value());
   settings.setValue("processingType", this->ui.tabWidget->currentIndex());
+  settings.setValue("motionProcessingEnabled", this->ui.motionProcessingEnabled->isChecked());
+  settings.setValue("faceProcessingEnabled", this->ui.faceProcessingEnabled->isChecked());
   // settings.setValue("cameraIndex", this->ui.cameraSelect->currentIndex());
   settings.endGroup();
 
@@ -428,6 +435,11 @@ void SettingsWidget::loadSettings()
   SilentCall(&this->RotateButtonGroup)->button(settings.value("rotation", 0).toInt())->click();
   // SilentCall(this->ui.cameraSelect)->setCurrentIndex(settings.value("cameraIndex", 0).toInt());
   SilentCall(this->ui.tabWidget)->setCurrentIndex(settings.value("processingType", 0).toInt());
+  SilentCall(this->ui.motionProcessingEnabled)
+      ->setChecked(settings.value("motionProcessingEnabled", true).toBool());
+  SilentCall(this->ui.faceProcessingEnabled)
+      ->setChecked(settings.value("faceProcessingEnabled", true).toBool());
+  this->applyProcessingEnableState();
   //
   settings.endGroup();
 
@@ -554,16 +566,20 @@ QDateTime SettingsWidget::TimeLapseEnd()
 //---------------------------------------------------------------------------
 void SettingsWidget::onTabChanged(int currentTabIndex)
 {
-  switch (currentTabIndex)
-  {
-  case 0: this->processingthread->setMotionDetectionProcessing(); break;
-  case 1: this->processingthread->setMotionDetectionProcessing(); break;
-  case 2: this->processingthread->setFaceRecognitionProcessing(); break;
-  default:
-    std::cout << "Current tab index = " << std::to_string(currentTabIndex) << " is unsupported\n";
-    break;
-  }
+  (void) currentTabIndex;
+  // Tab selection no longer controls processing loop activation.
 }
+
+//---------------------------------------------------------------------------
+void SettingsWidget::applyProcessingEnableState()
+{
+  if (!this->processingthread) return;
+  this->processingthread->setMotionDetectionEnabled(this->ui.motionProcessingEnabled->isChecked());
+  this->processingthread->setFaceRecognitionEnabled(this->ui.faceProcessingEnabled->isChecked());
+}
+
+//---------------------------------------------------------------------------
+void SettingsWidget::onProcessingEnableToggled(bool) { this->applyProcessingEnableState(); }
 
 //---------------------------------------------------------------------------
 void SettingsWidget::onRequestedFpsChanged(int value)

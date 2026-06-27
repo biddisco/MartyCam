@@ -74,6 +74,8 @@ class SettingsWidget : public QWidget
   double TimeLapseFPS() { return this->ui.timeLapseFPS->value(); }
   double TimeLapseBitrateMBps() { return this->ui.timeLapseBitrateMBps->value(); }
   bool TimeLapseEnabled() { return this->ui.timeLapseEnabled->isChecked(); }
+  bool MotionProcessingEnabled() { return this->ui.motionProcessingEnabled->isChecked(); }
+  bool FaceProcessingEnabled() { return this->ui.faceProcessingEnabled->isChecked(); }
 
   ProcessingType getCurentProcessingType();
   MotionFilterParams getMotionFilterParams();
@@ -101,11 +103,13 @@ class SettingsWidget : public QWidget
   void onStartTimeLapseClicked();
   //
   void onTabChanged(int);
+  void onProcessingEnableToggled(bool);
   //
 
   void loadSettings();
   void saveSettings();
   void SetupAVIStrings();
+  void applyProcessingEnableState();
 
   signals:
   void cameraConfigChanged(QString cameraPath, int width, int height, int fps, int fourcc);
