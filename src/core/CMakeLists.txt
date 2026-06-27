@@ -1,7 +1,6 @@
 # -----------------------------------------------------------------------------
-# MartyCam Core Library
-# Camera capture, image processing, filters, and utilities.
-# No QtWidgets dependency — suitable for CLI applications.
+# MartyCam Core Library Camera capture, image processing, filters, and utilities. No QtWidgets
+# dependency — suitable for CLI applications.
 # -----------------------------------------------------------------------------
 
 if(MARTYCAM_USE_STREAM_CAPTURE)
@@ -13,6 +12,7 @@ endif()
 set(martycam_core_SRCS
     ${capture_source}
     camera_utils.cpp
+    timelapse_ffmpeg_writer.cpp
     filter.cpp
     PSNRFilter.cpp
     MotionFilter.cpp
@@ -24,11 +24,9 @@ set(martycam_core_SRCS
 )
 
 if(MARTYCAM_USE_STREAM_CAPTURE)
-  list(APPEND martycam_core_SRCS
-       ${CMAKE_SOURCE_DIR}/include/martycam/core/stream_capture_thread.h)
+  list(APPEND martycam_core_SRCS ${CMAKE_SOURCE_DIR}/include/martycam/core/stream_capture_thread.h)
 else()
-  list(APPEND martycam_core_SRCS
-       ${CMAKE_SOURCE_DIR}/include/martycam/core/capturethread.h)
+  list(APPEND martycam_core_SRCS ${CMAKE_SOURCE_DIR}/include/martycam/core/capturethread.h)
 endif()
 
 add_library(martycam_core ${martycam_core_SRCS})
@@ -41,13 +39,9 @@ endif()
 
 target_include_directories(
   martycam_core
-  PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
-         $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/src>
-         ${FFMPEG_INCLUDE_DIRS}
-         ${CMAKE_SOURCE_DIR}/streamulus/src
-         ${HPX_INCLUDE_DIRS}
-  PRIVATE ${CMAKE_SOURCE_DIR}/include/martycam/core
-          ${CMAKE_BINARY_DIR}
+  PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include> $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/src>
+         ${FFMPEG_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/streamulus/src ${HPX_INCLUDE_DIRS}
+  PRIVATE ${CMAKE_SOURCE_DIR}/include/martycam/core ${CMAKE_BINARY_DIR}
 )
 
 target_link_libraries(
@@ -59,9 +53,5 @@ target_link_libraries(
          ${Boost_LIBRARIES}
          nlohmann_json::nlohmann_json
          martycam_debug
-  PRIVATE ${AVFORMAT_LIB}
-          ${AVCODEC_LIB}
-          ${AVUTIL_LIB}
-          ${SWSCALE_LIB}
-          ${AVDEVICE_LIB}
+  PRIVATE ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB} ${SWSCALE_LIB} ${AVDEVICE_LIB}
 )

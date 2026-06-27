@@ -72,6 +72,7 @@ class SettingsWidget : public QWidget
   QDateTime TimeLapseEnd();
   qint64 TimeLapseInterval() { return this->ui.interval->time().msecsSinceStartOfDay(); }
   double TimeLapseFPS() { return this->ui.timeLapseFPS->value(); }
+  double TimeLapseBitrateMBps() { return this->ui.timeLapseBitrateMBps->value(); }
   bool TimeLapseEnabled() { return this->ui.timeLapseEnabled->isChecked(); }
 
   ProcessingType getCurentProcessingType();
@@ -107,8 +108,7 @@ class SettingsWidget : public QWidget
   void SetupAVIStrings();
 
   signals:
-  void cameraConfigChanged(
-      QString cameraPath, int width, int height, int fps, int fourcc);
+  void cameraConfigChanged(QString cameraPath, int width, int height, int fps, int fourcc);
   void rotationChanged(int);
 
   protected:

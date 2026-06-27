@@ -278,6 +278,7 @@ void SettingsWidget::SetupAVIStrings()
   QString fileName2 = "TimeLapse-" + QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
   this->capturethread->setWriteMotionAVIDir(timeLapsePath.toLatin1().constData());
   this->capturethread->setWriteTimeLapseAVIName(fileName2.toLatin1().constData());
+  this->capturethread->setTimeLapseBitrateMBps(this->TimeLapseBitrateMBps());
   MARTY_LOG_INFO(settings_log, "{:<20} Time-lapse output configured: dir='{}', name='{}'",
       "SettingsWidget", timeLapsePath.toStdString(), fileName2.toStdString());
 }
@@ -378,6 +379,7 @@ void SettingsWidget::saveSettings()
 
   settings.beginGroup("TimeLapse");
   settings.setValue("aviDirectory", this->ui.avi_directory_TL->text());
+  settings.setValue("bitrateMBps", this->ui.timeLapseBitrateMBps->value());
   settings.setValue("interval", this->ui.interval->time());
   settings.setValue("duration", this->ui.duration->dateTime());
   settings.setValue("startDateTime", this->ui.startDateTime->dateTime());
@@ -440,6 +442,8 @@ void SettingsWidget::loadSettings()
   settings.beginGroup("TimeLapse");
   SilentCall(this->ui.avi_directory_TL)
       ->setText(settings.value("aviDirectory", this->ui.avi_directory->text()).toString());
+  SilentCall(this->ui.timeLapseBitrateMBps)
+      ->setValue(settings.value("bitrateMBps", 4.0).toDouble());
   SilentCall(this->ui.startDateTime)
       ->setDateTime(
           settings.value("startDateTime", QDateTime(QDate::currentDate(), QTime::currentTime()))
@@ -498,12 +502,15 @@ void SettingsWidget::onStartTimeLapseClicked()
           "{:<20} Time-lapse duration was zero/invalid, defaulting to 00:01:00", "SettingsWidget");
     }
 
+    this->capturethread->setTimeLapseBitrateMBps(this->TimeLapseBitrateMBps());
+
     QString const dir = this->ui.avi_directory_TL->text();
     MARTY_LOG_INFO(settings_log,
-        "{:<20} Time-lapse START requested: enabled={}, interval={}s, fps={:0.2f}, dir='{}', "
+        "{:<20} Time-lapse START requested: enabled={}, interval={}s, fps={:0.2f}, "
+        "bitrate={:0.2f}MB/s, dir='{}', "
         "start={}, stop={}",
         "SettingsWidget", this->TimeLapseEnabled(), this->TimeLapseInterval() / 1000,
-        this->TimeLapseFPS(), dir.toStdString(),
+        this->TimeLapseFPS(), this->TimeLapseBitrateMBps(), dir.toStdString(),
         this->TimeLapseStart().toString(Qt::ISODate).toStdString(),
         this->TimeLapseEnd().toString(Qt::ISODate).toStdString());
   }

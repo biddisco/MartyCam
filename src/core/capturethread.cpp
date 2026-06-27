@@ -316,6 +316,14 @@ void CaptureThread::updateTimeLapse()
 {
   MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   // always write the frame out if saving movie or in the process of closing AVI
+#ifdef MARTYCAM_USE_FFMPEG_TIMELAPSE
+  if (this->TimeLapseAVI_Writing) { this->saveTimeLapseAVI(this->currentFrame); }
+  else
+  {
+    MARTY_LOG_WARN(
+        cap_log, "{:<20} updateTimeLapse called but FFmpeg writer is not active", "CaptureThread");
+  }
+#else
   if (this->TimeLapseAVI_Writer.isOpened())
   {
     // add date time stamp if enabled
@@ -326,19 +334,40 @@ void CaptureThread::updateTimeLapse()
     MARTY_LOG_WARN(
         cap_log, "{:<20} updateTimeLapse called but writer is not open", "CaptureThread");
   }
+#endif
 }
 
 //----------------------------------------------------------------------------
 void CaptureThread::saveTimeLapseAVI(cv::Mat const& image)
 {
   MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
+#ifdef MARTYCAM_USE_FFMPEG_TIMELAPSE
+  if (!this->TimeLapseAVI_Writing)
+  {
+    if (this->timeLapseFFmpegWriter) this->timeLapseFFmpegWriter->close();
+  }
+  else if (this->timeLapseFFmpegWriter && this->timeLapseFFmpegWriter->isOpen())
+  {
+    if (!this->timeLapseFFmpegWriter->write(image))
+    {
+      MARTY_LOG_ERROR(cap_log, "{:<20} FFmpeg timelapse write failed: {}", "CaptureThread",
+          this->timeLapseFFmpegWriter->lastError());
+      this->TimeLapseAVI_Writing = false;
+      this->timeLapseFFmpegWriter->close();
+      return;
+    }
+    MARTY_LOG_INFO(cap_log, "{:<20} Time-lapse frame written: {}x{} at {}", "CaptureThread",
+        image.cols, image.rows, QTime::currentTime().toString("hh:mm:ss.zzz").toStdString());
+  }
+#else
   if (!this->TimeLapseAVI_Writing) { this->TimeLapseAVI_Writer.release(); }
   else if (this->TimeLapseAVI_Writer.isOpened())
   {
     this->TimeLapseAVI_Writer.write(image);
     MARTY_LOG_INFO(cap_log, "{:<20} Time-lapse frame written: {}x{} at {}", "CaptureThread",
-        image.cols, image.rows, QTime::currentTime().toString("hh:mm:ss.zzz"));
+        image.cols, image.rows, QTime::currentTime().toString("hh:mm:ss.zzz").toStdString());
   }
+#endif
 }
 
 //----------------------------------------------------------------------------
@@ -380,6 +409,24 @@ void CaptureThread::startTimeLapse(double fps)
   MARTY_LOG_INFO(cap_log, "{:<20} Opening time-lapse writer: path='{}', fps={:0.2f}, size={}x{}",
       "CaptureThread", path, fps, frameSize.width, frameSize.height);
 
+#ifdef MARTYCAM_USE_FFMPEG_TIMELAPSE
+  if (!this->timeLapseFFmpegWriter)
+  {
+    this->timeLapseFFmpegWriter = std::make_unique<TimeLapseFFmpegWriter>();
+  }
+
+  if (!this->timeLapseFFmpegWriter->open(
+          path, frameSize.width, frameSize.height, fps, this->TimeLapseBitrateMBps))
+  {
+    MARTY_LOG_ERROR(cap_log, "{:<20} Failed to open FFmpeg timelapse writer: {}", "CaptureThread",
+        this->timeLapseFFmpegWriter->lastError());
+    this->TimeLapseAVI_Writing = false;
+    return;
+  }
+
+  this->TimeLapseAVI_Writing = true;
+  MARTY_LOG_INFO(cap_log, "{:<20} Time-lapse FFmpeg writer started", "CaptureThread");
+#else
   if (!this->TimeLapseAVI_Writer.isOpened())
   {
     this->TimeLapseAVI_Writer.open(path.c_str(), CV_FOURCC('a', 'v', 'c', '1'), fps, frameSize);
@@ -400,6 +447,7 @@ void CaptureThread::startTimeLapse(double fps)
     this->TimeLapseAVI_Writing = true;
     MARTY_LOG_INFO(cap_log, "{:<20} Time-lapse writer started", "CaptureThread");
   }
+#endif
 }
 
 //----------------------------------------------------------------------------
@@ -408,11 +456,19 @@ void CaptureThread::stopTimeLapse()
   MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   MARTY_LOG_INFO(cap_log, "{:<20} Stopping time-lapse writer", "CaptureThread");
   this->TimeLapseAVI_Writing = false;
+#ifdef MARTYCAM_USE_FFMPEG_TIMELAPSE
+  if (this->timeLapseFFmpegWriter && this->timeLapseFFmpegWriter->isOpen())
+  {
+    this->timeLapseFFmpegWriter->close();
+    MARTY_LOG_INFO(cap_log, "{:<20} Time-lapse FFmpeg writer released", "CaptureThread");
+  }
+#else
   if (this->TimeLapseAVI_Writer.isOpened())
   {
     this->TimeLapseAVI_Writer.release();
     MARTY_LOG_INFO(cap_log, "{:<20} Time-lapse writer released", "CaptureThread");
   }
+#endif
   //    emit(RecordingState(true));
 }
 

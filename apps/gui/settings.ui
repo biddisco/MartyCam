@@ -477,6 +477,32 @@
            </widget>
           </item>
           <item row="5" column="0" colspan="2">
+           <widget class="QLabel" name="label_18">
+            <property name="text">
+             <string>Bitrate (MB/s)</string>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="2" colspan="2">
+           <widget class="QDoubleSpinBox" name="timeLapseBitrateMBps">
+            <property name="decimals">
+             <number>2</number>
+            </property>
+            <property name="minimum">
+             <double>0.250000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>32.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.250000000000000</double>
+            </property>
+            <property name="value">
+             <double>4.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="7" column="0" colspan="2">
            <widget class="QPushButton" name="startTimeLapse">
             <property name="text">
              <string>Start Time Lapse</string>

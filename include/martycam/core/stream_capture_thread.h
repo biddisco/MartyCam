@@ -21,6 +21,7 @@
 #include "martycam/core/ConcurrentCircularBuffer.h"
 #include "martycam/core/fps_helper.h"
 #include "martycam/core/stream_buffer_recorder.hpp"
+#include "martycam/core/timelapse_ffmpeg_writer.h"
 
 #define IMAGE_QUEUE_LEN 1024
 
@@ -69,6 +70,7 @@ class StreamCaptureThread : public QObject
   //
   void addNextFrameToTimeLapse(bool write) { this->TimeLapseAVI_Writing = write; }
   void setWriteTimeLapseAVIName(char const* name);
+  void setTimeLapseBitrateMBps(double value) { this->TimeLapseBitrateMBps = value; }
 
   //
   // General
@@ -121,11 +123,13 @@ class StreamCaptureThread : public QObject
   ImageBuffer aviBuffer;
   //
   cv::VideoWriter TimeLapseAVI_Writer;
+  std::unique_ptr<TimeLapseFFmpegWriter> timeLapseFFmpegWriter;
   std::atomic<bool> MotionAVI_Writing;
   std::atomic<bool> aviWriterActive;
   std::string AVI_Directory;
   std::string MotionAVI_Name;
   std::string TimeLapseAVI_Name;
+  double TimeLapseBitrateMBps = 4.0;
   std::string CaptureStatus;
   std::string CameraURL;
   //

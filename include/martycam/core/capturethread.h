@@ -30,6 +30,7 @@ typedef std::shared_ptr<CaptureThread> CaptureThread_SP;
 //
 # include "ConcurrentCircularBuffer.h"
 # include "fps_helper.h"
+# include "timelapse_ffmpeg_writer.h"
 # define IMAGE_QUEUE_LEN 1024
 
 typedef boost::circular_buffer<int> IntCircBuff;
@@ -80,6 +81,7 @@ class CaptureThread : public QObject
   //
   void addNextFrameToTimeLapse(bool write) { this->TimeLapseAVI_Writing = write; }
   void setWriteTimeLapseAVIName(char const* name);
+  void setTimeLapseBitrateMBps(double value) { this->TimeLapseBitrateMBps = value; }
 
   //
   // General
@@ -137,11 +139,13 @@ class CaptureThread : public QObject
   //
   cv::VideoWriter MotionAVI_Writer;
   cv::VideoWriter TimeLapseAVI_Writer;
+  std::unique_ptr<TimeLapseFFmpegWriter> timeLapseFFmpegWriter;
   std::atomic<bool> MotionAVI_Writing;
   std::atomic<bool> aviWriterActive;
   std::string AVI_Directory;
   std::string MotionAVI_Name;
   std::string TimeLapseAVI_Name;
+  double TimeLapseBitrateMBps = 4.0;
   std::string CaptureStatus;
   std::string CameraURL;
   //

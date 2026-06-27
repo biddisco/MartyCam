@@ -54,6 +54,15 @@ if(MARTYCAM_USE_STREAM_CAPTURE)
   message(STATUS "Using stream_buffer_recorder based capture thread")
   add_compile_definitions(USE_STREAM_CAPTURE_THREAD)
 endif()
+
+# -----------------------------------------------------------------------------
+# Use FFmpeg encoder for timelapse output instead of OpenCV VideoWriter
+# -----------------------------------------------------------------------------
+option(MARTYCAM_USE_FFMPEG_TIMELAPSE "Use FFmpeg for timelapse video writing" OFF)
+if(MARTYCAM_USE_FFMPEG_TIMELAPSE)
+  message(STATUS "Using FFmpeg timelapse writer")
+  add_compile_definitions(MARTYCAM_USE_FFMPEG_TIMELAPSE)
+endif()
 # -----------------------------------------------------------------------------
 # Include GitExternal for cloning other repos internally
 # -----------------------------------------------------------------------------
@@ -243,8 +252,9 @@ endif()
 # Setup libs
 # -----------------------------------------------------------------------------
 # QWT is fetched via get_external_project() earlier in this file
-set(MARTYCAM_INCLUDE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/include
-                          ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_BINARY_DIR}/src)
+set(MARTYCAM_INCLUDE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src
+                          ${CMAKE_CURRENT_BINARY_DIR}/src
+)
 
 add_subdirectory(src/debug)
 add_subdirectory(src/core)
