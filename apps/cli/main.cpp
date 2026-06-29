@@ -11,7 +11,7 @@
 
 #include "debug/logging.hpp"
 #include "martycam/core/ConcurrentCircularBuffer.h"
-#include "martycam/core/capturethread.h"
+#include "martycam/core/stream_capture_thread.h"
 #include "martycam/core/stream_buffer_recorder.hpp"
 
 #ifdef __linux__
@@ -37,7 +37,7 @@ static int run_capture_fps_display(hpx::program_options::variables_map& vm,
   int const height = vm["height"].as<int>();
 
   ImageBuffer buffer(new ConcurrentCircularBuffer<cv::Mat>(5));
-  CaptureThread capture(buffer, cv::Size(width, height), 0, camera, exec, fps);
+  StreamCaptureThread capture(buffer, cv::Size(width, height), 0, camera, exec, fps);
 
   if (!capture.startCapture())
   {

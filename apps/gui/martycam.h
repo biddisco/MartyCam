@@ -8,11 +8,12 @@
 #include <QDebug>
 #include <QMainWindow>
 #include <QShowEvent>
+#include <QTimer>
 //
 #include <memory>
 #include <opencv2/core/core.hpp>
 //
-#include "martycam/core/capturethread.h"
+#include "martycam/core/stream_capture_thread.h"
 #include "martycam/core/processingthread.h"
 #include "martycam/widgets/renderwidget.h"
 #include "settings.h"
@@ -38,6 +39,9 @@ class MartyCam : public QMainWindow
 
   public slots:
   void updateGUI();
+  //
+  void onTimeLapseTick();
+  //
   void onRotationChanged(int rotation);
   void onUserTrackChanged(int value);
   void onRecordingStateChanged(bool state);
@@ -46,7 +50,7 @@ class MartyCam : public QMainWindow
   void onCameraConfigChanged(QString cameraPath, int width, int height, int fps, int fourcc);
 
   protected:
-  void closeEvent(QCloseEvent*);
+  void closeEvent(QCloseEvent*) override;
   void deleteCaptureThread();
   void createCaptureThread(cv::Size size, std::string const& cameraname, int fps, int fourcc,
       hpx::execution::parallel_executor exec);
@@ -70,6 +74,7 @@ class MartyCam : public QMainWindow
   // The tracking flag, initialized to false
   bool m_isFirstShow = false;
 
+  using CaptureThread_SP = std::shared_ptr<StreamCaptureThread>;
   CaptureThread_SP captureThread;
   ProcessingThread_SP processingThread;
 
@@ -87,7 +92,7 @@ class MartyCam : public QMainWindow
   double UserDetectionThreshold;
   int EventRecordCounter;
   int insideMotionEvent;
-  QDateTime lastTimeLapse;
+  QTimer timeLapseTimer;
 };
 
 #endif

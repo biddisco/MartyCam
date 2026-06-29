@@ -1,7 +1,7 @@
 #include "martycam/core/MotionFilter.h"
 #include "martycam/core/DecayFilter.h"
 #include "martycam/core/PSNRFilter.h"
-#include "martycam/core/capturethread.h"
+#include "martycam/core/stream_capture_thread.h"
 #include "martycam/core/filter.h"
 //
 #include <opencv2/core/core.hpp>
@@ -225,7 +225,7 @@ void MotionFilter::process(cv::Mat const& image)
     // Add time and data to image
     //
     QString timestring = QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm:ss");
-    CaptureThread::captionImage(shownImage);
+    StreamCaptureThread::captionImage(shownImage);
     //
     // Pass final image to GUI
     //

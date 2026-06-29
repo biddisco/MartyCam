@@ -56,14 +56,6 @@ if(MARTYCAM_USE_STREAM_CAPTURE)
 endif()
 
 # -----------------------------------------------------------------------------
-# Use FFmpeg encoder for timelapse output instead of OpenCV VideoWriter
-# -----------------------------------------------------------------------------
-option(MARTYCAM_USE_FFMPEG_TIMELAPSE "Use FFmpeg for timelapse video writing" OFF)
-if(MARTYCAM_USE_FFMPEG_TIMELAPSE)
-  message(STATUS "Using FFmpeg timelapse writer")
-  add_compile_definitions(MARTYCAM_USE_FFMPEG_TIMELAPSE)
-endif()
-# -----------------------------------------------------------------------------
 # Include GitExternal for cloning other repos internally
 # -----------------------------------------------------------------------------
 include(GitExternal)

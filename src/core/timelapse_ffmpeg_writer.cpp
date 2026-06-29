@@ -2,10 +2,13 @@
 
 #include <cmath>
 
+#include <mutex>
 #include <opencv2/imgproc.hpp>
 
+// ----------------------------------------------------------------------------
 TimeLapseFFmpegWriter::~TimeLapseFFmpegWriter() { this->close(); }
 
+// ----------------------------------------------------------------------------
 bool TimeLapseFFmpegWriter::open(
     std::string const& path, int width_, int height_, double fps, double bitrateMBps)
 {
@@ -170,46 +173,15 @@ bool TimeLapseFFmpegWriter::open(
     return false;
   }
 
-  this->opened = true;
   this->last_error.clear();
+  this->opened = true;
   return true;
 }
 
-bool TimeLapseFFmpegWriter::encodeFrame(AVFrame* frame_to_encode)
-{
-  if (avcodec_send_frame(this->codec_ctx, frame_to_encode) < 0)
-  {
-    this->setError("avcodec_send_frame failed");
-    return false;
-  }
-
-  while (true)
-  {
-    int const ret = avcodec_receive_packet(this->codec_ctx, this->packet);
-    if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
-    if (ret < 0)
-    {
-      this->setError("avcodec_receive_packet failed");
-      return false;
-    }
-
-    av_packet_rescale_ts(this->packet, this->codec_ctx->time_base, this->stream->time_base);
-    this->packet->stream_index = this->stream->index;
-
-    if (av_interleaved_write_frame(this->format_ctx, this->packet) < 0)
-    {
-      av_packet_unref(this->packet);
-      this->setError("av_interleaved_write_frame failed");
-      return false;
-    }
-    av_packet_unref(this->packet);
-  }
-
-  return true;
-}
-
+// ----------------------------------------------------------------------------
 bool TimeLapseFFmpegWriter::write(cv::Mat const& image)
 {
+  std::lock_guard<mutex_type> lock(this->writer_lock);
   if (!this->opened)
   {
     this->setError("writer not open");
@@ -247,8 +219,47 @@ bool TimeLapseFFmpegWriter::write(cv::Mat const& image)
   return this->encodeFrame(this->frame);
 }
 
+// ----------------------------------------------------------------------------
+bool TimeLapseFFmpegWriter::encodeFrame(AVFrame* frame_to_encode)
+{
+  this->lastWriteTime = std::chrono::system_clock::now();
+
+  // don't take lock here, already taken in write() and close()
+  if (avcodec_send_frame(this->codec_ctx, frame_to_encode) < 0)
+  {
+    this->setError("avcodec_send_frame failed");
+    return false;
+  }
+
+  while (true)
+  {
+    int const ret = avcodec_receive_packet(this->codec_ctx, this->packet);
+    if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
+    if (ret < 0)
+    {
+      this->setError("avcodec_receive_packet failed");
+      return false;
+    }
+
+    av_packet_rescale_ts(this->packet, this->codec_ctx->time_base, this->stream->time_base);
+    this->packet->stream_index = this->stream->index;
+
+    if (av_interleaved_write_frame(this->format_ctx, this->packet) < 0)
+    {
+      av_packet_unref(this->packet);
+      this->setError("av_interleaved_write_frame failed");
+      return false;
+    }
+    av_packet_unref(this->packet);
+  }
+
+  return true;
+}
+
+// ----------------------------------------------------------------------------
 void TimeLapseFFmpegWriter::close()
 {
+  std::lock_guard<mutex_type> lock(this->writer_lock);
   if (this->codec_ctx && this->opened) { this->encodeFrame(nullptr); }
 
   if (this->format_ctx && this->opened) { av_write_trailer(this->format_ctx); }

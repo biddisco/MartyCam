@@ -141,7 +141,7 @@ void SettingsWidget::createCameraSelector()
 }
 
 //----------------------------------------------------------------------------
-void SettingsWidget::setThreads(CaptureThread_SP capthread, ProcessingThread_SP procthread)
+void SettingsWidget::setThreads(StreamCaptureThread_SP capthread, ProcessingThread_SP procthread)
 {
   this->capturethread = capthread;
   this->processingthread = procthread;
@@ -276,14 +276,16 @@ FaceRecogFilterParams SettingsWidget::getFaceRecogFilterParams()
 void SettingsWidget::SetupAVIStrings()
 {
   QString filePath = this->ui.avi_directory->text();
-  QString timeLapsePath = this->ui.avi_directory_TL->text();
   QString fileName = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
   this->capturethread->setWriteMotionAVIName(fileName.toLatin1().constData());
   this->capturethread->setWriteMotionAVIDir(filePath.toLatin1().constData());
+  //
+  QString timeLapsePath = this->ui.avi_directory_TL->text();
   QString fileName2 = "TimeLapse-" + QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
-  this->capturethread->setWriteMotionAVIDir(timeLapsePath.toLatin1().constData());
   this->capturethread->setWriteTimeLapseAVIName(fileName2.toLatin1().constData());
+  this->capturethread->setWriteTimeLapseAVIDir(timeLapsePath.toLatin1().constData());
   this->capturethread->setTimeLapseBitrateMBps(this->TimeLapseBitrateMBps());
+  //
   MARTY_LOG_INFO(settings_log, "{:<20} Time-lapse output configured: dir='{}', name='{}'",
       "SettingsWidget", timeLapsePath.toStdString(), fileName2.toStdString());
 }
@@ -456,10 +458,19 @@ void SettingsWidget::loadSettings()
       ->setText(settings.value("aviDirectory", this->ui.avi_directory->text()).toString());
   SilentCall(this->ui.timeLapseBitrateMBps)
       ->setValue(settings.value("bitrateMBps", 4.0).toDouble());
-  SilentCall(this->ui.startDateTime)
-      ->setDateTime(
-          settings.value("startDateTime", QDateTime(QDate::currentDate(), QTime::currentTime()))
-              .toDateTime());
+  auto start =
+      settings.value("startDateTime", QDateTime(QDate::currentDate(), QTime::currentTime()))
+          .toDateTime();
+  if (start < QDateTime::currentDateTime())
+  {
+    start = QDateTime::currentDateTime();
+    // set start time to beginning of last hour
+    start.setTime(QTime(start.time().hour(), 0, 0));
+    MARTY_LOG_WARN(settings_log,
+        "{:<20} Time-lapse start time was in the past, resetting to current time: {}",
+        "SettingsWidget", start.toString(Qt::ISODate).toStdString());
+  }
+  SilentCall(this->ui.startDateTime)->setDateTime(start);
   SilentCall(this->ui.interval)->setTime(settings.value("interval", QTime(0, 1, 00)).toTime());
   SilentCall(this->ui.duration)
       ->setTime(settings.value("duration", QDateTime(QDate(0, 0, 1), QTime(0, 1, 0))).toTime());
@@ -490,6 +501,13 @@ void SettingsWidget::onSnapClicked()
 }
 
 //----------------------------------------------------------------------------
+void SettingsWidget::ShowTimeLapseState(bool active)
+{
+  if (active) { this->ui.timelapse_group->setStyleSheet("QCheckBox { background-color: green; }"); }
+  else { this->ui.timelapse_group->setStyleSheet("QCheckBox { background-color: window; }"); }
+}
+
+//----------------------------------------------------------------------------
 void SettingsWidget::onStartTimeLapseClicked()
 {
   if (!this->capturethread)
@@ -504,17 +522,20 @@ void SettingsWidget::onStartTimeLapseClicked()
 
   if (startRequested)
   {
+    this->ui.startTimeLapse->setText("Stop Time-lapse");
     this->ui.startDateTime->setDateTime(QDateTime::currentDateTime());
 
     if (this->TimeLapseEnd() <= this->TimeLapseStart())
     {
       // Ensure a valid capture window when users click Start without adjusting duration.
-      this->ui.duration->setDateTime(QDateTime(QDate(1999, 12, 29), QTime(0, 1, 0)));
+      // 1999-12-29 is the "zero" date for QDateTime, so we use it to detect invalid durations.
+      this->ui.duration->setDateTime(QDateTime(QDate(1999, 12, 29), QTime(1, 0, 0)));
       MARTY_LOG_WARN(settings_log,
-          "{:<20} Time-lapse duration was zero/invalid, defaulting to 00:01:00", "SettingsWidget");
+          "{:<20} Time-lapse duration was zero/invalid, defaulting to 01:00:00", "SettingsWidget");
     }
 
-    this->capturethread->setTimeLapseBitrateMBps(this->TimeLapseBitrateMBps());
+    this->SetupAVIStrings();
+    this->ShowTimeLapseState(true);
 
     QString const dir = this->ui.avi_directory_TL->text();
     MARTY_LOG_INFO(settings_log,
@@ -525,10 +546,13 @@ void SettingsWidget::onStartTimeLapseClicked()
         this->TimeLapseFPS(), this->TimeLapseBitrateMBps(), dir.toStdString(),
         this->TimeLapseStart().toString(Qt::ISODate).toStdString(),
         this->TimeLapseEnd().toString(Qt::ISODate).toStdString());
+    // set timelapse going in the capture thread
+    this->capturethread->startTimeLapse(TimeLapseFPS());
   }
   else
   {
     this->capturethread->stopTimeLapse();
+    this->ui.startTimeLapse->setText("Start Time-lapse");
     MARTY_LOG_INFO(settings_log, "{:<20} Time-lapse STOP requested by user", "SettingsWidget");
   }
 }

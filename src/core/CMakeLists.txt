@@ -3,12 +3,6 @@
 # dependency — suitable for CLI applications.
 # -----------------------------------------------------------------------------
 
-if(MARTYCAM_USE_STREAM_CAPTURE)
-  set(capture_source stream_capture_thread.cpp)
-else()
-  set(capture_source capturethread.cpp)
-endif()
-
 set(martycam_core_SRCS
     ${capture_source}
     camera_utils.cpp
@@ -20,14 +14,10 @@ set(martycam_core_SRCS
     FaceRecogFilter.cpp
     processingthread.cpp
     stream_buffer_recorder.cpp
+    stream_capture_thread.cpp
     ${CMAKE_SOURCE_DIR}/include/martycam/core/processingthread.h
+    ${CMAKE_SOURCE_DIR}/include/martycam/core/stream_capture_thread.h
 )
-
-if(MARTYCAM_USE_STREAM_CAPTURE)
-  list(APPEND martycam_core_SRCS ${CMAKE_SOURCE_DIR}/include/martycam/core/stream_capture_thread.h)
-else()
-  list(APPEND martycam_core_SRCS ${CMAKE_SOURCE_DIR}/include/martycam/core/capturethread.h)
-endif()
 
 add_library(martycam_core ${martycam_core_SRCS})
 

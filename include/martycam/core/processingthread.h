@@ -7,6 +7,7 @@
 //
 #include <QMutex>
 #include <QWaitCondition>
+#include <atomic>
 //
 #include <QtCore/QObject>
 #include <opencv2/core/core.hpp>
@@ -71,10 +72,10 @@ class ProcessingThread : public QObject
 
   void setMotionDetectionProcessing();
   void setFaceRecognitionProcessing();
-  void setMotionDetectionEnabled(bool enabled) { this->motionDetectionEnabled = enabled; }
-  void setFaceRecognitionEnabled(bool enabled) { this->faceRecognitionEnabled = enabled; }
-  bool isMotionDetectionEnabled() const { return this->motionDetectionEnabled; }
-  bool isFaceRecognitionEnabled() const { return this->faceRecognitionEnabled; }
+  void setMotionDetectionEnabled(bool enabled) { this->motionDetectionEnabled.store(enabled); }
+  void setFaceRecognitionEnabled(bool enabled) { this->faceRecognitionEnabled.store(enabled); }
+  bool isMotionDetectionEnabled() const { return this->motionDetectionEnabled.load(); }
+  bool isFaceRecognitionEnabled() const { return this->faceRecognitionEnabled.load(); }
   MotionFilter_SP motionFilter;
   FaceRecogFilter_SP faceRecogFilter;
 
@@ -97,9 +98,9 @@ class ProcessingThread : public QObject
   hpx::execution::parallel_executor executor;
   //
   ImageBuffer imageBuffer;
-  ProcessingType processingType;
-  bool motionDetectionEnabled = true;
-  bool faceRecognitionEnabled = true;
+  std::atomic<ProcessingType> processingType;
+  std::atomic<bool> motionDetectionEnabled{true};
+  std::atomic<bool> faceRecognitionEnabled{true};
   rolling_average processingTime;
 };
 

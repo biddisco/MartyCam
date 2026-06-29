@@ -63,12 +63,12 @@ void ProcessingThread::CopySettings(ProcessingThread* thread)
 void ProcessingThread::setMotionDetectionProcessing()
 {
   MARTY_LOG_SCOPE(process_log, "{} {}", (void*) (this), __func__);
-  this->processingType = ProcessingType::motionDetection;
+  this->processingType.store(ProcessingType::motionDetection);
 }
 void ProcessingThread::setFaceRecognitionProcessing()
 {
   MARTY_LOG_SCOPE(process_log, "{} {}", (void*) (this), __func__);
-  this->processingType = ProcessingType::faceRecognition;
+  this->processingType.store(ProcessingType::faceRecognition);
 }
 
 //----------------------------------------------------------------------------
@@ -90,27 +90,48 @@ void ProcessingThread::run()
       hpx::this_thread::yield();
       continue;
     }
-    cv::Mat cameracopy = cameraImage.clone();
-
     this->processingTime.restart();
-    switch (this->processingType)
-    {
-    case ProcessingType::motionDetection:
-      if (!this->motionDetectionEnabled) break;
-      this->motionFilter->process(cameracopy);
+    bool const motionEnabled = this->motionDetectionEnabled.load();
+    bool const faceEnabled = this->faceRecognitionEnabled.load();
 
+    if (!motionEnabled && !faceEnabled)
+    {
+      // Keep preview alive even when all processing pipelines are disabled.
+      if (this->motionFilter->renderer) { this->motionFilter->renderer->process(cameraImage); }
+      this->processingTime.tick();
+      emit(NewData());
+      continue;
+    }
+
+    ProcessingType const preferred = this->processingType.load();
+    bool const runMotionFirst = (preferred == ProcessingType::motionDetection) || !faceEnabled;
+
+    auto runMotion = [&]() {
+      cv::Mat motionFrame = cameraImage.clone();
+      this->motionFilter->process(motionFrame);
       this->graphFilter->process(this->motionFilter->PSNR_Filter->PSNR,
           this->motionFilter->logMotion, this->motionFilter->normalizedMotion,
           this->motionFilter->rollingMean, this->motionFilter->decayFilter->mavg10.getLastResult(),
           this->motionFilter->decayFilter->mavg1.getLastResult(), framenum++,
           this->motionFilter->triggerLevel, this->motionFilter->eventLevel);
+    };
 
-      break;
-    case ProcessingType::faceRecognition:
-      if (!this->faceRecognitionEnabled) break;
-      this->faceRecogFilter->process(cameracopy);
-      break;
+    auto runFace = [&]() {
+      cv::Mat faceFrame = cameraImage.clone();
+      this->faceRecogFilter->process(faceFrame);
+    };
+
+    if (runMotionFirst)
+    {
+      if (motionEnabled) runMotion();
+      if (faceEnabled) runFace();
     }
+    else
+    {
+      if (faceEnabled) runFace();
+      if (motionEnabled) runMotion();
+    }
+
     this->processingTime.tick();
     emit(NewData());
   }

@@ -16,8 +16,10 @@
 #include <boost/lockfree/spsc_queue.hpp>
 #include <memory>
 //
+#include <hpx/future.hpp>
 #include <hpx/include/parallel_executors.hpp>
 //
+#include <vector>
 #include "martycam/core/ConcurrentCircularBuffer.h"
 #include "martycam/core/fps_helper.h"
 #include "martycam/core/stream_buffer_recorder.hpp"
@@ -30,6 +32,9 @@ typedef std::shared_ptr<ConcurrentCircularBuffer<cv::Mat>> ImageBuffer;
 typedef std::shared_ptr<
     boost::lockfree::spsc_queue<cv::Mat, boost::lockfree::capacity<IMAGE_QUEUE_LEN>>>
     ImageQueue;
+
+class StreamCaptureThread;
+typedef std::shared_ptr<StreamCaptureThread> StreamCaptureThread_SP;
 
 class StreamCaptureThread : public QObject
 {
@@ -71,11 +76,16 @@ class StreamCaptureThread : public QObject
   void addNextFrameToTimeLapse(bool write) { this->TimeLapseAVI_Writing = write; }
   void setWriteTimeLapseAVIName(char const* name);
   void setTimeLapseBitrateMBps(double value) { this->TimeLapseBitrateMBps = value; }
+  std::chrono::system_clock::time_point getLastTimeLapseWriteTime()
+  {
+    return this->timeLapseFFmpegWriter->getLastWriteTime();
+  }
 
   //
   // General
   //
   void setWriteMotionAVIDir(char const* dir);
+  void setWriteTimeLapseAVIDir(char const* dir);
   void closeAVI();
 
   void saveTimeLapseAVI(cv::Mat image);
@@ -122,12 +132,13 @@ class StreamCaptureThread : public QObject
   int motion_video_FrameCounter;
   ImageBuffer aviBuffer;
   //
-  cv::VideoWriter TimeLapseAVI_Writer;
-  std::unique_ptr<TimeLapseFFmpegWriter> timeLapseFFmpegWriter;
+  //   cv::VideoWriter TimeLapseAVI_Writer;
+  std::shared_ptr<TimeLapseFFmpegWriter> timeLapseFFmpegWriter;
   std::atomic<bool> MotionAVI_Writing;
   std::atomic<bool> aviWriterActive;
   std::string AVI_Directory;
   std::string MotionAVI_Name;
+  std::string TimeLapse_Directory;
   std::string TimeLapseAVI_Name;
   double TimeLapseBitrateMBps = 4.0;
   std::string CaptureStatus;

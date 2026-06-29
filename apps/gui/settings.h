@@ -7,7 +7,8 @@
 #include <QTimer>
 //
 #include "martycam/core/MotionFilter.h"
-#include "martycam/core/capturethread.h"
+#include "martycam/core/stream_capture_thread.h"
+
 #include "martycam/core/processingthread.h"
 #include "martycam/widgets/CameraSelectorWidget.h"
 //
@@ -61,7 +62,7 @@ class SettingsWidget : public QWidget
 
   void RecordMotionAVI(bool state);
 
-  void setThreads(CaptureThread_SP capthread, ProcessingThread_SP procthread);
+  void setThreads(StreamCaptureThread_SP capthread, ProcessingThread_SP procthread);
   void unsetCaptureThread();
   void unsetProcessingThread();
   void setRenderWidget(RenderWidget* rw) { this->renderWidget = rw; }
@@ -70,10 +71,13 @@ class SettingsWidget : public QWidget
 
   QDateTime TimeLapseStart();
   QDateTime TimeLapseEnd();
+  // The interval is just a datetime hh:mm:ss but we just get the msecs since o0:00:00
   qint64 TimeLapseInterval() { return this->ui.interval->time().msecsSinceStartOfDay(); }
   double TimeLapseFPS() { return this->ui.timeLapseFPS->value(); }
   double TimeLapseBitrateMBps() { return this->ui.timeLapseBitrateMBps->value(); }
   bool TimeLapseEnabled() { return this->ui.timeLapseEnabled->isChecked(); }
+  void ShowTimeLapseState(bool active);
+  //
   bool MotionProcessingEnabled() { return this->ui.motionProcessingEnabled->isChecked(); }
   bool FaceProcessingEnabled() { return this->ui.faceProcessingEnabled->isChecked(); }
 
@@ -119,7 +123,7 @@ class SettingsWidget : public QWidget
   QString decimationCoeffToQString(int sliderVal);
 
   Ui::SettingsWidget ui;
-  CaptureThread_SP capturethread;
+  StreamCaptureThread_SP capturethread;
   ProcessingThread_SP processingthread;
   QElapsedTimer AVI_StartTime;
   QTime AVI_EndTime;
