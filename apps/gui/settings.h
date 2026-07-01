@@ -77,6 +77,7 @@ class SettingsWidget : public QWidget
   double TimeLapseBitrateMBps() { return this->ui.timeLapseBitrateMBps->value(); }
   bool TimeLapseEnabled() { return this->ui.timeLapseEnabled->isChecked(); }
   void ShowTimeLapseState(bool active);
+  void setTimeLapseRunningUi(bool running);
   //
   bool MotionProcessingEnabled() { return this->ui.motionProcessingEnabled->isChecked(); }
   bool FaceProcessingEnabled() { return this->ui.faceProcessingEnabled->isChecked(); }
@@ -105,6 +106,7 @@ class SettingsWidget : public QWidget
   //
   void onSnapClicked();
   void onStartTimeLapseClicked();
+  void onTimeLapseEnabledToggled(bool enabled);
   //
   void onTabChanged(int);
   void onProcessingEnableToggled(bool);
@@ -113,6 +115,7 @@ class SettingsWidget : public QWidget
   void loadSettings();
   void saveSettings();
   void SetupAVIStrings();
+  void syncTimeLapseSettingsToCaptureThread();
   void applyProcessingEnableState();
 
   signals:

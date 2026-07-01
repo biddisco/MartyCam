@@ -22,8 +22,6 @@
 #include "debug/logging.hpp"
 #include "martycam/core/camera_utils.h"
 
-// ----------------------------------------------------------------------------
-static auto cap_log = martycam::log::create("StreamCapture");
 //
 typedef std::shared_ptr<ConcurrentCircularBuffer<cv::Mat>> ImageBuffer;
 
@@ -59,6 +57,7 @@ StreamCaptureThread::StreamCaptureThread(ImageBuffer imageBuffer, cv::Size const
   , deInterlace(false)
   , MotionAVI_Writing(false)
   , aviWriterActive(false)
+  , timeLapseFFmpegWriter(std::make_shared<TimeLapseFFmpegWriter>())
   , rotatedImage()
   , rotatedSize(cv::Size(0, 0))
   , streamRecorder(std::make_unique<stream_buffer_recorder>(
@@ -350,7 +349,12 @@ void StreamCaptureThread::saveTimeLapseAVI(cv::Mat image)
 void StreamCaptureThread::startTimeLapse(double fps)
 {
   MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
-  if (this->AVI_Directory.empty() || this->TimeLapseAVI_Name.empty())
+  if (!this->timeLapseFFmpegWriter)
+  {
+    this->timeLapseFFmpegWriter = std::make_shared<TimeLapseFFmpegWriter>();
+  }
+
+  if (!this->timeLapseFFmpegWriter->validateSettings())
   {
     MARTY_LOG_ERROR(cap_log,
         "{:<20} Cannot create time-lapse writer: directory or filename is empty",
@@ -359,22 +363,8 @@ void StreamCaptureThread::startTimeLapse(double fps)
     return;
   }
 
-  std::string expandedDir = expandPath(this->TimeLapse_Directory);
-  std::filesystem::path dirPath(expandedDir);
-  if (!std::filesystem::exists(dirPath))
-  {
-    if (!std::filesystem::create_directories(dirPath))
-    {
-      MARTY_LOG_ERROR(cap_log,
-          "{:<20} Cannot create time-lapse writer: failed to create directory {}",
-          "StreamCaptureThread", expandedDir);
-      this->TimeLapseAVI_Writing = false;
-      return;
-    }
-  }
-
-  std::string path = expandedDir + "/" + this->TimeLapseAVI_Name + std::string(".mp4");
-  cv::Size frameSize = this->getImageSize();
+  std::string const path = this->timeLapseFFmpegWriter->buildOutputPath();
+  cv::Size const frameSize = this->getImageSize();
   if (frameSize.width <= 0 || frameSize.height <= 0)
   {
     MARTY_LOG_ERROR(cap_log, "{:<20} Cannot create time-lapse writer: invalid frame size {}x{}",
@@ -383,16 +373,19 @@ void StreamCaptureThread::startTimeLapse(double fps)
     return;
   }
 
+  if (path.empty())
+  {
+    MARTY_LOG_ERROR(cap_log, "{:<20} Cannot create time-lapse writer: output path is empty",
+        "StreamCaptureThread");
+    this->TimeLapseAVI_Writing = false;
+    return;
+  }
+
   MARTY_LOG_INFO(cap_log, "{:<20} Opening time-lapse writer: path='{}', fps={:0.2f}, size={}x{}",
       "StreamCaptureThread", path, fps, frameSize.width, frameSize.height);
 
-  if (!this->timeLapseFFmpegWriter)
-  {
-    this->timeLapseFFmpegWriter = std::make_shared<TimeLapseFFmpegWriter>();
-  }
-
-  if (!this->timeLapseFFmpegWriter->open(
-          path, frameSize.width, frameSize.height, fps, this->TimeLapseBitrateMBps))
+  if (!this->timeLapseFFmpegWriter->open(path, frameSize.width, frameSize.height, fps,
+          this->timeLapseFFmpegWriter->getBitrateMBps()))
   {
     MARTY_LOG_ERROR(cap_log, "{:<20} Failed to open FFmpeg timelapse writer: {}",
         "StreamCaptureThread", this->timeLapseFFmpegWriter->lastError());
@@ -409,6 +402,7 @@ void StreamCaptureThread::stopTimeLapse()
 {
   MARTY_LOG_SCOPE(cap_log, "{} {}", (void*) (this), __func__);
   MARTY_LOG_INFO(cap_log, "{:<20} Stopping time-lapse writer", "StreamCaptureThread");
+  this->TimeLapseAVI_Writing = false;
   if (this->timeLapseFFmpegWriter && this->timeLapseFFmpegWriter->isOpen())
   {
     this->timeLapseFFmpegWriter->close();
@@ -437,12 +431,68 @@ void StreamCaptureThread::setWriteMotionAVIDir(char const* dir) { this->AVI_Dire
 void StreamCaptureThread::setWriteMotionAVIName(char const* name) { this->MotionAVI_Name = name; }
 
 //----------------------------------------------------------------------------
-void StreamCaptureThread::setWriteTimeLapseAVIDir(char const* dir) { this->TimeLapse_Directory = dir; }
+void StreamCaptureThread::setWriteTimeLapseAVIDir(char const* dir)
+{
+  if (!this->timeLapseFFmpegWriter)
+  {
+    this->timeLapseFFmpegWriter = std::make_shared<TimeLapseFFmpegWriter>();
+  }
+  this->timeLapseFFmpegWriter->setOutputDirectory(dir ? expandPath(dir) : std::string());
+}
 
 //----------------------------------------------------------------------------
 void StreamCaptureThread::setWriteTimeLapseAVIName(char const* name)
 {
-  this->TimeLapseAVI_Name = name;
+  if (!this->timeLapseFFmpegWriter)
+  {
+    this->timeLapseFFmpegWriter = std::make_shared<TimeLapseFFmpegWriter>();
+  }
+  this->timeLapseFFmpegWriter->setOutputFileName(name ? std::string(name) : std::string());
+}
+
+//----------------------------------------------------------------------------
+void StreamCaptureThread::applyTimeLapseConfig(
+    std::string const& directory, double bitrateMBps, std::uint64_t frameIntervalMs, double fps)
+{
+  if (!this->timeLapseFFmpegWriter)
+  {
+    this->timeLapseFFmpegWriter = std::make_shared<TimeLapseFFmpegWriter>();
+  }
+
+  this->timeLapseFFmpegWriter->setOutputDirectory(expandPath(directory));
+  this->timeLapseFFmpegWriter->setBitrateMBps(bitrateMBps);
+  this->timeLapseFFmpegWriter->setFrameInterval(frameIntervalMs);
+  this->timeLapseFFmpegWriter->setFPS(fps);
+}
+
+//----------------------------------------------------------------------------
+void StreamCaptureThread::setTimeLapseBitrateMBps(double value)
+{
+  if (!this->timeLapseFFmpegWriter)
+  {
+    this->timeLapseFFmpegWriter = std::make_shared<TimeLapseFFmpegWriter>();
+  }
+  this->timeLapseFFmpegWriter->setBitrateMBps(value);
+}
+
+//----------------------------------------------------------------------------
+void StreamCaptureThread::setTimeLapseFrameIntervalMs(std::uint64_t value)
+{
+  if (!this->timeLapseFFmpegWriter)
+  {
+    this->timeLapseFFmpegWriter = std::make_shared<TimeLapseFFmpegWriter>();
+  }
+  this->timeLapseFFmpegWriter->setFrameInterval(value);
+}
+
+//----------------------------------------------------------------------------
+void StreamCaptureThread::setTimeLapseFPS(double value)
+{
+  if (!this->timeLapseFFmpegWriter)
+  {
+    this->timeLapseFFmpegWriter = std::make_shared<TimeLapseFFmpegWriter>();
+  }
+  this->timeLapseFFmpegWriter->setFPS(value);
 }
 
 //----------------------------------------------------------------------------

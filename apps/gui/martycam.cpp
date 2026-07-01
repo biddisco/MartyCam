@@ -292,35 +292,39 @@ void MartyCam::onTimeLapseTick()
         start.toString(Qt::ISODate).toStdString(), stop.toString(Qt::ISODate).toStdString(), 0,
         this->settingsWidget->TimeLapseFPS());
     this->settingsWidget->SetupAVIStrings();
-    this->settingsWidget->ShowTimeLapseState(true);
+    this->settingsWidget->setTimeLapseRunningUi(true);
     this->captureThread->startTimeLapse(this->settingsWidget->TimeLapseFPS());
     this->captureThread->updateTimeLapse();
   }
 
   if (this->captureThread->TimeLapseAVI_Writing)
   {
-    // The next frame should be captured if the current time is greater than or equal to
-    // the last time a frame was captured plus the interval.
-    int const secs =
-        std::max(1, static_cast<int>(this->settingsWidget->TimeLapseInterval() / 1000));
-
-    std::chrono::system_clock::time_point const lastTimeLapse =
-        this->captureThread->getLastTimeLapseWriteTime();
-
-    // Convert to milliseconds since epoch
-    auto duration = lastTimeLapse.time_since_epoch();
-    auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-    // Create QDateTime (defaults to UTC)
-    QDateTime qdt = QDateTime::fromMSecsSinceEpoch(millis);
-    // Convert to local time if needed
-    qdt.setTimeZone(QTimeZone::systemTimeZone());
-    QDateTime const next = qdt.addSecs(secs);
-
-    // the timelapse might have been started manually, or automatically
-    if ((now >= next) && (now < stop))
+    std::shared_ptr<TimeLapseFFmpegWriter> writer = this->captureThread->timeLapseWriter();
+    if (!writer)
     {
-      MARTY_LOG_TRACE(marty_log, "{:<20} Time-lapse frame requested at {}", "MartyCam",
-          now.toString(Qt::ISODate).toStdString());
+      MARTY_LOG_WARN(marty_log,
+          "{:<20} Time-lapse writer unavailable while recording; skipping tick", "MartyCam");
+      return;
+    }
+
+    // Quantize by elapsed wall-clock time from start, not from the last write,
+    // to prevent drift from scheduler jitter.
+    qint64 const intervalMs =
+        std::max<qint64>(1000, static_cast<qint64>(writer->getFrameInterval()));
+    qint64 const elapsedMs = std::max<qint64>(0, start.msecsTo(now));
+    std::uint64_t const dueSlots = static_cast<std::uint64_t>(elapsedMs / intervalMs) + 1;
+
+    std::uint64_t const writtenFrames = writer->getFrameNumber();
+
+    // Request a frame when we're behind the slot count. This naturally catches up
+    // after delayed ticks and keeps frame times aligned to start + N*interval.
+    if ((now < stop) && (writtenFrames < dueSlots))
+    {
+      MARTY_LOG_TRACE(marty_log,
+          "{:<20} Time-lapse frame requested at {} (written={}, due={}, elapsed_ms={}, "
+          "interval_ms={})",
+          "MartyCam", now.toString(Qt::ISODate).toStdString(), writtenFrames, dueSlots, elapsedMs,
+          intervalMs);
       this->captureThread->updateTimeLapse();
       return;
     }
@@ -331,6 +335,7 @@ void MartyCam::onTimeLapseTick()
       MARTY_LOG_INFO(marty_log, "{:<20} Stopping time-lapse: now={}, stop={}", "MartyCam",
           now.toString(Qt::ISODate).toStdString(), stop.toString(Qt::ISODate).toStdString());
       this->captureThread->stopTimeLapse();
+      this->settingsWidget->setTimeLapseRunningUi(false);
     }
   }
 }

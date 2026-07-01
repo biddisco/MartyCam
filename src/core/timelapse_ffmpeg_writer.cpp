@@ -23,6 +23,8 @@ bool TimeLapseFFmpegWriter::open(
   this->width = width_;
   this->height = height_;
   this->frame_index = 0;
+  this->frame_counter = 0;
+  this->lastWriteTime = std::chrono::system_clock::now();
 
   if (avformat_alloc_output_context2(&this->format_ctx, nullptr, nullptr, path.c_str()) < 0 ||
       !this->format_ctx)
@@ -250,6 +252,7 @@ bool TimeLapseFFmpegWriter::encodeFrame(AVFrame* frame_to_encode)
       this->setError("av_interleaved_write_frame failed");
       return false;
     }
+    if (frame_to_encode != nullptr) { ++this->frame_counter; }
     av_packet_unref(this->packet);
   }
 

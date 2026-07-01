@@ -18,6 +18,7 @@
 #include <QString>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/highgui/highgui_c.h>
+#include <wordexp.h>
 //
 // we need these to get access to videoInput
 // Caution: including cpp file here as routines are not exported from openCV
@@ -26,6 +27,19 @@
 
 // ----------------------------------------------------------------------------
 static auto settings_log = martycam::log::create("Settings");
+
+// Expand shell-style variables and ~ in a path (e.g. $HOME/wildlife -> /home/user/wildlife)
+static std::string expandPath(std::string const& path)
+{
+  wordexp_t p;
+  if (wordexp(path.c_str(), &p, WRDE_NOCMD) == 0)
+  {
+    std::string result(p.we_wordv[0]);
+    wordfree(&p);
+    return result;
+  }
+  return path;
+}
 
 //----------------------------------------------------------------------------
 SettingsWidget::SettingsWidget(QWidget* parent)
@@ -73,6 +87,8 @@ SettingsWidget::SettingsWidget(QWidget* parent)
   //
   connect(ui.snapButton, SIGNAL(clicked()), this, SLOT(onSnapClicked()), Qt::QueuedConnection);
   connect(ui.startTimeLapse, SIGNAL(clicked()), this, SLOT(onStartTimeLapseClicked()),
+      Qt::QueuedConnection);
+  connect(ui.timeLapseEnabled, SIGNAL(toggled(bool)), this, SLOT(onTimeLapseEnabledToggled(bool)),
       Qt::QueuedConnection);
   connect(ui.motionProcessingEnabled, SIGNAL(toggled(bool)), this,
       SLOT(onProcessingEnableToggled(bool)), Qt::QueuedConnection);
@@ -145,6 +161,9 @@ void SettingsWidget::setThreads(StreamCaptureThread_SP capthread, ProcessingThre
 {
   this->capturethread = capthread;
   this->processingthread = procthread;
+
+  this->syncTimeLapseSettingsToCaptureThread();
+
   this->applyProcessingEnableState();
 }
 
@@ -281,13 +300,25 @@ void SettingsWidget::SetupAVIStrings()
   this->capturethread->setWriteMotionAVIDir(filePath.toLatin1().constData());
   //
   QString timeLapsePath = this->ui.avi_directory_TL->text();
-  QString fileName2 = "TimeLapse-" + QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
-  this->capturethread->setWriteTimeLapseAVIName(fileName2.toLatin1().constData());
-  this->capturethread->setWriteTimeLapseAVIDir(timeLapsePath.toLatin1().constData());
-  this->capturethread->setTimeLapseBitrateMBps(this->TimeLapseBitrateMBps());
+  QString timeLapseName =
+      "TimeLapse-" + QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
+  std::shared_ptr<TimeLapseFFmpegWriter> timeLapseWriter = this->capturethread->timeLapseWriter();
+  timeLapseWriter->setOutputFileName(timeLapseName.toLatin1().constData());
+
+  this->syncTimeLapseSettingsToCaptureThread();
   //
   MARTY_LOG_INFO(settings_log, "{:<20} Time-lapse output configured: dir='{}', name='{}'",
-      "SettingsWidget", timeLapsePath.toStdString(), fileName2.toStdString());
+      "SettingsWidget", timeLapsePath.toStdString(), timeLapseName.toStdString());
+}
+
+//----------------------------------------------------------------------------
+void SettingsWidget::syncTimeLapseSettingsToCaptureThread()
+{
+  if (!this->capturethread) return;
+
+  this->capturethread->applyTimeLapseConfig(
+      expandPath(this->ui.avi_directory_TL->text().toStdString()), this->TimeLapseBitrateMBps(),
+      static_cast<std::uint64_t>(this->TimeLapseInterval()), this->TimeLapseFPS());
 }
 
 //----------------------------------------------------------------------------
@@ -475,6 +506,8 @@ void SettingsWidget::loadSettings()
   SilentCall(this->ui.duration)
       ->setTime(settings.value("duration", QDateTime(QDate(0, 0, 1), QTime(0, 1, 0))).toTime());
   settings.endGroup();
+
+  this->syncTimeLapseSettingsToCaptureThread();
 }
 
 //----------------------------------------------------------------------------
@@ -508,6 +541,26 @@ void SettingsWidget::ShowTimeLapseState(bool active)
 }
 
 //----------------------------------------------------------------------------
+void SettingsWidget::setTimeLapseRunningUi(bool running)
+{
+  this->ui.startTimeLapse->setChecked(running);
+  this->ui.startTimeLapse->setText(running ? "Stop Time-lapse" : "Start Time-lapse");
+  this->ShowTimeLapseState(running);
+}
+
+//----------------------------------------------------------------------------
+void SettingsWidget::onTimeLapseEnabledToggled(bool enabled)
+{
+  if (!enabled && this->capturethread && this->capturethread->TimeLapseAVI_Writing)
+  {
+    MARTY_LOG_INFO(settings_log,
+        "{:<20} Time-lapse auto-enable unchecked while running; stopping now", "SettingsWidget");
+    this->capturethread->stopTimeLapse();
+    this->setTimeLapseRunningUi(false);
+  }
+}
+
+//----------------------------------------------------------------------------
 void SettingsWidget::onStartTimeLapseClicked()
 {
   if (!this->capturethread)
@@ -522,7 +575,7 @@ void SettingsWidget::onStartTimeLapseClicked()
 
   if (startRequested)
   {
-    this->ui.startTimeLapse->setText("Stop Time-lapse");
+    this->setTimeLapseRunningUi(true);
     this->ui.startDateTime->setDateTime(QDateTime::currentDateTime());
 
     if (this->TimeLapseEnd() <= this->TimeLapseStart())
@@ -535,7 +588,6 @@ void SettingsWidget::onStartTimeLapseClicked()
     }
 
     this->SetupAVIStrings();
-    this->ShowTimeLapseState(true);
 
     QString const dir = this->ui.avi_directory_TL->text();
     MARTY_LOG_INFO(settings_log,
@@ -552,7 +604,7 @@ void SettingsWidget::onStartTimeLapseClicked()
   else
   {
     this->capturethread->stopTimeLapse();
-    this->ui.startTimeLapse->setText("Start Time-lapse");
+    this->setTimeLapseRunningUi(false);
     MARTY_LOG_INFO(settings_log, "{:<20} Time-lapse STOP requested by user", "SettingsWidget");
   }
 }

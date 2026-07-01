@@ -73,13 +73,14 @@ class StreamCaptureThread : public QObject
   //
   // Time Lapse film
   //
+  std::shared_ptr<TimeLapseFFmpegWriter> timeLapseWriter() { return this->timeLapseFFmpegWriter; }
   void addNextFrameToTimeLapse(bool write) { this->TimeLapseAVI_Writing = write; }
+  void applyTimeLapseConfig(
+      std::string const& directory, double bitrateMBps, std::uint64_t frameIntervalMs, double fps);
   void setWriteTimeLapseAVIName(char const* name);
-  void setTimeLapseBitrateMBps(double value) { this->TimeLapseBitrateMBps = value; }
-  std::chrono::system_clock::time_point getLastTimeLapseWriteTime()
-  {
-    return this->timeLapseFFmpegWriter->getLastWriteTime();
-  }
+  void setTimeLapseBitrateMBps(double value);
+  void setTimeLapseFrameIntervalMs(std::uint64_t value);
+  void setTimeLapseFPS(double value);
 
   //
   // General
@@ -138,9 +139,6 @@ class StreamCaptureThread : public QObject
   std::atomic<bool> aviWriterActive;
   std::string AVI_Directory;
   std::string MotionAVI_Name;
-  std::string TimeLapse_Directory;
-  std::string TimeLapseAVI_Name;
-  double TimeLapseBitrateMBps = 4.0;
   std::string CaptureStatus;
   std::string CameraURL;
   //
